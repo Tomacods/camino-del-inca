@@ -11,9 +11,9 @@ Mora Anabella Molina y Mariano Reyes.
 
 | Parte | Tecnología |
 |---|---|
-| Lógica de negocio | Laravel (PHP), patrón Modelo–Vista–Controlador |
-| Portal del cliente | Vistas Blade y componentes Livewire |
-| Panel del administrador y del guía | Filament |
+| Lógica de negocio | Laravel 12 (PHP), patrón Modelo–Vista–Controlador |
+| Portal del cliente | Vistas Blade y componentes Livewire 4 |
+| Panel del administrador y del guía | Filament 5 |
 | Acceso a datos | Eloquent (Active Record) y migraciones |
 | Base de datos | PostgreSQL |
 | Cobro | Mercado Pago, Checkout Pro en modo de prueba |
@@ -21,37 +21,23 @@ Mora Anabella Molina y Mariano Reyes.
 
 ## Requisitos
 
-- **PHP 8.2 o superior**, con estas extensiones habilitadas en `php.ini`: `pdo_pgsql`, `pgsql`, `intl`, `zip`,
-  `mbstring`, `fileinfo`, `curl`, `openssl`. En Windows suelen venir comentadas: se les saca el `;` de adelante.
+- **PHP 8.2 o superior** (probado con 8.5), con las extensiones `pdo_pgsql`, `pgsql`, `intl`, `zip`, `mbstring`,
+  `fileinfo`, `curl` y `openssl`
 - **Composer 2**
-- **Node.js 22** (LTS) con npm
-- **PostgreSQL** y pgAdmin
+- **Node.js 22 o superior** (probado con 24), con npm
+- **PostgreSQL**
 - **Git**. En Windows, los comandos de este repositorio se corren desde **Git Bash**.
 
-Para comprobarlo: `php -v`, `php -m`, `composer -V`, `node -v`, `psql --version`.
+**Si no tenés nada de esto instalado, seguí [docs/instalacion-windows.md](docs/instalacion-windows.md)**: tiene los
+pasos en orden y los problemas que ya nos pasaron (el Control inteligente de aplicaciones de Windows bloquea PHP, y el
+instalador de PostgreSQL a veces no crea el servicio).
 
-## Puesta en marcha inicial (una sola vez, una sola persona)
-
-> Esta sección se borra cuando Laravel ya esté subido al repositorio.
-
-El repositorio arranca sólo con las reglas de trabajo y los scripts. Laravel, Livewire y Filament se instalan con:
-
-```bash
-bash scripts/instalar-laravel.sh
-```
-
-El script descarga el proyecto base de Laravel, lo ubica en la raíz sin pisar los archivos del grupo, deja el `.env`
-apuntando a PostgreSQL e instala Filament. Al terminar muestra los pasos que quedan a mano (crear la base, migrar,
-crear el usuario del panel y subir todo). Por defecto instala Laravel 12 y Filament 5; para otra versión:
-
-```bash
-LARAVEL="^13.0" bash scripts/instalar-laravel.sh    # Laravel 13 necesita PHP 8.3
-```
+Para comprobar que está todo: `php -v`, `composer -V` y `node -v` tienen que responder con su versión.
 
 ## Para clonar y levantar el proyecto
 
 ```bash
-git clone https://github.com/<usuario>/camino-del-inca.git
+git clone https://github.com/Tomacods/camino-del-inca.git
 cd camino-del-inca
 
 composer install
@@ -63,7 +49,7 @@ php artisan key:generate
 
 Después:
 
-1. Crear en PostgreSQL una base vacía llamada `camino_del_inca` (pgAdmin, o `createdb -U postgres camino_del_inca`).
+1. Crear en PostgreSQL una base vacía llamada `camino_del_inca` (con pgAdmin, o con `createdb -U postgres camino_del_inca`).
 2. En `.env`, completar `DB_PASSWORD` con la contraseña de tu PostgreSQL.
 3. Crear las tablas y cargar los datos de prueba:
 
@@ -71,7 +57,13 @@ Después:
    php artisan migrate --seed
    ```
 
-4. Levantar la aplicación, en dos terminales:
+4. Crear tu usuario para entrar al panel (el correo y la contraseña son sólo para tu PC):
+
+   ```bash
+   php artisan make:filament-user --name="Tu nombre" --email="admin@caminodelinca.test" --password="admin1234"
+   ```
+
+5. Levantar la aplicación, en dos ventanas de Git Bash:
 
    ```bash
    php artisan serve     # http://localhost:8000   (panel: http://localhost:8000/admin)
@@ -79,6 +71,8 @@ Después:
    ```
 
 El archivo `.env` es de cada uno y no se sube. Si se agrega una variable nueva, se agrega también en `.env.example`.
+
+Después de cada `git pull` que traiga cambios: `composer install`, `npm install` y `php artisan migrate`.
 
 ## Cómo trabajamos
 
@@ -88,14 +82,17 @@ respalda la base.
 
 ## Qué hay en el repositorio
 
+Además de las carpetas de Laravel (`app`, `config`, `database`, `resources`, `routes`, etc.):
+
 | Carpeta o archivo | Contenido |
 |---|---|
 | `CONTRIBUTING.md` | Forma de trabajo: ramas, commits, *pull requests*, migraciones, versiones estables y respaldos |
+| `docs/instalacion-windows.md` | Instalación de PHP, Composer, Node y PostgreSQL en Windows, y problemas conocidos |
 | `docs/reparto-casos-de-uso.md` | Quién hace cada caso de uso y en qué orden |
 | `docs/esquema-base-de-datos.md` | Las 15 tablas del Documento de Normalización, como referencia para las migraciones |
 | `docs/convenciones-de-codigo.md` | Nombres, dónde va cada cosa y formato del código |
-| `scripts/instalar-laravel.sh` | Instalación inicial de Laravel, Livewire y Filament (usa `scripts/configurar-env.php` para el `.env`) |
 | `scripts/respaldar-bd.sh` | Respaldo de la base de datos local en `respaldos/` |
+| `scripts/instalar-laravel.sh` | Con lo que se instaló Laravel, Livewire y Filament el 03/10. Ya se usó: queda como registro |
 | `.github/pull_request_template.md` | Lista de control que aparece al abrir un *pull request* |
 
 La documentación del proyecto (ERS, modelo de dominio y casos de uso, arquitectura, normalización, diagramas) está en
