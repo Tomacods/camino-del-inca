@@ -1,0 +1,34 @@
+# --- Laravel (lo mismo que trae el proyecto base) ---
+*.log
+.DS_Store
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+/.fleet
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+Homestead.json
+Homestead.yaml
+Thumbs.db
+
+# --- Propio del grupo ---
+# Carpeta temporal del script de instalación
+/_laravel_tmp
+# Respaldos de la base: quedan en cada PC y en el Drive, no en el repositorio
+/respaldos/*
+!/respaldos/.gitkeep
+# Base SQLite que crea Laravel por defecto (usamos PostgreSQL)
+/database/*.sqlite
