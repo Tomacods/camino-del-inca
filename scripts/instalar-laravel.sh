@@ -20,7 +20,7 @@ set -euo pipefail
 
 LARAVEL="${LARAVEL:-^12.0}"
 FILAMENT="${FILAMENT:-^5.0}"
-TMP="_laravel_tmp"
+DESCARGA="_laravel_tmp"
 
 paso()  { printf '\n==> %s\n' "$*"; }
 aviso() { printf '    %s\n' "$*"; }
@@ -64,13 +64,13 @@ if [ -f artisan ] && [ -f composer.json ]; then
     paso "Laravel ya está en el repositorio: se saltea la descarga"
 else
     paso "Descargando el proyecto base de Laravel $LARAVEL"
-    rm -rf "$TMP"
-    composer create-project "laravel/laravel:$LARAVEL" "$TMP" \
+    rm -rf "$DESCARGA"
+    composer create-project "laravel/laravel:$LARAVEL" "$DESCARGA" \
         --no-install --no-scripts --no-interaction --prefer-dist
 
     paso "Pasando los archivos de Laravel a la raíz del repositorio"
     shopt -s dotglob nullglob
-    for origen in "$TMP"/*; do
+    for origen in "$DESCARGA"/*; do
         nombre="$(basename "$origen")"
         if [ "$nombre" = ".git" ]; then
             continue
@@ -84,7 +84,7 @@ else
         fi
     done
     shopt -u dotglob nullglob
-    rm -rf "$TMP"
+    rm -rf "$DESCARGA"
 fi
 
 # --------------------------------------------------------------------------
