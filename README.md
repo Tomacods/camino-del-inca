@@ -57,11 +57,15 @@ Después:
    php artisan migrate --seed
    ```
 
-4. Crear tu usuario para entrar al panel (el correo y la contraseña son sólo para tu PC):
+4. Entrar al panel con una de las cuentas de prueba que cargan los *seeders* (`database/seeders/UsuarioSeeder.php`):
 
-   ```bash
-   php artisan make:filament-user --name="Tu nombre" --email="admin@caminodelinca.test" --password="admin1234"
-   ```
+   | Rol | Correo | Contraseña |
+   |---|---|---|
+   | Administrador | `admin@caminodelinca.test` | `admin1234` |
+   | Guía | `guia@caminodelinca.test` | `guia1234` |
+
+   Son sólo para probar en tu PC. No hace falta crear usuarios a mano: `php artisan make:filament-user` no sirve, porque
+   la tabla `usuario` no tiene las columnas que usa Filament por defecto.
 
 5. Levantar la aplicación, en dos ventanas de Git Bash:
 
