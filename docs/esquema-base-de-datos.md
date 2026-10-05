@@ -8,6 +8,9 @@ falta cambiar una tabla, se cambia también el Doc 6.
 
 **Clave primaria** en negrita · *clave foránea* en cursiva · ***clave primaria que también es foránea*** en ambas.
 
+Los nombres de las tablas figuran en mayúscula, como en el Doc 6; en la base van en minúscula (`usuario`,
+`paquete_servicio`).
+
 | Tabla | Columnas |
 |---|---|
 | USUARIO | **id_usuario**, correo, password, rol |
@@ -59,18 +62,23 @@ El monto de una devolución se calcula sobre **la suma de todos los pagos** de l
   `categoria`) son columnas con dominio cerrado: los valores son los del diagrama de clases del Doc 3.
 - `plazas_retenidas` arranca en 0 y nunca es negativa.
 
-## Decisiones para tomar al empezar el TP5
+## Decisiones del TP5
 
-Son del grupo; conviene cerrarlas antes de escribir la primera migración.
+Tomadas el 05/10. Cómo se escriben en el código está en [convenciones](convenciones-de-codigo.md).
 
-1. **Nombres de tablas y claves.** Laravel espera tablas en plural y clave `id` (`reservas.id`); el Doc 6 usa singular y
-   `id_<tabla>` (`RESERVA.id_reserva`). Se puede mantener lo del Doc 6 declarando `$table` y `$primaryKey` en cada
-   modelo, y así la base coincide con la documentación que revisa la cátedra. Lo que se elija, igual en las 15 tablas.
-2. **Tabla de usuarios.** El proyecto base de Laravel trae su propia tabla `users` (con `name` y `email`) y Filament la
-   usa para el inicio de sesión. Hay que reemplazarla por USUARIO (`correo`, `password`, `rol`) y adaptar el inicio de
-   sesión del panel a esos nombres. Revisar en la documentación de Filament cómo se cambia el campo de acceso y de
-   dónde toma el nombre que muestra.
-3. **Fechas de auditoría.** Eloquent agrega `created_at` y `updated_at` salvo que el modelo declare
-   `$timestamps = false`. El Doc 6 no las tiene.
-4. **Retención de cupo.** Dónde se guarda la hora de inicio de cada retención y cómo se asegura la concurrencia
-   (ver [reparto](reparto-casos-de-uso.md), pendientes del Área B).
+1. **Nombres de tablas y claves: los del Doc 6.** Tablas en singular y minúscula (`reserva`) y clave primaria
+   `id_<tabla>` (`id_reserva`); cada modelo declara `$table` y `$primaryKey`. Así la base coincide con la documentación
+   que revisa la cátedra.
+2. **Tabla de usuarios: USUARIO reemplaza a `users`.** Columnas `correo`, `password` y `rol`; el modelo es `Usuario`. El
+   panel de Filament inicia sesión por `correo` y no ofrece «Recordarme», porque no hay columna `remember_token`. No se
+   crea `password_reset_tokens`. Las cuentas de administrador y de guía se cargan con los *seeders*.
+3. **Sin fechas de auditoría.** Ninguna tabla lleva `created_at` ni `updated_at`: los modelos declaran
+   `$timestamps = false`.
+
+Las tablas `sessions`, `cache`, `jobs` y `migrations` son de Laravel: no forman parte del modelo de datos y se dejan
+como vienen.
+
+## Pendiente
+
+**Retención de cupo.** Dónde se guarda la hora de inicio de cada retención y cómo se asegura la concurrencia
+(ver [reparto](reparto-casos-de-uso.md), pendientes del Área B). Se consulta a la cátedra el 09/10.
