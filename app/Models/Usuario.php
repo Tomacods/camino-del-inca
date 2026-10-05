@@ -5,6 +5,7 @@ namespace App\Models;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
 use Filament\Panel;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class Usuario extends Authenticatable implements FilamentUser, HasName
@@ -37,6 +38,11 @@ class Usuario extends Authenticatable implements FilamentUser, HasName
         return [
             'password' => 'hashed',
         ];
+    }
+
+    public function guia(): HasOne
+    {
+        return $this->hasOne(Guia::class, 'id_usuario', 'id_usuario');
     }
 
     public function canAccessPanel(Panel $panel): bool
