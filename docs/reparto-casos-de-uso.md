@@ -1,8 +1,8 @@
 # Reparto de casos de uso
 
-Propuesta de reparto en cuatro áreas, una por integrante. Las áreas agrupan casos de uso que tocan las mismas pantallas
-y las mismas clases, para que cada uno pueda avanzar sin pisar a los demás. **Falta completar los nombres** y ajustar
-lo que el grupo decida.
+Reparto en cuatro áreas, una por integrante (decidido por el grupo el 05/10). Las áreas agrupan casos de uso que tocan
+las mismas pantallas y las mismas clases, para que cada uno pueda avanzar sin pisar a los demás. **Falta confirmar** los
+responsables de la base compartida y definir los de las tareas que cruzan todas las áreas.
 
 Dónde se programa cada caso de uso:
 
@@ -16,18 +16,22 @@ Se hace primero y entre todos, porque los 26 casos de uso dependen de ella. Term
 
 | Parte | Tablas (ver [esquema](esquema-base-de-datos.md)) | Responsable |
 |---|---|---|
-| Usuarios y acceso | USUARIO, GUIA; inicio de sesión por rol | |
-| Catálogo | RECORRIDO, ETAPA, SERVICIO, PAQUETE, PAQUETE_SERVICIO | |
-| Excursión y reserva | EXCURSION, RESERVA, EXCURSIONISTA | |
-| Pagos y valoraciones | PAGO, COMPROBANTE, DEVOLUCION, VALORACION, DETALLE_VALORACION | |
+| Usuarios y acceso | USUARIO, GUIA; inicio de sesión por rol | César (a confirmar) |
+| Catálogo | RECORRIDO, ETAPA, SERVICIO, PAQUETE, PAQUETE_SERVICIO | Mariano (a confirmar) |
+| Excursión y reserva | EXCURSION, RESERVA, EXCURSIONISTA | Tomás (a confirmar) |
+| Pagos y valoraciones | PAGO, COMPROBANTE, DEVOLUCION, VALORACION, DETALLE_VALORACION | Mora (a confirmar) |
 
 Cada parte incluye la migración, el modelo con sus relaciones y los datos de prueba (*seeders*). Los recorridos, las
 etapas, los servicios y las cuentas de administrador y guía son datos precargados (ERS, sección 2.5): van en los
 *seeders*.
 
+Las partes se integran en el orden de la tabla, porque cada una referencia a las anteriores: «Usuarios y acceso» y
+«Catálogo» pueden avanzar a la vez; «Excursión y reserva» necesita PAQUETE, GUIA y ETAPA; «Pagos y valoraciones»
+necesita RESERVA.
+
 ## Área A — Paquetes, valoraciones y acceso
 
-**Responsable:**
+**Responsable:** Mariano
 
 | CU | Nombre | Actor | Dónde |
 |---|---|---|---|
@@ -44,7 +48,7 @@ etapas, los servicios y las cuentas de administrador y guía son datos precargad
 
 ## Área B — Reserva y pagos
 
-**Responsable:**
+**Responsable:** Tomás
 
 | CU | Nombre | Actor | Dónde |
 |---|---|---|---|
@@ -57,7 +61,7 @@ Mercado Pago. El paquete `mercadopago/dx-php` se agrega en esta área.
 
 ## Área C — Gestión de la reserva
 
-**Responsable:**
+**Responsable:** Mora
 
 | CU | Nombre | Actor | Dónde |
 |---|---|---|---|
@@ -70,7 +74,7 @@ Mercado Pago. El paquete `mercadopago/dx-php` se agrega en esta área.
 
 ## Área D — Permisos, excursión, notificaciones y cancelaciones automáticas
 
-**Responsable:**
+**Responsable:** César
 
 | CU | Nombre | Actor | Dónde |
 |---|---|---|---|
