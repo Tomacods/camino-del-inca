@@ -54,8 +54,11 @@ Después:
 3. Crear las tablas y cargar los datos de prueba:
 
    ```bash
-   php artisan migrate --seed
+   php artisan migrate:fresh --seed
    ```
+
+   El comando borra todas las tablas de la base y las vuelve a crear, así que sirve tanto la primera vez como si la
+   base ya tenía tablas de una versión anterior.
 
 4. Entrar al panel con una de las cuentas de prueba que cargan los *seeders* (`database/seeders/UsuarioSeeder.php`):
 
@@ -76,7 +79,12 @@ Después:
 
 El archivo `.env` es de cada uno y no se sube. Si se agrega una variable nueva, se agrega también en `.env.example`.
 
-Después de cada `git pull` que traiga cambios: `composer install`, `npm install` y `php artisan migrate`.
+Después de cada `git pull` que traiga cambios: `composer install`, `npm install` y
+`php artisan migrate:fresh --seed`.
+
+Mientras se arma la base (hasta la etiqueta `v0.1`) las migraciones se corrigen y se renombran, y `php artisan migrate`
+solo falla o deja la base a medias: por eso se reconstruye entera. Se pierden los datos cargados a mano; los de prueba
+los repone el *seeder*. A partir de `v0.1` alcanza con `php artisan migrate`.
 
 ## Cómo trabajamos
 

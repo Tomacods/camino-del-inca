@@ -92,7 +92,8 @@ El que revisa baja la rama, corre lo mismo y prueba el caso de uso. Si funciona,
 - `composer.lock` y `package-lock.json` **se suben**. Así todos tenemos las mismas versiones.
 - Un paquete nuevo se agrega con `composer require` o `npm install <paquete>` en una rama propia y se avisa al grupo.
 - Si hay conflicto en un archivo `.lock`, no se resuelve a mano: se toma el de `main` y se vuelve a correr el comando.
-- Después de un `git pull` que trae cambios: `composer install`, `npm install` y `php artisan migrate`.
+- Después de un `git pull` que trae cambios: `composer install`, `npm install` y, hasta la etiqueta `v0.1`,
+  `php artisan migrate:fresh --seed`. A partir de `v0.1`, `php artisan migrate`.
 
 ## Versiones estables y respaldos
 
