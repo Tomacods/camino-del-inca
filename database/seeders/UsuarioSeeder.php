@@ -27,5 +27,11 @@ class UsuarioSeeder extends Seeder
             'password' => 'luko1234',
             'rol' => Usuario::ROL_GUIA,
         ]);
+
+        Usuario::create([
+            'correo' => 'ojosverdes@caminodelinca.test',
+            'password' => 'ojosverdes1234',
+            'rol' => Usuario::ROL_GUIA,
+        ]);
     }
 }
