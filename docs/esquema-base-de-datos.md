@@ -56,10 +56,12 @@ El monto de una devolución se calcula sobre **la suma de todos los pagos** de l
 
 ## Restricciones
 
-- Valores únicos: `RESERVA.numero_reserva`, `PAQUETE.nombre`, `COMPROBANTE.numero_comprobante`,
+- Valores únicos: `USUARIO.correo`, `RESERVA.numero_reserva`, `PAQUETE.nombre`, `COMPROBANTE.numero_comprobante`,
   (`id_paquete`, `fecha_salida`) en EXCURSION y (`id_reserva`, `tipo_pago`) en PAGO.
 - Las enumeraciones (`rol`, `estado`, `estado_saldo`, `estado_permiso`, `tipo_pago`, `medio_pago`, `motivo`, `tipo`,
-  `categoria`) son columnas con dominio cerrado: los valores son los del diagrama de clases del Doc 3.
+  `categoria`) son columnas con dominio cerrado: los valores son los del diagrama de clases del Doc 3. Los que ya están
+  en la base:
+  - `USUARIO.rol`: «Administrador» o «Guía».
 - `plazas_retenidas` arranca en 0 y nunca es negativa.
 
 ## Decisiones del TP5
