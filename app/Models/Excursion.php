@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class Excursion extends Model
 {
@@ -50,5 +51,10 @@ class Excursion extends Model
     public function reservas(): HasMany
     {
         return $this->hasMany(Reserva::class, 'id_excursion', 'id_excursion');
+    }
+
+    public function getFechaSalida(): Carbon
+    {
+        return $this->fecha_salida;
     }
 }
