@@ -195,7 +195,7 @@ Reserva grupal de una excursión.
 |---|---|---|---|
 | `id_reserva` | BIGINT | No | Clave primaria, autoincremental |
 | `id_excursion` | BIGINT | No | Clave foránea a `excursion` |
-| `numero_reserva` | VARCHAR(12) | No | Único. Número secuencial más dígito verificador |
+| `numero_reserva` | VARCHAR(12) | No | Único. Número secuencial más dígito verificador, separados por guion (`000124-7`). El dígito es el resto de dividir por 11 la suma de los dígitos del número multiplicados por los pesos 2 a 7, desde la derecha (módulo 11). Los números cuyo resto es 10 no se emiten |
 | `correo_electronico` | VARCHAR(100) | No | Correo del titular |
 | `fecha_reserva` | TIMESTAMP | No | Momento en que se registra el primer pago |
 | `estado` | Enumeración EstadoReserva | No | Por defecto «Pendiente» |

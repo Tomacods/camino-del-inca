@@ -21,6 +21,7 @@ class PaqueteSeeder extends Seeder
             precioBase: 750,
             cantidadPorteadores: 6,
             nombresServicios: [
+                'Hotel en Cusco',
                 'Bus de Cusco al Kilómetro 82',
                 'Camping Wayllabamba',
                 'Camping Pacaymayo',
@@ -51,6 +52,7 @@ class PaqueteSeeder extends Seeder
             precioBase: 950,
             cantidadPorteadores: 8,
             nombresServicios: [
+                'Hotel en Cusco',
                 'Bus de Cusco al Kilómetro 82',
                 'Camping Wayllabamba',
                 'Camping Ayapata',

@@ -21,7 +21,7 @@ class PagoSeeder extends Seeder
             tipoPago: Pago::TIPO_PAGO_TOTAL,
             monto: 1545,
             medioPago: 'Tarjeta de crédito',
-            fechaHoraPago: '2026-06-15 11:20:00',
+            fechaHoraPago: '2026-06-01 11:20:00',
             numeroComprobante: '0001-00000001',
         );
 
@@ -41,7 +41,7 @@ class PagoSeeder extends Seeder
             tipoPago: Pago::TIPO_PAGO_TOTAL,
             monto: 1710,
             medioPago: 'Dinero en cuenta de Mercado Pago',
-            fechaHoraPago: '2026-09-20 16:45:00',
+            fechaHoraPago: '2026-09-10 16:45:00',
             numeroComprobante: '0001-00000003',
         );
 
@@ -61,8 +61,18 @@ class PagoSeeder extends Seeder
             tipoPago: Pago::TIPO_PAGO_SENA,
             monto: 1350,
             medioPago: 'Tarjeta de crédito',
-            fechaHoraPago: '2026-10-02 10:30:00',
+            fechaHoraPago: '2026-09-30 10:30:00',
             numeroComprobante: '0001-00000005',
+        );
+
+        // Confirmada con saldo adeudado: seña de 2 × 750.
+        $this->crearPago(
+            numeroReserva: '000125-9',
+            tipoPago: Pago::TIPO_PAGO_SENA,
+            monto: 750,
+            medioPago: 'Tarjeta de crédito',
+            fechaHoraPago: '2026-10-01 18:20:00',
+            numeroComprobante: '0001-00000006',
         );
     }
 
