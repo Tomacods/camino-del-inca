@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\TipoServicio;
 use App\Models\Servicio;
 use Illuminate\Database\Seeder;
 
@@ -11,20 +12,20 @@ class ServicioSeeder extends Seeder
     public function run(): void
     {
         $nombresPorTipo = [
-            Servicio::TIPO_HOTEL => [
+            TipoServicio::Hotel->value => [
                 'Hotel en Cusco',
                 'Hotel en Aguas Calientes',
             ],
-            Servicio::TIPO_TRANSPORTE_EN_BUS => [
+            TipoServicio::TransporteEnBus->value => [
                 'Bus de Cusco al Kilómetro 82',
                 'Bus de Machu Picchu a Aguas Calientes',
                 'Bus de Ollantaytambo a Cusco',
             ],
-            Servicio::TIPO_TRANSPORTE_FERROVIARIO => [
+            TipoServicio::TransporteFerroviario->value => [
                 'Tren de Ollantaytambo al Kilómetro 104',
                 'Tren de Aguas Calientes a Ollantaytambo',
             ],
-            Servicio::TIPO_CAMPING_DE_ETAPA => [
+            TipoServicio::CampingDeEtapa->value => [
                 'Camping Wayllabamba',
                 'Camping Ayapata',
                 'Camping Pacaymayo',

@@ -181,7 +181,7 @@ new class extends Component
                     @forelse ($reserva->pagos as $pago)
                         <li class="flex items-start justify-between gap-4 rounded-xl bg-fondo px-4 py-3">
                             <div>
-                                <p class="font-medium">{{ $pago->tipo_pago }}</p>
+                                <p class="font-medium">{{ $pago->tipo_pago->value }}</p>
                                 <p class="text-[15px] text-texto-secundario">
                                     <span class="tabular-nums">{{ $pago->fecha->format('d/m/Y') }}</span> · {{ $pago->medio_pago }}
                                 </p>

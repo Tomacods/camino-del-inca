@@ -2,17 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoPermiso;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Excursionista extends Model
 {
-    public const ESTADO_PERMISO_PENDIENTE = 'Pendiente';
-
-    public const ESTADO_PERMISO_OBTENIDO = 'Obtenido';
-
-    public const ESTADO_PERMISO_NO_OBTENIDO = 'No Obtenido';
-
     protected $table = 'excursionista';
 
     protected $primaryKey = 'id_excursionista';
@@ -32,6 +27,7 @@ class Excursionista extends Model
     {
         return [
             'equipo_camping' => 'boolean',
+            'estado_permiso' => EstadoPermiso::class,
         ];
     }
 

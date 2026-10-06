@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\EstadoReserva;
 use Tests\TestCase;
 
 class PortalInicioTest extends TestCase
@@ -17,9 +18,9 @@ class PortalInicioTest extends TestCase
 
     public function test_el_chip_de_estado_escribe_el_estado(): void
     {
-        $html = $this->blade('<x-chip-estado estado="Sin Permiso" />');
+        $html = $this->blade('<x-chip-estado :estado="$estado" />', ['estado' => EstadoReserva::SinPermiso]);
 
-        $html->assertSee('Sin Permiso');
+        $html->assertSee(EstadoReserva::SinPermiso->value);
         $html->assertSee('text-error');
     }
 }

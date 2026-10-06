@@ -2,18 +2,13 @@
 
 namespace App\Models;
 
+use App\Enums\TipoPago;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Pago extends Model
 {
-    public const TIPO_PAGO_SENA = 'Seña';
-
-    public const TIPO_PAGO_SALDO = 'Saldo';
-
-    public const TIPO_PAGO_TOTAL = 'Total';
-
     protected $table = 'pago';
 
     protected $primaryKey = 'id_pago';
@@ -33,6 +28,7 @@ class Pago extends Model
         return [
             'fecha' => 'date',
             'monto' => 'decimal:2',
+            'tipo_pago' => TipoPago::class,
         ];
     }
 

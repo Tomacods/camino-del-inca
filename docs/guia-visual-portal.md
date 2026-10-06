@@ -210,7 +210,7 @@ Fondo blanco, bordes redondeados y sombra suave. Agrupa un bloque de contenido. 
 
 | Atributo | Valores |
 |---|---|
-| `estado` | El enum `EstadoReserva` o su texto, o el estado del permiso de un excursionista (`estado_permiso`) |
+| `estado` | Un caso del enum `EstadoReserva` o del enum `EstadoPermiso` (el `estado_permiso` de un excursionista) |
 
 El estado siempre va escrito: el color ayuda, pero no es lo único que lo indica.
 

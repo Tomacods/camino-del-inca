@@ -2,7 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\Excursionista;
+use App\Enums\EstadoPermiso;
+use App\Enums\EstadoReserva;
+use App\Enums\EstadoSaldo;
 use App\Models\Paquete;
 use App\Models\Reserva;
 use Illuminate\Database\Seeder;
@@ -19,14 +21,14 @@ class ReservaSeeder extends Seeder
             'numero_reserva' => '000118-1',
             'correo_electronico' => 'paula.benitez@mail.com',
             'fecha_reserva' => '2026-05-18 15:40:00',
-            'estado' => Reserva::ESTADO_FINALIZADA,
-            'estado_saldo' => Reserva::ESTADO_SALDO_ABONADO,
+            'estado' => EstadoReserva::Finalizada,
+            'estado_saldo' => EstadoSaldo::Abonado,
             'noches_extra_antes' => 0,
             'noches_extra_despues' => 0,
             'fecha_limite_saldo' => '2026-08-07 23:59:59',
             'fecha_limite_confirmacion' => '2026-08-07 23:59:59',
         ], [
-            ['nombre' => 'Paula', 'apellido' => 'Benítez', 'documento_pasaporte' => 'AAB905731', 'equipo_camping' => false, 'estado_permiso' => Excursionista::ESTADO_PERMISO_OBTENIDO],
+            ['nombre' => 'Paula', 'apellido' => 'Benítez', 'documento_pasaporte' => 'AAB905731', 'equipo_camping' => false, 'estado_permiso' => EstadoPermiso::Obtenido],
         ]);
 
         // Se abonó el total al reservar: no tiene fecha límite de saldo.
@@ -34,29 +36,29 @@ class ReservaSeeder extends Seeder
             'numero_reserva' => '000119-3',
             'correo_electronico' => 'carlos.gomez@mail.com',
             'fecha_reserva' => '2026-06-01 11:20:00',
-            'estado' => Reserva::ESTADO_FINALIZADA,
-            'estado_saldo' => Reserva::ESTADO_SALDO_ABONADO,
+            'estado' => EstadoReserva::Finalizada,
+            'estado_saldo' => EstadoSaldo::Abonado,
             'noches_extra_antes' => 0,
             'noches_extra_despues' => 0,
             'fecha_limite_saldo' => null,
             'fecha_limite_confirmacion' => '2026-08-07 23:59:59',
         ], [
-            ['nombre' => 'Carlos', 'apellido' => 'Gómez', 'documento_pasaporte' => 'AAC118204', 'equipo_camping' => true, 'estado_permiso' => Excursionista::ESTADO_PERMISO_OBTENIDO],
-            ['nombre' => 'Ana', 'apellido' => 'Gómez', 'documento_pasaporte' => 'AAC118205', 'equipo_camping' => false, 'estado_permiso' => Excursionista::ESTADO_PERMISO_OBTENIDO],
+            ['nombre' => 'Carlos', 'apellido' => 'Gómez', 'documento_pasaporte' => 'AAC118204', 'equipo_camping' => true, 'estado_permiso' => EstadoPermiso::Obtenido],
+            ['nombre' => 'Ana', 'apellido' => 'Gómez', 'documento_pasaporte' => 'AAC118205', 'equipo_camping' => false, 'estado_permiso' => EstadoPermiso::Obtenido],
         ]);
 
         $this->crearReserva('Camino Inca Corto', '2027-01-11', [
             'numero_reserva' => '000121-1',
             'correo_electronico' => 'martina.lopez@mail.com',
             'fecha_reserva' => '2026-09-05 14:05:00',
-            'estado' => Reserva::ESTADO_CANCELADA,
-            'estado_saldo' => Reserva::ESTADO_SALDO_ADEUDADO,
+            'estado' => EstadoReserva::Cancelada,
+            'estado_saldo' => EstadoSaldo::Adeudado,
             'noches_extra_antes' => 0,
             'noches_extra_despues' => 0,
             'fecha_limite_saldo' => '2026-12-11 23:59:59',
             'fecha_limite_confirmacion' => '2026-12-11 23:59:59',
         ], [
-            ['nombre' => 'Martina', 'apellido' => 'López', 'documento_pasaporte' => 'AAD330917', 'equipo_camping' => false, 'estado_permiso' => Excursionista::ESTADO_PERMISO_PENDIENTE],
+            ['nombre' => 'Martina', 'apellido' => 'López', 'documento_pasaporte' => 'AAD330917', 'equipo_camping' => false, 'estado_permiso' => EstadoPermiso::Pendiente],
         ]);
 
         // Se abonó el total al reservar: no tiene fecha límite de saldo.
@@ -64,30 +66,30 @@ class ReservaSeeder extends Seeder
             'numero_reserva' => '000122-3',
             'correo_electronico' => 'valentina.diaz@mail.com',
             'fecha_reserva' => '2026-09-10 16:45:00',
-            'estado' => Reserva::ESTADO_CONFIRMADA,
-            'estado_saldo' => Reserva::ESTADO_SALDO_ABONADO,
+            'estado' => EstadoReserva::Confirmada,
+            'estado_saldo' => EstadoSaldo::Abonado,
             'noches_extra_antes' => 1,
             'noches_extra_despues' => 0,
             'fecha_limite_saldo' => null,
             'fecha_limite_confirmacion' => '2026-11-14 23:59:59',
         ], [
-            ['nombre' => 'Valentina', 'apellido' => 'Díaz', 'documento_pasaporte' => 'AAE402215', 'equipo_camping' => true, 'estado_permiso' => Excursionista::ESTADO_PERMISO_OBTENIDO],
-            ['nombre' => 'Joaquín', 'apellido' => 'Pereyra', 'documento_pasaporte' => 'AAE402388', 'equipo_camping' => true, 'estado_permiso' => Excursionista::ESTADO_PERMISO_OBTENIDO],
+            ['nombre' => 'Valentina', 'apellido' => 'Díaz', 'documento_pasaporte' => 'AAE402215', 'equipo_camping' => true, 'estado_permiso' => EstadoPermiso::Obtenido],
+            ['nombre' => 'Joaquín', 'apellido' => 'Pereyra', 'documento_pasaporte' => 'AAE402388', 'equipo_camping' => true, 'estado_permiso' => EstadoPermiso::Obtenido],
         ]);
 
         $this->crearReserva('Camino Inca Clásico', '2027-01-04', [
             'numero_reserva' => '000123-5',
             'correo_electronico' => 'diego.morales@mail.com',
             'fecha_reserva' => '2026-09-28 09:10:00',
-            'estado' => Reserva::ESTADO_SIN_PERMISO,
-            'estado_saldo' => Reserva::ESTADO_SALDO_ADEUDADO,
+            'estado' => EstadoReserva::SinPermiso,
+            'estado_saldo' => EstadoSaldo::Adeudado,
             'noches_extra_antes' => 0,
             'noches_extra_despues' => 2,
             'fecha_limite_saldo' => '2026-12-04 23:59:59',
             'fecha_limite_confirmacion' => '2026-12-04 23:59:59',
         ], [
-            ['nombre' => 'Diego', 'apellido' => 'Morales', 'documento_pasaporte' => 'AAF517402', 'equipo_camping' => false, 'estado_permiso' => Excursionista::ESTADO_PERMISO_OBTENIDO],
-            ['nombre' => 'Camila', 'apellido' => 'Morales', 'documento_pasaporte' => 'AAF517403', 'equipo_camping' => false, 'estado_permiso' => Excursionista::ESTADO_PERMISO_NO_OBTENIDO],
+            ['nombre' => 'Diego', 'apellido' => 'Morales', 'documento_pasaporte' => 'AAF517402', 'equipo_camping' => false, 'estado_permiso' => EstadoPermiso::Obtenido],
+            ['nombre' => 'Camila', 'apellido' => 'Morales', 'documento_pasaporte' => 'AAF517403', 'equipo_camping' => false, 'estado_permiso' => EstadoPermiso::NoObtenido],
         ]);
 
         // La reserva del prototipo.
@@ -95,16 +97,16 @@ class ReservaSeeder extends Seeder
             'numero_reserva' => '000124-7',
             'correo_electronico' => 'lucia.fernandez@mail.com',
             'fecha_reserva' => '2026-09-30 10:30:00',
-            'estado' => Reserva::ESTADO_PENDIENTE,
-            'estado_saldo' => Reserva::ESTADO_SALDO_ADEUDADO,
+            'estado' => EstadoReserva::Pendiente,
+            'estado_saldo' => EstadoSaldo::Adeudado,
             'noches_extra_antes' => 1,
             'noches_extra_despues' => 1,
             'fecha_limite_saldo' => '2026-12-18 23:59:59',
             'fecha_limite_confirmacion' => '2026-12-18 23:59:59',
         ], [
-            ['nombre' => 'Lucía', 'apellido' => 'Fernández', 'documento_pasaporte' => 'AAG604118', 'equipo_camping' => true, 'estado_permiso' => Excursionista::ESTADO_PERMISO_PENDIENTE],
-            ['nombre' => 'Martín', 'apellido' => 'Fernández', 'documento_pasaporte' => 'AAG604119', 'equipo_camping' => true, 'estado_permiso' => Excursionista::ESTADO_PERMISO_PENDIENTE],
-            ['nombre' => 'Sofía', 'apellido' => 'Ruiz', 'documento_pasaporte' => 'AAG611025', 'equipo_camping' => false, 'estado_permiso' => Excursionista::ESTADO_PERMISO_PENDIENTE],
+            ['nombre' => 'Lucía', 'apellido' => 'Fernández', 'documento_pasaporte' => 'AAG604118', 'equipo_camping' => true, 'estado_permiso' => EstadoPermiso::Pendiente],
+            ['nombre' => 'Martín', 'apellido' => 'Fernández', 'documento_pasaporte' => 'AAG604119', 'equipo_camping' => true, 'estado_permiso' => EstadoPermiso::Pendiente],
+            ['nombre' => 'Sofía', 'apellido' => 'Ruiz', 'documento_pasaporte' => 'AAG611025', 'equipo_camping' => false, 'estado_permiso' => EstadoPermiso::Pendiente],
         ]);
 
         // Confirmada con el saldo todavía adeudado.
@@ -112,15 +114,15 @@ class ReservaSeeder extends Seeder
             'numero_reserva' => '000125-9',
             'correo_electronico' => 'federico.rios@mail.com',
             'fecha_reserva' => '2026-10-01 18:20:00',
-            'estado' => Reserva::ESTADO_CONFIRMADA,
-            'estado_saldo' => Reserva::ESTADO_SALDO_ADEUDADO,
+            'estado' => EstadoReserva::Confirmada,
+            'estado_saldo' => EstadoSaldo::Adeudado,
             'noches_extra_antes' => 0,
             'noches_extra_despues' => 0,
             'fecha_limite_saldo' => '2027-01-01 23:59:59',
             'fecha_limite_confirmacion' => '2027-01-01 23:59:59',
         ], [
-            ['nombre' => 'Federico', 'apellido' => 'Ríos', 'documento_pasaporte' => 'AAH715300', 'equipo_camping' => false, 'estado_permiso' => Excursionista::ESTADO_PERMISO_OBTENIDO],
-            ['nombre' => 'Lorena', 'apellido' => 'Ríos', 'documento_pasaporte' => 'AAH715301', 'equipo_camping' => false, 'estado_permiso' => Excursionista::ESTADO_PERMISO_OBTENIDO],
+            ['nombre' => 'Federico', 'apellido' => 'Ríos', 'documento_pasaporte' => 'AAH715300', 'equipo_camping' => false, 'estado_permiso' => EstadoPermiso::Obtenido],
+            ['nombre' => 'Lorena', 'apellido' => 'Ríos', 'documento_pasaporte' => 'AAH715301', 'equipo_camping' => false, 'estado_permiso' => EstadoPermiso::Obtenido],
         ]);
     }
 

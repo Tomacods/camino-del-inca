@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoPaquete;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -9,10 +10,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Paquete extends Model
 {
-    public const ESTADO_ACTIVO = 'Activo';
-
-    public const ESTADO_INACTIVO = 'Inactivo';
-
     protected $table = 'paquete';
 
     protected $primaryKey = 'id_paquete';
@@ -36,6 +33,7 @@ class Paquete extends Model
             'precio_base' => 'decimal:2',
             'costo_noche_extra_cusco' => 'decimal:2',
             'costo_equipo_camping' => 'decimal:2',
+            'estado' => EstadoPaquete::class,
             'fecha_creacion' => 'date',
         ];
     }

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\TipoPago;
 use App\Models\Comprobante;
 use App\Models\Pago;
 use App\Models\Reserva;
@@ -19,7 +20,7 @@ class PagoSeeder extends Seeder
         // Finalizada sin valoración: seña de 1 × 750.
         $this->crearPago(
             numeroReserva: '000118-1',
-            tipoPago: Pago::TIPO_PAGO_SENA,
+            tipoPago: TipoPago::Sena,
             monto: 375,
             medioPago: 'Tarjeta de débito',
             fechaHoraPago: '2026-05-18 15:40:00',
@@ -29,7 +30,7 @@ class PagoSeeder extends Seeder
         // Finalizada: 2 × 750 + 1 equipo × 45.
         $this->crearPago(
             numeroReserva: '000119-3',
-            tipoPago: Pago::TIPO_PAGO_TOTAL,
+            tipoPago: TipoPago::Total,
             monto: 1545,
             medioPago: 'Tarjeta de crédito',
             fechaHoraPago: '2026-06-01 11:20:00',
@@ -39,7 +40,7 @@ class PagoSeeder extends Seeder
         // Finalizada sin valoración: el saldo, antes de la fecha límite (07/08/2026).
         $this->crearPago(
             numeroReserva: '000118-1',
-            tipoPago: Pago::TIPO_PAGO_SALDO,
+            tipoPago: TipoPago::Saldo,
             monto: 375,
             medioPago: 'Dinero en cuenta de Mercado Pago',
             fechaHoraPago: '2026-07-20 10:15:00',
@@ -49,7 +50,7 @@ class PagoSeeder extends Seeder
         // Cancelada: seña de 1 × 480.
         $this->crearPago(
             numeroReserva: '000121-1',
-            tipoPago: Pago::TIPO_PAGO_SENA,
+            tipoPago: TipoPago::Sena,
             monto: 240,
             medioPago: 'Tarjeta de débito',
             fechaHoraPago: '2026-09-05 14:05:00',
@@ -59,7 +60,7 @@ class PagoSeeder extends Seeder
         // Confirmada: 2 × 750 + 1 noche × 2 × 60 + 2 equipos × 45.
         $this->crearPago(
             numeroReserva: '000122-3',
-            tipoPago: Pago::TIPO_PAGO_TOTAL,
+            tipoPago: TipoPago::Total,
             monto: 1710,
             medioPago: 'Dinero en cuenta de Mercado Pago',
             fechaHoraPago: '2026-09-10 16:45:00',
@@ -69,7 +70,7 @@ class PagoSeeder extends Seeder
         // Sin Permiso: seña de 2 × 750 + 2 noches × 2 × 60.
         $this->crearPago(
             numeroReserva: '000123-5',
-            tipoPago: Pago::TIPO_PAGO_SENA,
+            tipoPago: TipoPago::Sena,
             monto: 870,
             medioPago: 'Tarjeta de crédito',
             fechaHoraPago: '2026-09-28 09:10:00',
@@ -79,7 +80,7 @@ class PagoSeeder extends Seeder
         // La del prototipo: seña de 3 × 750 + 2 noches × 3 × 60 + 2 equipos × 45.
         $this->crearPago(
             numeroReserva: '000124-7',
-            tipoPago: Pago::TIPO_PAGO_SENA,
+            tipoPago: TipoPago::Sena,
             monto: 1350,
             medioPago: 'Tarjeta de crédito',
             fechaHoraPago: '2026-09-30 10:30:00',
@@ -89,7 +90,7 @@ class PagoSeeder extends Seeder
         // Confirmada con saldo adeudado: seña de 2 × 750.
         $this->crearPago(
             numeroReserva: '000125-9',
-            tipoPago: Pago::TIPO_PAGO_SENA,
+            tipoPago: TipoPago::Sena,
             monto: 750,
             medioPago: 'Tarjeta de crédito',
             fechaHoraPago: '2026-10-01 18:20:00',
@@ -99,7 +100,7 @@ class PagoSeeder extends Seeder
 
     private function crearPago(
         string $numeroReserva,
-        string $tipoPago,
+        TipoPago $tipoPago,
         int $monto,
         string $medioPago,
         string $fechaHoraPago,

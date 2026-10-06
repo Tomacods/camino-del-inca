@@ -2,6 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Enums\EstadoPaquete;
+use App\Enums\EstadoPermiso;
+use App\Enums\EstadoReserva;
+use App\Enums\EstadoSaldo;
+use App\Enums\Rol;
 use App\Models\Excursion;
 use App\Models\Excursionista;
 use App\Models\Guia;
@@ -22,9 +27,9 @@ class ExcursionTest extends TestCase
     public function test_suma_los_excursionistas_de_las_reservas_pendientes_confirmadas_y_sin_permiso(): void
     {
         $excursion = $this->crearExcursion(cupo: 12);
-        $this->crearReserva($excursion, Reserva::ESTADO_PENDIENTE, 3);
-        $this->crearReserva($excursion, Reserva::ESTADO_CONFIRMADA, 2);
-        $this->crearReserva($excursion, Reserva::ESTADO_SIN_PERMISO, 1);
+        $this->crearReserva($excursion, EstadoReserva::Pendiente, 3);
+        $this->crearReserva($excursion, EstadoReserva::Confirmada, 2);
+        $this->crearReserva($excursion, EstadoReserva::SinPermiso, 1);
 
         $this->assertSame(6, $excursion->sumarPlazasReservadas());
     }
@@ -32,8 +37,8 @@ class ExcursionTest extends TestCase
     public function test_no_suma_las_reservas_canceladas_ni_finalizadas(): void
     {
         $excursion = $this->crearExcursion(cupo: 12);
-        $this->crearReserva($excursion, Reserva::ESTADO_CANCELADA, 3);
-        $this->crearReserva($excursion, Reserva::ESTADO_FINALIZADA, 2);
+        $this->crearReserva($excursion, EstadoReserva::Cancelada, 3);
+        $this->crearReserva($excursion, EstadoReserva::Finalizada, 2);
 
         $this->assertSame(0, $excursion->sumarPlazasReservadas());
     }
@@ -42,7 +47,7 @@ class ExcursionTest extends TestCase
     {
         $excursion = $this->crearExcursion(cupo: 12);
         $otraExcursion = $this->crearExcursion(cupo: 12, fechaSalida: '2027-01-11');
-        $this->crearReserva($otraExcursion, Reserva::ESTADO_PENDIENTE, 4);
+        $this->crearReserva($otraExcursion, EstadoReserva::Pendiente, 4);
 
         $this->assertSame(0, $excursion->sumarPlazasReservadas());
     }
@@ -50,7 +55,7 @@ class ExcursionTest extends TestCase
     public function test_el_cupo_disponible_descuenta_las_plazas_reservadas_y_las_retenidas(): void
     {
         $excursion = $this->crearExcursion(cupo: 12, plazasRetenidas: 2);
-        $this->crearReserva($excursion, Reserva::ESTADO_CONFIRMADA, 3);
+        $this->crearReserva($excursion, EstadoReserva::Confirmada, 3);
 
         $this->assertSame(7, $excursion->obtenerCupoDisponible());
     }
@@ -58,7 +63,7 @@ class ExcursionTest extends TestCase
     public function test_tiene_cupo_si_la_cantidad_es_justo_el_cupo_disponible(): void
     {
         $excursion = $this->crearExcursion(cupo: 8, plazasRetenidas: 1);
-        $this->crearReserva($excursion, Reserva::ESTADO_PENDIENTE, 3);
+        $this->crearReserva($excursion, EstadoReserva::Pendiente, 3);
 
         $this->assertTrue($excursion->tieneCupoPara(4));
     }
@@ -66,7 +71,7 @@ class ExcursionTest extends TestCase
     public function test_no_tiene_cupo_si_la_cantidad_supera_el_cupo_disponible(): void
     {
         $excursion = $this->crearExcursion(cupo: 8, plazasRetenidas: 1);
-        $this->crearReserva($excursion, Reserva::ESTADO_PENDIENTE, 3);
+        $this->crearReserva($excursion, EstadoReserva::Pendiente, 3);
 
         $this->assertFalse($excursion->tieneCupoPara(5));
     }
@@ -94,7 +99,7 @@ class ExcursionTest extends TestCase
 
     public function test_no_admite_reserva_si_el_paquete_esta_inactivo(): void
     {
-        $excursion = $this->crearExcursion(cupo: 12, fechaSalida: '2027-01-04', estadoPaquete: Paquete::ESTADO_INACTIVO);
+        $excursion = $this->crearExcursion(cupo: 12, fechaSalida: '2027-01-04', estadoPaquete: EstadoPaquete::Inactivo);
 
         $this->assertFalse($excursion->admiteReserva('2026-09-30'));
     }
@@ -110,7 +115,7 @@ class ExcursionTest extends TestCase
     public function test_retiene_el_cupo_si_alcanza_justo(): void
     {
         $excursion = $this->crearExcursion(cupo: 8, plazasRetenidas: 2);
-        $this->crearReserva($excursion, Reserva::ESTADO_CONFIRMADA, 3);
+        $this->crearReserva($excursion, EstadoReserva::Confirmada, 3);
 
         $this->assertTrue($excursion->retenerCupo(3));
         $this->assertSame(5, $excursion->plazas_retenidas);
@@ -121,7 +126,7 @@ class ExcursionTest extends TestCase
     public function test_no_retiene_el_cupo_si_no_alcanza(): void
     {
         $excursion = $this->crearExcursion(cupo: 8, plazasRetenidas: 2);
-        $this->crearReserva($excursion, Reserva::ESTADO_CONFIRMADA, 3);
+        $this->crearReserva($excursion, EstadoReserva::Confirmada, 3);
 
         $this->assertFalse($excursion->retenerCupo(4));
         $this->assertSame(2, $excursion->fresh()->plazas_retenidas);
@@ -211,7 +216,7 @@ class ExcursionTest extends TestCase
         int $cupo,
         int $plazasRetenidas = 0,
         string $fechaSalida = '2027-01-04',
-        string $estadoPaquete = Paquete::ESTADO_ACTIVO,
+        EstadoPaquete $estadoPaquete = EstadoPaquete::Activo,
     ): Excursion {
         $recorrido = Recorrido::create([
             'nombre' => 'Recorrido '.$fechaSalida,
@@ -233,7 +238,7 @@ class ExcursionTest extends TestCase
         $usuario = Usuario::create([
             'correo' => 'guia'.$fechaSalida.'@caminodelinca.test',
             'password' => 'guia1234',
-            'rol' => Usuario::ROL_GUIA,
+            'rol' => Rol::Guia,
         ]);
 
         Guia::create(['id_usuario' => $usuario->id_usuario, 'nombre' => 'Rosa', 'apellido' => 'Quispe']);
@@ -247,7 +252,7 @@ class ExcursionTest extends TestCase
         ])->fresh();
     }
 
-    private function crearReserva(Excursion $excursion, string $estado, int $cantidadExcursionistas): Reserva
+    private function crearReserva(Excursion $excursion, EstadoReserva $estado, int $cantidadExcursionistas): Reserva
     {
         $reserva = Reserva::create([
             'id_excursion' => $excursion->id_excursion,
@@ -255,7 +260,7 @@ class ExcursionTest extends TestCase
             'correo_electronico' => 'titular@mail.com',
             'fecha_reserva' => '2026-10-01 10:00:00',
             'estado' => $estado,
-            'estado_saldo' => Reserva::ESTADO_SALDO_ADEUDADO,
+            'estado_saldo' => EstadoSaldo::Adeudado,
             'noches_extra_antes' => 0,
             'noches_extra_despues' => 0,
             'fecha_limite_saldo' => '2026-12-04 23:59:59',
@@ -269,7 +274,7 @@ class ExcursionTest extends TestCase
                 'apellido' => (string) $numero,
                 'documento_pasaporte' => 'PAS'.$numero,
                 'equipo_camping' => false,
-                'estado_permiso' => Excursionista::ESTADO_PERMISO_PENDIENTE,
+                'estado_permiso' => EstadoPermiso::Pendiente,
             ]);
         }
 

@@ -98,8 +98,8 @@ public function cancelarOperacion()
 ?>
 
 @php
-    $diasLimite = config('reservas.dias_anticipacion_reembolso');
-    $porcentajeReembolso = (int) round(config('reservas.porcentaje_reembolso') * 100);
+    $diasLimite = config('reserva.dias_anticipacion_reembolso');
+    $porcentajeReembolso = (int) round(config('reserva.porcentaje_reembolso') * 100);
 @endphp
 
 <div class="grid gap-6 md:grid-cols-[300px_1fr]">
