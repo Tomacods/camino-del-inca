@@ -4,36 +4,37 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Devolucion extends Model
+class Valoracion extends Model
 {
-    public const MOTIVO_REINTEGRO = 'Reintegro';
+    protected $table = 'valoracion';
 
-    public const MOTIVO_REEMBOLSO = 'Reembolso';
-
-    protected $table = 'devolucion';
-
-    protected $primaryKey = 'id_devolucion';
+    protected $primaryKey = 'id_valoracion';
 
     public $timestamps = false;
 
     protected $fillable = [
         'id_reserva',
         'fecha',
-        'monto',
-        'motivo',
+        'puntaje_experiencia_general',
+        'comentario',
     ];
 
     protected function casts(): array
     {
         return [
-            'fecha' => 'date',
-            'monto' => 'decimal:2',
+            'fecha' => 'datetime',
         ];
     }
 
     public function reserva(): BelongsTo
     {
         return $this->belongsTo(Reserva::class, 'id_reserva', 'id_reserva');
+    }
+
+    public function detalles(): HasMany
+    {
+        return $this->hasMany(DetalleValoracion::class, 'id_valoracion', 'id_valoracion');
     }
 }

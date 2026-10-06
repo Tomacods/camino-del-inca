@@ -13,7 +13,7 @@
 $archivo = $argv[1] ?? null;
 
 if ($archivo === null || ! is_file($archivo)) {
-    fwrite(STDERR, "No se encuentra el archivo: " . ($archivo ?? '(falta el nombre)') . PHP_EOL);
+    fwrite(STDERR, 'No se encuentra el archivo: '.($archivo ?? '(falta el nombre)').PHP_EOL);
     exit(1);
 }
 
@@ -28,9 +28,9 @@ function buscar(array $lineas, string $clave): array
     $comentada = null;
 
     foreach ($lineas as $i => $linea) {
-        if ($activa === null && preg_match('/^' . preg_quote($clave, '/') . '=/', $linea)) {
+        if ($activa === null && preg_match('/^'.preg_quote($clave, '/').'=/', $linea)) {
             $activa = $i;
-        } elseif ($comentada === null && preg_match('/^#\s*' . preg_quote($clave, '/') . '=/', $linea)) {
+        } elseif ($comentada === null && preg_match('/^#\s*'.preg_quote($clave, '/').'=/', $linea)) {
             $comentada = $i;
         }
     }
@@ -107,6 +107,6 @@ if ($mercadoPago === null) {
     );
 }
 
-file_put_contents($archivo, implode($finDeLinea, $lineas) . $finDeLinea);
+file_put_contents($archivo, implode($finDeLinea, $lineas).$finDeLinea);
 
-echo "    $archivo: listo" . PHP_EOL;
+echo "    $archivo: listo".PHP_EOL;

@@ -3,36 +3,46 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
-//use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Pago extends Model
 {
-    protected $table = 'pagos';
+    public const TIPO_PAGO_SENA = 'Seña';
+
+    public const TIPO_PAGO_SALDO = 'Saldo';
+
+    public const TIPO_PAGO_TOTAL = 'Total';
+
+    protected $table = 'pago';
+
     protected $primaryKey = 'id_pago';
 
-     protected $guarded = [];
+    public $timestamps = false;
 
-    protected $casts = [
-        'fecha' => 'date',
-        'monto' => 'float',
+    protected $fillable = [
+        'id_reserva',
+        'fecha',
+        'monto',
+        'tipo_pago',
+        'medio_pago',
     ];
-    
-    public function consultarMonto(): float
+
+    protected function casts(): array
     {
-        return $this->getMonto();
-    }
-    
-    private function getMonto(): float
-    {
-       return $this->monto; 
+        return [
+            'fecha' => 'date',
+            'monto' => 'decimal:2',
+        ];
     }
 
-    /**
-     * TEMPORAL: datos de prueba hasta que existan las tablas.
-     * Cuando estén, se reemplaza por una consulta real (ver más abajo).
-     */
+    public function reserva(): BelongsTo
+    {
+        return $this->belongsTo(Reserva::class, 'id_reserva', 'id_reserva');
+    }
 
-
-
+    public function comprobante(): HasOne
+    {
+        return $this->hasOne(Comprobante::class, 'id_pago', 'id_pago');
+    }
 }

@@ -12,6 +12,7 @@ mismos nombres**, para que se pueda ir de un diagrama a su clase sin traducir.
 |---|---|---|
 | Clases del dominio (modelos) | Como en el diagrama de clases | `Excursion`, `Reserva`, `Excursionista` |
 | Métodos | Como en los diagramas de secuencia, en *camelCase* | `obtenerCupoDisponible()`, `retenerCupo()`, `liberarCupoRetenido()` |
+| Tablas | Como en el Doc 6, en singular y minúscula | `reserva`, `paquete_servicio` |
 | Columnas | Como en el Doc 6, en *snake_case* | `plazas_retenidas`, `fecha_limite_saldo` |
 | Variables | En español, sin abreviar, que digan qué contienen | `$cantidadPlazas`, no `$cp` ni `$data` |
 | Controladores | Como en los diagramas de secuencia | definir uno de los dos: `ControladorReserva` o `ReservaController` |
@@ -33,6 +34,56 @@ La arquitectura es Modelo–Vista–Controlador, sin capa de servicios:
 - **Tareas programadas** — las cancelaciones automáticas (CU-22 y CU-26).
 
 Regla práctica: si una cuenta o una condición del negocio aparece en un controlador o en una vista, va en el modelo.
+
+## Base de datos y modelos
+
+Decidido el 05/10: la base se llama igual que el Documento de Normalización (Doc 6), no como propone Laravel.
+
+- **Tablas** en singular y minúscula: `reserva`, `excursion`, `paquete_servicio`.
+- **Clave primaria** `id_<tabla>`; las **claves foráneas** llevan el nombre que tienen en el esquema.
+- **Sin `created_at` ni `updated_at`**: las migraciones no llevan `$table->timestamps()`.
+
+Cada modelo lo declara, y cada relación escribe sus claves, porque Laravel no las deduce con estos nombres:
+
+```php
+class Reserva extends Model
+{
+    protected $table = 'reserva';
+
+    protected $primaryKey = 'id_reserva';
+
+    public $timestamps = false;
+
+    public function excursion(): BelongsTo
+    {
+        return $this->belongsTo(Excursion::class, 'id_excursion', 'id_excursion');
+    }
+
+    public function excursionistas(): HasMany
+    {
+        return $this->hasMany(Excursionista::class, 'id_reserva', 'id_reserva');
+    }
+}
+```
+
+En la migración:
+
+```php
+Schema::create('reserva', function (Blueprint $table) {
+    $table->id('id_reserva');
+    $table->foreignId('id_excursion')->constrained('excursion', 'id_excursion');
+    $table->string('numero_reserva')->unique();
+    // ... el resto de las columnas del esquema
+});
+```
+
+Tres tablas no tienen una clave propia de ese tipo:
+
+- `guia`: su clave es `id_usuario`, que viene de `usuario`. El modelo lleva `public $incrementing = false;`.
+- `paquete_servicio`: tabla intermedia, sin modelo. Se usa desde `Paquete` con
+  `belongsToMany(Servicio::class, 'paquete_servicio', 'id_paquete', 'id_servicio')`.
+- `detalle_valoracion`: clave compuesta (`id_valoracion`, `categoria`), que Eloquent no maneja. Se crea y se lee siempre
+  a través de la valoración, nunca por su clave.
 
 ## Formato
 
