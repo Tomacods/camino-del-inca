@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class Excursion extends Model
 {
@@ -91,6 +92,10 @@ class Excursion extends Model
     // La fila se bloquea hasta el final de la transacción para que dos clientes a la vez no retengan el mismo lugar.
     public function retenerCupo(int $cantidadPlazas): bool
     {
+        if ($cantidadPlazas < 1) {
+            throw new InvalidArgumentException('La cantidad de plazas a retener tiene que ser 1 o más.');
+        }
+
         return DB::transaction(function () use ($cantidadPlazas) {
             $excursion = Excursion::lockForUpdate()->findOrFail($this->id_excursion);
 
@@ -109,6 +114,10 @@ class Excursion extends Model
 
     public function liberarCupoRetenido(int $cantidadPlazas): void
     {
+        if ($cantidadPlazas < 1) {
+            throw new InvalidArgumentException('La cantidad de plazas a liberar tiene que ser 1 o más.');
+        }
+
         DB::transaction(function () use ($cantidadPlazas) {
             $excursion = Excursion::lockForUpdate()->findOrFail($this->id_excursion);
 

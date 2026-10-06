@@ -101,6 +101,8 @@ Tres tablas no tienen una clave propia de ese tipo:
 - Nada de credenciales en el código: se leen del `.env` a través de `config/`.
 - El sistema no guarda datos de tarjetas: el cobro lo resuelve la pasarela.
 - Toda entrada del usuario se valida en el servidor, aunque la pantalla ya la valide.
+- Todas las fechas y horas del sistema usan la zona horaria `America/Argentina/Buenos_Aires` (`timezone` en
+  `config/app.php`).
 
 ## Pruebas
 

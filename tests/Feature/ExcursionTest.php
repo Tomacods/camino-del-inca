@@ -10,6 +10,7 @@ use App\Models\Recorrido;
 use App\Models\Reserva;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class ExcursionTest extends TestCase
@@ -137,6 +138,30 @@ class ExcursionTest extends TestCase
         $this->assertSame(6, $excursion->fresh()->plazas_retenidas);
     }
 
+    public function test_no_retiene_cero_plazas(): void
+    {
+        $excursion = $this->crearExcursion(cupo: 8, plazasRetenidas: 2);
+
+        $this->assertThrows(
+            fn () => $excursion->retenerCupo(0),
+            InvalidArgumentException::class,
+            'La cantidad de plazas a retener tiene que ser 1 o más.',
+        );
+        $this->assertSame(2, $excursion->fresh()->plazas_retenidas);
+    }
+
+    public function test_no_retiene_una_cantidad_negativa_de_plazas(): void
+    {
+        $excursion = $this->crearExcursion(cupo: 8, plazasRetenidas: 2);
+
+        $this->assertThrows(
+            fn () => $excursion->retenerCupo(-1),
+            InvalidArgumentException::class,
+            'La cantidad de plazas a retener tiene que ser 1 o más.',
+        );
+        $this->assertSame(2, $excursion->fresh()->plazas_retenidas);
+    }
+
     public function test_libera_el_cupo_retenido(): void
     {
         $excursion = $this->crearExcursion(cupo: 8, plazasRetenidas: 5);
@@ -155,6 +180,31 @@ class ExcursionTest extends TestCase
 
         $this->assertSame(0, $excursion->plazas_retenidas);
         $this->assertSame(0, $excursion->fresh()->plazas_retenidas);
+    }
+
+    public function test_no_libera_cero_plazas(): void
+    {
+        $excursion = $this->crearExcursion(cupo: 8, plazasRetenidas: 2);
+
+        $this->assertThrows(
+            fn () => $excursion->liberarCupoRetenido(0),
+            InvalidArgumentException::class,
+            'La cantidad de plazas a liberar tiene que ser 1 o más.',
+        );
+        $this->assertSame(2, $excursion->fresh()->plazas_retenidas);
+    }
+
+    // Restar una cantidad negativa sumaría plazas retenidas sin controlar el cupo.
+    public function test_no_libera_una_cantidad_negativa_de_plazas(): void
+    {
+        $excursion = $this->crearExcursion(cupo: 8, plazasRetenidas: 2);
+
+        $this->assertThrows(
+            fn () => $excursion->liberarCupoRetenido(-3),
+            InvalidArgumentException::class,
+            'La cantidad de plazas a liberar tiene que ser 1 o más.',
+        );
+        $this->assertSame(2, $excursion->fresh()->plazas_retenidas);
     }
 
     private function crearExcursion(
