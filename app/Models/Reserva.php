@@ -104,7 +104,7 @@ class Reserva extends Model
             ->first();
     }
 
-    public function obtenerMontoTotal(): float
+    public function obtenerMontoTotal(): float // puse este aca aunq vaya en paquete para usarlo momentaneamente, cuando este el metodo correspondinete uso ese
     {
         $paquete = $this->excursion->paquete;
         $integrantes = $this->excursionistas->count();
@@ -190,8 +190,6 @@ class Reserva extends Model
         $this->cancelarRegistrandoDevolucion($monto_reintegro, $fecha_actual, MotivoDevolucion::Reintegro);
     }
 
-    // Registra la devolución (si hay monto) y pasa la reserva a "Cancelada" en una sola operación.
-    // Los lugares se liberan solos: el cupo disponible se calcula según el estado de las reservas.
     private function cancelarRegistrandoDevolucion(float $monto, Carbon $fecha, MotivoDevolucion $motivo): void
     {
         DB::transaction(function () use ($monto, $fecha, $motivo) {
