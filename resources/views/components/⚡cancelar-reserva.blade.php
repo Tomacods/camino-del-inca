@@ -109,16 +109,16 @@ public function cancelarOperacion()
 
         <form wire:submit="buscar" class="space-y-4">
             <div>
-                <label for="correo" class="block text-sm text-gray-300">Correo electrónico</label>
+                <label for="correo" class="block text-sm text-texto">Correo electrónico</label>
                 <input id="correo" type="email" wire:model="correo" @if($paso > 1) disabled @endif
-                       class="mt-1 w-full rounded border border-borde bg-fondo px-3 py-2 text-gray-100 disabled:opacity-50">
+                       class="mt-1 w-full rounded border border-borde bg-fondo px-3 py-2 text-texto disabled:opacity-50">
                 @error('correo') <p class="mt-1 text-sm text-peligro">{{ $message }}</p> @enderror
             </div>
 
             <div>
-                <label for="numeroReserva" class="block text-sm text-gray-300">Número de reserva</label>
+                <label for="numeroReserva" class="block text-sm text-texto">Número de reserva</label>
                 <input id="numeroReserva" type="text" wire:model="numeroReserva" placeholder="000124-7" @if($paso > 1) disabled @endif
-                       class="mt-1 w-full rounded border border-borde bg-fondo px-3 py-2 text-gray-100 placeholder-gray-500 disabled:opacity-50">
+                       class="mt-1 w-full rounded border border-borde bg-fondo px-3 py-2 text-texto placeholder-texto-secundario disabled:opacity-50">
                 @error('numeroReserva') <p class="mt-1 text-sm text-peligro">{{ $message }}</p> @enderror
             </div>
 
@@ -133,7 +133,7 @@ public function cancelarOperacion()
         @if ($mensajeError && $paso === 1)
             <div class="rounded-lg border border-peligro bg-tarjeta p-5">
                 <h2 class="text-lg font-bold text-peligro">No se puede cancelar</h2>
-                <p class="mt-2 text-sm text-gray-300">{{ $mensajeError }}</p>
+                <p class="mt-2 text-sm text-texto">{{ $mensajeError }}</p>
             </div>
         @endif
 
@@ -141,22 +141,22 @@ public function cancelarOperacion()
             <section class="rounded-lg border border-borde bg-tarjeta p-5">
                 <h2 class="mb-4 text-lg font-bold">Confirmar Cancelación</h2>
                 <dl class="mb-6 divide-y divide-borde text-sm">
-                    <div class="flex justify-between py-2"><dt class="text-gray-400">Reserva</dt><dd class="font-semibold">{{ $this->reserva->numero_reserva }}</dd></div>
-                    <div class="flex justify-between py-2"><dt class="text-gray-400">Paquete</dt><dd>$this->reserva->excursion->paquete->nombre</dd></div>
-                    <div class="flex justify-between py-2"><dt class="text-gray-400">Salida</dt><dd>{{ $this->reserva->excursion->getFechaSalida()->format('d/m/Y') }}</dd></div>
+                    <div class="flex justify-between py-2"><dt class="text-texto-secundario">Reserva</dt><dd class="font-semibold">{{ $this->reserva->numero_reserva }}</dd></div>
+                    <div class="flex justify-between py-2"><dt class="text-texto-secundario">Paquete</dt><dd>$this->reserva->excursion->paquete->nombre</dd></div>
+                    <div class="flex justify-between py-2"><dt class="text-texto-secundario">Salida</dt><dd>{{ $this->reserva->excursion->getFechaSalida()->format('d/m/Y') }}</dd></div>
                     <div class="mt-2 flex justify-between pt-4">
-                        <dt class="font-semibold text-gray-300">Monto a reembolsar</dt>
-                        <dd class="font-semibold {{ $montoReembolso > 0 ? 'text-inca' : 'text-gray-400' }}">USD {{ number_format($montoReembolso, 0, ',', '.') }}</dd>
+                        <dt class="font-semibold text-texto">Monto a reembolsar</dt>
+                        <dd class="font-semibold {{ $montoReembolso > 0 ? 'text-inca' : 'text-texto-secundario' }}">USD {{ number_format($montoReembolso, 0, ',', '.') }}</dd>
                     </div>
                 </dl>
                 @if($montoReembolso == 0)
-                    <div class="mb-6 rounded border-l-4 border-ambar bg-fondo p-3 text-sm text-gray-300">Faltan {{ $diasLimite }} días o menos. No genera devolución.</div>
+                    <div class="mb-6 rounded border-l-4 border-ambar bg-fondo p-3 text-sm text-texto">Faltan {{ $diasLimite }} días o menos. No genera devolución.</div>
                 @else
-                    <div class="mb-6 rounded border-l-4 border-inca bg-fondo p-3 text-sm text-gray-300">Te corresponde un reembolso del {{ $porcentajeReembolso }}%.</div>
+                    <div class="mb-6 rounded border-l-4 border-inca bg-fondo p-3 text-sm text-texto">Te corresponde un reembolso del {{ $porcentajeReembolso }}%.</div>
                 @endif
                 <div class="mt-4 flex flex-wrap gap-3">
                     <button type="button" wire:click="confirmar" class="rounded border border-peligro bg-tarjeta px-4 py-2 text-sm font-semibold text-peligro hover:bg-peligro hover:text-fondo">Sí, cancelar reserva</button>
-                    <button type="button" wire:click="cancelarOperacion" class="rounded border border-borde px-4 py-2 text-sm font-semibold text-gray-100 hover:bg-fondo">No, me arrepentí</button>
+                    <button type="button" wire:click="cancelarOperacion" class="rounded border border-borde px-4 py-2 text-sm font-semibold text-texto hover:bg-fondo">No, me arrepentí</button>
                 </div>
             </section>
         @endif

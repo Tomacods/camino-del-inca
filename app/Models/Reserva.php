@@ -116,22 +116,41 @@ class Reserva extends Model
             + $nochesExtra * $integrantes * $paquete->costo_noche_extra_cusco;
     }
 
-    public function obtenerSaldoPendiente(): float
+    public function getDetalle(): self
+    {
+        return $this->load([
+            'excursion.paquete',
+            'excursionistas',
+            'pagos' => fn ($pagos) => $pagos->orderBy('fecha'),
+        ]);
+    }
+
+    public function calcularSaldoPendiente(): float
     {
         return $this->obtenerMontoTotal() - $this->sumarPagos();
     }
 
-    public function obtenerOpcionesHabilitadas(): array
+    public function getOpcionesHabilitadas(): array
     {
-        return match ($this->estado) {
+        return $this->determinarOpciones($this->estado, $this->estado_saldo, $this->tieneValoracion());
+    }
+
+    public function tieneValoracion(): bool
+    {
+        return $this->valoracion()->exists();
+    }
+
+    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion): array
+    {
+        return match ($estado) {
             EstadoReserva::Confirmada => array_values(array_filter([
-                $this->estado_saldo === EstadoSaldo::Adeudado ? self::OPCION_PAGAR_SALDO : null,
+                $estadoSaldo === EstadoSaldo::Adeudado ? self::OPCION_PAGAR_SALDO : null,
                 self::OPCION_MODIFICAR,
                 self::OPCION_CANCELAR,
             ])),
             EstadoReserva::Pendiente => [self::OPCION_CANCELAR],
             EstadoReserva::SinPermiso => [self::OPCION_REINTEGRO, self::OPCION_REPROGRAMAR],
-            EstadoReserva::Finalizada => $this->valoracion()->exists() ? [] : [self::OPCION_VALORAR],
+            EstadoReserva::Finalizada => $tieneValoracion ? [] : [self::OPCION_VALORAR],
             default => [], // Cancelada
         };
     }

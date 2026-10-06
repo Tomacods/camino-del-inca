@@ -14,6 +14,21 @@ class ReservaSeeder extends Seeder
     // es 10). Las fechas límite vencen a las 23:59:59 del día, un mes antes de la salida, como en el prototipo.
     public function run(): void
     {
+        // Finalizada y todavía sin valoración: pagó la seña al reservar y el saldo antes de la fecha límite.
+        $this->crearReserva('Camino Inca Clásico', '2026-09-07', [
+            'numero_reserva' => '000118-1',
+            'correo_electronico' => 'paula.benitez@mail.com',
+            'fecha_reserva' => '2026-05-18 15:40:00',
+            'estado' => Reserva::ESTADO_FINALIZADA,
+            'estado_saldo' => Reserva::ESTADO_SALDO_ABONADO,
+            'noches_extra_antes' => 0,
+            'noches_extra_despues' => 0,
+            'fecha_limite_saldo' => '2026-08-07 23:59:59',
+            'fecha_limite_confirmacion' => '2026-08-07 23:59:59',
+        ], [
+            ['nombre' => 'Paula', 'apellido' => 'Benítez', 'documento_pasaporte' => 'AAB905731', 'equipo_camping' => false, 'estado_permiso' => Excursionista::ESTADO_PERMISO_OBTENIDO],
+        ]);
+
         // Se abonó el total al reservar: no tiene fecha límite de saldo.
         $this->crearReserva('Camino Inca Clásico', '2026-09-07', [
             'numero_reserva' => '000119-3',
