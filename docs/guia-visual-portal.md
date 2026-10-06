@@ -161,7 +161,7 @@ Estados:
   El mensaje sale del `validate()` del componente Livewire; no hay que escribir `@error` en la vista.
 
 ```blade
-<form wire:submit="consultar" class="space-y-6">
+<form wire:submit="consultarReserva" class="space-y-6">
     <x-campo nombre="correo" etiqueta="Correo electrónico" type="email" wire:model="correo" />
     <x-campo nombre="numeroReserva" etiqueta="Número de reserva" wire:model="numeroReserva"
              placeholder="000124-7" ayuda="Está en el correo de confirmación." />

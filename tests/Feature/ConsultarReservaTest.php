@@ -30,7 +30,7 @@ class ConsultarReservaTest extends TestCase
 
     public function test_la_reserva_llega_a_la_vista_con_sus_relaciones_cargadas(): void
     {
-        $componente = $this->consultar('000125-9')->instance();
+        $componente = $this->consultarReserva('000125-9')->instance();
 
         // La vista ya se dibujó y pudo cargar relaciones sobre la reserva guardada: se la vuelve a pedir desde cero.
         unset($componente->reserva);
@@ -44,7 +44,7 @@ class ConsultarReservaTest extends TestCase
 
     public function test_muestra_los_integrantes_con_el_estado_de_su_permiso(): void
     {
-        $this->consultar('000125-9')
+        $this->consultarReserva('000125-9')
             ->assertHasNoErrors()
             ->assertSee('Federico Ríos')
             ->assertSee('Sofía Ríos')
@@ -54,7 +54,7 @@ class ConsultarReservaTest extends TestCase
 
     public function test_muestra_el_medio_de_cada_pago(): void
     {
-        $this->consultar('000125-9')
+        $this->consultarReserva('000125-9')
             ->assertSee('Seña')
             ->assertSee('Tarjeta de crédito')
             ->assertSee('USD 650');
@@ -62,7 +62,7 @@ class ConsultarReservaTest extends TestCase
 
     public function test_las_opciones_sin_pantalla_se_muestran_deshabilitadas(): void
     {
-        $this->consultar('000125-9')
+        $this->consultarReserva('000125-9')
             ->assertSee('Pagar saldo')
             ->assertSee('Modificar reserva')
             ->assertSee('Disponible próximamente')
@@ -71,7 +71,7 @@ class ConsultarReservaTest extends TestCase
 
     public function test_avisa_si_no_encuentra_la_reserva(): void
     {
-        $this->consultar('999999-9')
+        $this->consultarReserva('999999-9')
             ->assertHasErrors(['numeroReserva'])
             ->assertSee('No encontramos una reserva con esos datos.');
     }
@@ -80,7 +80,7 @@ class ConsultarReservaTest extends TestCase
     {
         $this->crearReservaFinalizada('000118-1', 'paula.benitez@mail.com');
 
-        $this->consultar('000118-1', 'paula.benitez@mail.com')
+        $this->consultarReserva('000118-1', 'paula.benitez@mail.com')
             ->assertSee('Valorar servicios')
             ->assertDontSee('Ya valoraste los servicios de este viaje.');
     }
@@ -94,17 +94,17 @@ class ConsultarReservaTest extends TestCase
             'puntaje_experiencia_general' => 4,
         ]);
 
-        $this->consultar('000119-3', 'carlos.gomez@mail.com')
+        $this->consultarReserva('000119-3', 'carlos.gomez@mail.com')
             ->assertSee('Ya valoraste los servicios de este viaje.')
             ->assertDontSee('Valorar servicios');
     }
 
-    private function consultar(string $numeroReserva, string $correo = 'federico.rios@mail.com')
+    private function consultarReserva(string $numeroReserva, string $correo = 'federico.rios@mail.com')
     {
         return Livewire::test('consultar-reserva')
             ->set('correo', $correo)
             ->set('numeroReserva', $numeroReserva)
-            ->call('consultar');
+            ->call('consultarReserva');
     }
 
     private function crearReservaConfirmada(): void

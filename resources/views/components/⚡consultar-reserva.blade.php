@@ -42,7 +42,7 @@ new class extends Component
         ];
     }
 
-    public function consultar(): void
+    public function consultarReserva(): void
     {
         $this->validate();
 
@@ -69,8 +69,7 @@ new class extends Component
             return null;
         }
 
-        return Reserva::buscarPorCorreoYNumero($this->correo, $this->numeroReserva)
-            ?->load(['excursion.paquete', 'excursionistas', 'pagos' => fn ($pagos) => $pagos->orderBy('fecha')]);
+        return Reserva::buscarPorCorreoYNumero($this->correo, $this->numeroReserva)?->getDetalle();
     }
 };
 
@@ -81,11 +80,11 @@ new class extends Component
 @php
     $reserva = $this->reserva;
 
-    // Se piden una sola vez: con una reserva Finalizada, el modelo consulta si ya tiene valoración.
-    $opcionesHabilitadas = $reserva?->obtenerOpcionesHabilitadas() ?? [];
+    // Se piden una sola vez: el modelo consulta si la reserva ya tiene valoración.
+    $opcionesHabilitadas = $reserva?->getOpcionesHabilitadas() ?? [];
     $saldoPorPagar = in_array(Reserva::OPCION_PAGAR_SALDO, $opcionesHabilitadas, true);
 
-    // Qué se puede hacer desde Mi reserva y en qué estado se habilita cada opción (Reserva::obtenerOpcionesHabilitadas).
+    // Qué se puede hacer desde Mi reserva y en qué estado se habilita cada opción (Reserva::getOpcionesHabilitadas).
     $opciones = [
         [Reserva::OPCION_PAGAR_SALDO, 'Pagá lo que falta de tu reserva.', [EstadoReserva::Confirmada], 'M3 6.5h14v8H3zM3 9.5h14M6 12.5h3'],
         [Reserva::OPCION_MODIFICAR, 'Cambiá tu reserva a otra fecha de salida, hasta tres meses antes de la salida actual.', [EstadoReserva::Confirmada], 'M12.5 4.5l3 3L8 15H5v-3zM10.5 6.5l3 3'],
@@ -118,7 +117,7 @@ new class extends Component
 
     <div class="relative -mt-20 px-3 sm:px-8">
         <x-tarjeta class="shadow-tarjeta-elevada">
-            <form wire:submit="consultar" class="grid gap-5 md:grid-cols-[1fr_1fr_auto]">
+            <form wire:submit="consultarReserva" class="grid gap-5 md:grid-cols-[1fr_1fr_auto]">
                 <x-campo nombre="correo" etiqueta="Correo electrónico" type="email" wire:model="correo"
                          placeholder="nombre@correo.com" autocomplete="email" />
                 <x-campo nombre="numeroReserva" etiqueta="Número de reserva" wire:model="numeroReserva"
@@ -173,7 +172,7 @@ new class extends Component
                     <div class="flex justify-between gap-4 py-3">
                         <dt class="text-texto-secundario">Saldo</dt>
                         <dd class="text-right tabular-nums {{ $saldoPorPagar ? 'font-semibold text-ambar' : '' }}">
-                            {{ $reserva->estado_saldo->value }} · USD {{ number_format($reserva->obtenerSaldoPendiente(), 0, ',', '.') }}
+                            {{ $reserva->estado_saldo->value }} · USD {{ number_format($reserva->calcularSaldoPendiente(), 0, ',', '.') }}
                         </dd>
                     </div>
                 </dl>
