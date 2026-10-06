@@ -1,8 +1,8 @@
 # Reparto de casos de uso
 
 Reparto en cuatro áreas, una por integrante (decidido por el grupo el 05/10). Las áreas agrupan casos de uso que tocan
-las mismas pantallas y las mismas clases, para que cada uno pueda avanzar sin pisar a los demás. **Falta confirmar** los
-responsables de la base compartida y definir los de las tareas que cruzan todas las áreas.
+las mismas pantallas y las mismas clases, para que cada uno pueda avanzar sin pisar a los demás. **Falta definir** los
+responsables de las tareas que cruzan todas las áreas, salvo la de base de datos.
 
 Dónde se programa cada caso de uso:
 
@@ -16,10 +16,10 @@ Se hace primero y entre todos, porque los 26 casos de uso dependen de ella. Term
 
 | Parte | Tablas (ver [esquema](esquema-base-de-datos.md)) | Responsable |
 |---|---|---|
-| Usuarios y acceso | USUARIO, GUIA; inicio de sesión por rol | César (a confirmar) |
-| Catálogo | RECORRIDO, ETAPA, SERVICIO, PAQUETE, PAQUETE_SERVICIO | Mariano (a confirmar) |
-| Excursión y reserva | EXCURSION, RESERVA, EXCURSIONISTA | Tomás (a confirmar) |
-| Pagos y valoraciones | PAGO, COMPROBANTE, DEVOLUCION, VALORACION, DETALLE_VALORACION | Mora (a confirmar) |
+| Usuarios y acceso | USUARIO, GUIA; inicio de sesión por rol | Tomás |
+| Catálogo | RECORRIDO, ETAPA, SERVICIO, PAQUETE, PAQUETE_SERVICIO | Tomás |
+| Excursión y reserva | EXCURSION, RESERVA, EXCURSIONISTA | Tomás |
+| Pagos y valoraciones | PAGO, COMPROBANTE, DEVOLUCION, VALORACION, DETALLE_VALORACION | Tomás |
 
 Cada parte incluye la migración, el modelo con sus relaciones y los datos de prueba (*seeders*). Los recorridos, las
 etapas, los servicios y las cuentas de administrador y guía son datos precargados (ERS, sección 2.5): van en los
@@ -94,7 +94,7 @@ principio sólo envíe la confirmación de la reserva.
 | Tarea | Qué hace | Responsable |
 |---|---|---|
 | Integración | Cuida que `main` funcione; arma la etiqueta estable de los viernes | |
-| Base de datos | Integra los cambios de esquema; mantiene el Documento de Normalización al día | |
+| Base de datos | Integra los cambios de esquema; mantiene el Documento de Normalización al día | Tomás |
 | Documento de prueba (TP7) | Junta los casos de prueba de cada área | |
 | Manual de usuario (TP7) | No técnico: capturas y pasos, para cualquier lector | |
 
