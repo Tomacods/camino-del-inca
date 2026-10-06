@@ -57,6 +57,15 @@ class Excursion extends Model
         return $this->hasMany(Reserva::class, 'id_excursion', 'id_excursion');
     }
 
+    // whereDate compara sólo el día: así funciona igual en PostgreSQL y en SQLite (las pruebas), que guarda la fecha con
+    // hora. La fecha tiene que llegar ya validada: en PostgreSQL una fecha mal escrita rompe la consulta.
+    public static function buscarPorFechaSalida(int $idPaquete, string $fechaSalida): ?self
+    {
+        return self::where('id_paquete', $idPaquete)
+            ->whereDate('fecha_salida', $fechaSalida)
+            ->first();
+    }
+
     public function getFechaSalida(): Carbon
     {
         return $this->fecha_salida;
@@ -85,15 +94,20 @@ class Excursion extends Model
         return $this->obtenerCupoDisponible() >= $cantidadIntegrantes;
     }
 
-    // Se comparan días, no horas: una salida justo a los 3 meses de la fecha se admite aunque se reserve de tarde.
     public function admiteReserva($fecha): bool
+    {
+        return $this->paquete->estado === EstadoPaquete::Activo
+            && $this->cumpleAnticipacionMinima($fecha);
+    }
+
+    // Se comparan días, no horas: una salida justo a los 3 meses de la fecha se admite aunque se reserve de tarde.
+    public function cumpleAnticipacionMinima($fecha): bool
     {
         $fechaMinimaSalida = Carbon::parse($fecha)
             ->addMonthsNoOverflow(config('reserva.meses_anticipacion_minima'))
             ->startOfDay();
 
-        return $this->paquete->estado === EstadoPaquete::Activo
-            && $this->fecha_salida->greaterThanOrEqualTo($fechaMinimaSalida);
+        return $this->fecha_salida->greaterThanOrEqualTo($fechaMinimaSalida);
     }
 
     // La fila se bloquea hasta el final de la transacción para que dos clientes a la vez no retengan el mismo lugar.
