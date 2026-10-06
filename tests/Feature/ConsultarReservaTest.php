@@ -75,6 +75,13 @@ class ConsultarReservaTest extends TestCase
             ->assertSeeHtml('href="/mi-reserva/000125-9/cancelar"');
     }
 
+    public function test_encuentra_la_reserva_aunque_el_correo_tenga_otras_mayusculas(): void
+    {
+        $this->consultarReserva('000125-9', 'Federico.Rios@Mail.com')
+            ->assertHasNoErrors()
+            ->assertSee('Reserva 000125-9');
+    }
+
     public function test_avisa_si_no_encuentra_la_reserva(): void
     {
         $this->consultarReserva('999999-9')

@@ -127,6 +127,12 @@ new #[Title('Reservar')] class extends Component
     // Cada dato se valida cuando el cliente deja el campo (wire:model.live.blur).
     public function updated(string $propiedad): void
     {
+        // El correo se guarda en minúsculas y sin espacios en las puntas, para que después el cliente encuentre su
+        // reserva aunque lo escriba con otras mayúsculas. El campo muestra el correo ya convertido.
+        if ($propiedad === 'correoElectronico') {
+            $this->correoElectronico = mb_strtolower(trim($this->correoElectronico));
+        }
+
         if (! $this->enPantalla(1)) {
             return;
         }

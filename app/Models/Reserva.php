@@ -93,9 +93,11 @@ class Reserva extends Model
 
     /* ----------------------------- CU-18 Consultar ---------------------------- */
 
+    // Los correos se guardan en minúsculas y sin espacios en las puntas: el que escribe el cliente se convierte igual,
+    // así encuentra su reserva aunque lo escriba con otras mayúsculas.
     public static function buscarPorCorreoYNumero(string $correo, string $numeroReserva): ?self
     {
-        return self::where('correo_electronico', $correo)
+        return self::where('correo_electronico', mb_strtolower(trim($correo)))
             ->where('numero_reserva', $numeroReserva)
             ->first();
     }

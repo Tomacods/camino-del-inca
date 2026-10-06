@@ -205,6 +205,16 @@ class RealizarReservaTest extends TestCase
             ->assertSee('El correo no tiene un formato válido.');
     }
 
+    public function test_el_correo_queda_en_minusculas_y_sin_espacios_en_las_puntas(): void
+    {
+        $this->crearExcursion('2027-01-18');
+
+        $this->abrir('2027-01-18')
+            ->set('correoElectronico', ' Ana.Perez@Mail.com ')
+            ->assertHasNoErrors()
+            ->assertSet('correoElectronico', 'ana.perez@mail.com');
+    }
+
     public function test_avisa_que_datos_del_integrante_faltan(): void
     {
         $this->crearExcursion('2027-01-18');
