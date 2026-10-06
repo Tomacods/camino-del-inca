@@ -55,6 +55,11 @@ class Excursion extends Model
         return $this->hasMany(Reserva::class, 'id_excursion', 'id_excursion');
     }
 
+    public function getFechaSalida(): Carbon
+    {
+        return $this->fecha_salida;
+    }
+
     // Las reservas canceladas o finalizadas ya no ocupan lugar en la salida.
     public function sumarPlazasReservadas(): int
     {
