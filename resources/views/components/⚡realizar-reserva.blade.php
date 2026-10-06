@@ -276,11 +276,13 @@ new #[Title('Reservar')] class extends Component
         $this->resetValidation(['nombre', 'apellido', 'documentoPasaporte']);
     }
 
+    // Sólo contra los anteriores: «Anterior» guarda el actual sin validar, y compararlo con los posteriores trabaría
+    // al integrante al que se vuelve. Los posteriores se validan al volver a pasar por ellos, antes de la pantalla 2.
     // Sin distinguir mayúsculas: «aac118204» y «AAC118204» son el mismo documento.
     private function documentoRepetido(string $documento): bool
     {
         foreach ($this->integrantes as $posicion => $integrante) {
-            if ($posicion !== $this->integranteActual && strcasecmp($integrante['documentoPasaporte'], $documento) === 0) {
+            if ($posicion < $this->integranteActual && strcasecmp($integrante['documentoPasaporte'], $documento) === 0) {
                 return true;
             }
         }

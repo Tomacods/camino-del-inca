@@ -243,6 +243,40 @@ class RealizarReservaTest extends TestCase
             ->assertSet('paso', 1);
     }
 
+    public function test_volver_con_anterior_no_traba_al_integrante_anterior(): void
+    {
+        $this->crearExcursion('2027-01-18');
+        $componente = $this->abrir('2027-01-18')
+            ->set('correoElectronico', 'ana.perez@mail.com')
+            ->set('cantidadIntegrantes', 2);
+
+        // En el integrante 2 se escribe el mismo documento que el 1 y se vuelve al 1 sin corregirlo.
+        $this->cargarIntegrante($componente, 'Ana', 'Pérez', 'AAA111')
+            ->set('documentoPasaporte', 'AAA111')
+            ->call('anteriorIntegrante')
+            ->call('siguienteIntegrante')
+            ->assertHasNoErrors()
+            ->assertSet('integranteActual', 1);
+    }
+
+    public function test_el_documento_repetido_se_marca_al_avanzar_desde_el_posterior(): void
+    {
+        $this->crearExcursion('2027-01-18');
+
+        // Desde el resumen se vuelve al integrante 1 y se le pone el documento del 2, que ya estaba cargado.
+        $this->llegarAlResumen()
+            ->call('volver')
+            ->call('anteriorIntegrante')
+            ->set('documentoPasaporte', 'BBB222')
+            ->call('siguienteIntegrante')
+            ->assertHasNoErrors()
+            ->assertSet('integranteActual', 1)
+            ->call('siguienteIntegrante')
+            ->assertHasErrors(['documentoPasaporte'])
+            ->assertSee('Ya cargaste un integrante con ese documento.')
+            ->assertSet('paso', 1);
+    }
+
     public function test_no_acepta_mas_de_dos_noches_extra_en_total(): void
     {
         $this->crearExcursion('2027-01-18');
