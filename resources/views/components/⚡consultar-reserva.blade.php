@@ -73,16 +73,16 @@ session(['acceso_reserva' => [
 
         <form wire:submit="consultar" class="space-y-4">
             <div>
-                <label for="correo" class="block text-sm text-gray-300">Correo electrónico</label>
+                <label for="correo" class="block text-sm text-texto">Correo electrónico</label>
                 <input id="correo" type="email" wire:model="correo"
-                       class="mt-1 w-full rounded border border-borde bg-fondo px-3 py-2 text-gray-100">
+                       class="mt-1 w-full rounded border border-borde bg-fondo px-3 py-2 text-texto">
                 @error('correo') <p class="mt-1 text-sm text-peligro">{{ $message }}</p> @enderror
             </div>
 
             <div>
-                <label for="numeroReserva" class="block text-sm text-gray-300">Número de reserva</label>
+                <label for="numeroReserva" class="block text-sm text-texto">Número de reserva</label>
                 <input id="numeroReserva" type="text" wire:model="numeroReserva" placeholder="000124-7"
-                       class="mt-1 w-full rounded border border-borde bg-fondo px-3 py-2 text-gray-100 placeholder-gray-500">
+                       class="mt-1 w-full rounded border border-borde bg-fondo px-3 py-2 text-texto placeholder-texto-secundario">
                 @error('numeroReserva') <p class="mt-1 text-sm text-peligro">{{ $message }}</p> @enderror
             </div>
 
@@ -100,18 +100,18 @@ session(['acceso_reserva' => [
                 </div>
 
                 <dl class="divide-y divide-borde text-sm">
-                    <div class="flex justify-between py-2"><dt class="text-gray-400">Paquete</dt><dd>{{$reserva->excursion->paquete->nombre}}</dd></div>
-                    <div class="flex justify-between py-2"><dt class="text-gray-400">Salida</dt><dd>{{ $reserva->excursion->getFechaSalida()->format('d/m/Y') }}</dd></div>
-                    <div class="flex justify-between py-2"><dt class="text-gray-400">Monto total</dt><dd>USD {{ number_format($reserva->obtenerMontoTotal(), 0, ',', '.') }}</dd></div>
+                    <div class="flex justify-between py-2"><dt class="text-texto-secundario">Paquete</dt><dd>{{$reserva->excursion->paquete->nombre}}</dd></div>
+                    <div class="flex justify-between py-2"><dt class="text-texto-secundario">Salida</dt><dd>{{ $reserva->excursion->getFechaSalida()->format('d/m/Y') }}</dd></div>
+                    <div class="flex justify-between py-2"><dt class="text-texto-secundario">Monto total</dt><dd>USD {{ number_format($reserva->obtenerMontoTotal(), 0, ',', '.') }}</dd></div>
                     <div class="flex justify-between py-2">
-                        <dt class="text-gray-400">Saldo</dt>
+                        <dt class="text-texto-secundario">Saldo</dt>
                         <dd class="{{ $reserva->estado_saldo === EstadoSaldo::Adeudado ? 'font-semibold text-ambar' : '' }}">
                             {{ $reserva->estado_saldo->value }} · USD {{ number_format($reserva->obtenerSaldoPendiente(), 0, ',', '.') }}
                         </dd>
                     </div>
                     @foreach ($reserva->pagos as $pago)
                         <div class="flex justify-between py-2">
-                            <dt class="text-gray-400">Pago</dt>
+                            <dt class="text-texto-secundario">Pago</dt>
                             <dd>{{ $pago->fecha->format('d/m/Y') }} · {{ $pago->tipo_pago }} · USD {{ number_format($pago->monto, 0, ',', '.') }}</dd>
                         </div>
                     @endforeach
@@ -120,7 +120,7 @@ session(['acceso_reserva' => [
 
             {{-- 3. Opciones --}}
             <section>
-                <p class="mb-3 text-sm text-gray-300">Opciones para una reserva «{{ $reserva->estado->value }}»</p>
+                <p class="mb-3 text-sm text-texto">Opciones para una reserva «{{ $reserva->estado->value }}»</p>
                 <div class="flex flex-wrap gap-3">
                     @forelse ($reserva->obtenerOpcionesHabilitadas() as $opcion)
                         @if ($opcion === Reserva::OPCION_CANCELAR)
@@ -134,12 +134,12 @@ session(['acceso_reserva' => [
                                 {{ $opcion }}
                             </a>
                         @else
-                            <button type="button" class="rounded border px-4 py-2 text-sm font-semibold border-gray-200 text-gray-100">
+                            <button type="button" class="rounded border px-4 py-2 text-sm font-semibold border-divisor text-texto">
                                 {{ $opcion }}
                             </button>
                         @endif
                     @empty
-                        <p class="text-sm text-gray-400">Esta reserva no tiene opciones de gestión.</p>
+                        <p class="text-sm text-texto-secundario">Esta reserva no tiene opciones de gestión.</p>
                     @endforelse
                 </div>
             </section>

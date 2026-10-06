@@ -5,11 +5,77 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
+/*
+ * Paleta y tipografía del portal: interfaz clara, tomando como referencia la tienda de Apple.
+ * Se usan con las clases de Tailwind: bg-tarjeta, text-texto-secundario, border-divisor, etc.
+ * La guía completa está en docs/guia-visual-portal.md.
+ */
 @theme {
-    --color-fondo: #0d131a;
-    --color-tarjeta: #1a212b;
-    --color-borde: #2c3644;
-    --color-inca: #19f0c8;
-    --color-ambar: #f5b82e;
-    --color-peligro: #ff5a5f;
+    --color-fondo: #f5f5f7;
+    --color-tarjeta: #ffffff;
+    --color-divisor: #d2d2d7;
+    --color-borde-campo: #86868b;
+    --color-accion: #0071e3;
+    --color-accion-hover: #0077ed;
+    --color-accion-presionado: #006edb;
+    --color-enlace: #0066cc;
+    --color-aviso: #e8f2fd;
+    --color-texto: #1d1d1f;
+    --color-texto-secundario: #6e6e73;
+    --color-exito: #00802f;
+    --color-error: #d70015;
+    --color-error-fondo: #fff2f4;
+    --color-ambar: #9a5b00;
+    --color-ambar-fondo: #fdf3dc;
+    --color-gris-fondo: #e8e8ed;
+
+    /* Nombres anteriores, que todavía usan las pantallas de Mi reserva. Se quitan cuando pasen a los componentes. */
+    --color-borde: var(--color-divisor);
+    --color-inca: var(--color-accion);
+    --color-peligro: var(--color-error);
+
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+    --shadow-tarjeta: 2px 4px 12px rgb(0 0 0 / 0.08);
+    --shadow-tarjeta-elevada: 2px 6px 20px rgb(0 0 0 / 0.12);
+}
+
+@layer base {
+    html {
+        color-scheme: light;
+        scrollbar-color: var(--color-borde-campo) var(--color-fondo);
+    }
+
+    body {
+        background-color: var(--color-fondo);
+        color: var(--color-texto);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+    }
+
+    h1,
+    h2,
+    h3 {
+        letter-spacing: -0.02em;
+        text-wrap: balance;
+    }
+
+    ::selection {
+        background-color: #b3d7ff;
+        color: var(--color-texto);
+    }
+
+    input,
+    textarea {
+        caret-color: var(--color-accion);
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--color-accion);
+        outline-offset: 2px;
+    }
+
+    a {
+        text-underline-offset: 0.2em;
+    }
 }
