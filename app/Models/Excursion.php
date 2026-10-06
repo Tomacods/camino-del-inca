@@ -54,7 +54,7 @@ class Excursion extends Model
     }
 
     public function getFechaSalida(): Carbon
-{
-    return $this->fecha_salida;
-}
+    {
+        return $this->fecha_salida;
+    }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Enums;
 
-enum MotivoDevolucion: string 
+enum MotivoDevolucion: string
 {
     case Reintegro = 'Reintegro';
     case Reembolso = 'Reembolso';

@@ -100,9 +100,9 @@ session(['acceso_reserva' => [
                 </div>
 
                 <dl class="divide-y divide-borde text-sm">
-                    <div class="flex justify-between py-2"><dt class="text-gray-400">Paquete</dt><dd>{{ $reserva->paquete_nombre }}</dd></div>
+                    <div class="flex justify-between py-2"><dt class="text-gray-400">Paquete</dt><dd>{{$reserva->excursion->paquete->nombre}}</dd></div>
                     <div class="flex justify-between py-2"><dt class="text-gray-400">Salida</dt><dd>{{ $reserva->excursion->getFechaSalida()->format('d/m/Y') }}</dd></div>
-                    <div class="flex justify-between py-2"><dt class="text-gray-400">Monto total</dt><dd>USD {{ number_format($reserva->monto_total, 0, ',', '.') }}</dd></div>
+                    <div class="flex justify-between py-2"><dt class="text-gray-400">Monto total</dt><dd>USD {{ number_format($reserva->obtenerMontoTotal(), 0, ',', '.') }}</dd></div>
                     <div class="flex justify-between py-2">
                         <dt class="text-gray-400">Saldo</dt>
                         <dd class="{{ $reserva->estado_saldo === EstadoSaldo::Adeudado ? 'font-semibold text-ambar' : '' }}">
@@ -126,6 +126,11 @@ session(['acceso_reserva' => [
                         @if ($opcion === Reserva::OPCION_CANCELAR)
                            <a href="/mi-reserva/{{ $reserva->numero_reserva }}/cancelar"
                                class="rounded border border-peligro px-4 py-2 text-sm font-semibold text-peligro hover:bg-peligro hover:text-fondo">
+                                {{ $opcion }}
+                            </a>
+                        @elseif ($opcion === Reserva::OPCION_REINTEGRO)
+                            <a href="/mi-reserva/{{ $reserva->numero_reserva }}/reintegro"
+                            class="rounded border border-inca px-4 py-2 text-sm font-semibold text-inca hover:bg-inca hover:text-fondo">
                                 {{ $opcion }}
                             </a>
                         @else

@@ -142,7 +142,7 @@ public function cancelarOperacion()
                 <h2 class="mb-4 text-lg font-bold">Confirmar Cancelación</h2>
                 <dl class="mb-6 divide-y divide-borde text-sm">
                     <div class="flex justify-between py-2"><dt class="text-gray-400">Reserva</dt><dd class="font-semibold">{{ $this->reserva->numero_reserva }}</dd></div>
-                    <div class="flex justify-between py-2"><dt class="text-gray-400">Paquete</dt><dd>{{ $this->reserva->paquete_nombre }}</dd></div>
+                    <div class="flex justify-between py-2"><dt class="text-gray-400">Paquete</dt><dd>$this->reserva->excursion->paquete->nombre</dd></div>
                     <div class="flex justify-between py-2"><dt class="text-gray-400">Salida</dt><dd>{{ $this->reserva->excursion->getFechaSalida()->format('d/m/Y') }}</dd></div>
                     <div class="mt-2 flex justify-between pt-4">
                         <dt class="font-semibold text-gray-300">Monto a reembolsar</dt>

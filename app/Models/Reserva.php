@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Models;
+
 use App\Enums\EstadoReserva;
 use App\Enums\EstadoSaldo;
 use App\Enums\MotivoDevolucion;
@@ -27,8 +28,6 @@ class Reserva extends Model
 
     public const ESTADO_SALDO_ABONADO = 'Abonado';
 
-
-
     public const OPCION_PAGAR_SALDO = 'Pagar saldo';
 
     public const OPCION_MODIFICAR = 'Modificar reserva';
@@ -40,8 +39,6 @@ class Reserva extends Model
     public const OPCION_REPROGRAMAR = 'Solicitar reprogramación';
 
     public const OPCION_VALORAR = 'Valorar servicios';
-
-
 
     protected $table = 'reserva';
 
@@ -98,7 +95,7 @@ class Reserva extends Model
         return $this->hasOne(Valoracion::class, 'id_reserva', 'id_reserva');
     }
 
-     /* ----------------------------- CU-18 Consultar ---------------------------- */
+    /* ----------------------------- CU-18 Consultar ---------------------------- */
 
     public static function buscarPorCorreoYNumero(string $correo, string $numeroReserva): ?self
     {
@@ -184,6 +181,7 @@ class Reserva extends Model
         if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
             throw new \Exception('La reserva se encuentra en estado «'.$this->estado->value.'» y no admite reintegro.');
         }
+
         return $this->sumarPagos();
     }
 
@@ -191,7 +189,6 @@ class Reserva extends Model
     {
         $this->cancelarRegistrandoDevolucion($monto_reintegro, $fecha_actual, MotivoDevolucion::Reintegro);
     }
-
 
     // Registra la devolución (si hay monto) y pasa la reserva a "Cancelada" en una sola operación.
     // Los lugares se liberan solos: el cupo disponible se calcula según el estado de las reservas.
@@ -221,4 +218,3 @@ class Reserva extends Model
         return in_array($this->estado, $estados, true);
     }
 }
-
