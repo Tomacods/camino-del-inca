@@ -81,6 +81,16 @@ class Reserva extends Model
         return $this->hasOne(Valoracion::class, 'id_reserva', 'id_reserva');
     }
 
+    /* ----------------------------- CU-14 Realizar ----------------------------- */
+
+    // Es estático porque cuando el cliente elige las noches todavía no existe la reserva: se guarda con el primer pago.
+    public static function validarNochesExtra(int $nochesExtraAntes, int $nochesExtraDespues): bool
+    {
+        return $nochesExtraAntes >= 0
+            && $nochesExtraDespues >= 0
+            && $nochesExtraAntes + $nochesExtraDespues <= config('reserva.maximo_noches_extra');
+    }
+
     /* ----------------------------- CU-18 Consultar ---------------------------- */
 
     public static function buscarPorCorreoYNumero(string $correo, string $numeroReserva): ?self
