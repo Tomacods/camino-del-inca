@@ -14,6 +14,7 @@ class ReservaSeeder extends Seeder
     // salida, como en el prototipo.
     public function run(): void
     {
+        // Se abonó el total al reservar: no tiene fecha límite de saldo.
         $this->crearReserva('Camino Inca Clásico', '2026-09-07', [
             'numero_reserva' => '000119-3',
             'correo_electronico' => 'carlos.gomez@mail.com',
@@ -22,7 +23,7 @@ class ReservaSeeder extends Seeder
             'estado_saldo' => Reserva::ESTADO_SALDO_ABONADO,
             'noches_extra_antes' => 0,
             'noches_extra_despues' => 0,
-            'fecha_limite_saldo' => '2026-08-07 23:59:59',
+            'fecha_limite_saldo' => null,
             'fecha_limite_confirmacion' => '2026-08-07 23:59:59',
         ], [
             ['nombre' => 'Carlos', 'apellido' => 'Gómez', 'documento_pasaporte' => 'AAC118204', 'equipo_camping' => true, 'estado_permiso' => Excursionista::ESTADO_PERMISO_OBTENIDO],

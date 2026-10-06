@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Reserva extends Model
 {
@@ -58,5 +59,20 @@ class Reserva extends Model
     public function excursionistas(): HasMany
     {
         return $this->hasMany(Excursionista::class, 'id_reserva', 'id_reserva');
+    }
+
+    public function pagos(): HasMany
+    {
+        return $this->hasMany(Pago::class, 'id_reserva', 'id_reserva');
+    }
+
+    public function devolucion(): HasOne
+    {
+        return $this->hasOne(Devolucion::class, 'id_reserva', 'id_reserva');
+    }
+
+    public function valoracion(): HasOne
+    {
+        return $this->hasOne(Valoracion::class, 'id_reserva', 'id_reserva');
     }
 }

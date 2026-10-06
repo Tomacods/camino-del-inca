@@ -22,6 +22,9 @@ class DatabaseSeeder extends Seeder
             PaqueteSeeder::class,
             ExcursionSeeder::class,
             ReservaSeeder::class,
+            PagoSeeder::class,
+            DevolucionSeeder::class,
+            ValoracionSeeder::class,
         ]);
     }
 }
