@@ -2,8 +2,9 @@
 
 Cómo se ven las pantallas públicas del cliente: la paleta, la tipografía, el layout y los componentes Blade
 reutilizables. La estética es clara y toma como referencia la tienda de Apple (apple.com/store): fondo gris muy claro,
-tarjetas blancas con sombra suave, botones azules en forma de pastilla y títulos grandes en dos tonos. Reemplaza a la
-paleta oscura del prototipo (decidido el 06/10/2026).
+tarjetas blancas con sombra suave, botones azules en forma de pastilla y títulos grandes en dos tonos. Es el diseño
+vigente desde el 06/10/2026; la paleta oscura del prototipo quedó reservada (ver
+[Paleta reservada para un posible modo oscuro](#paleta-reservada-para-un-posible-modo-oscuro)).
 
 Para ver todos los componentes juntos, con el servidor local levantado: <http://localhost:8000/guia-visual>. Esa
 página sólo existe con `APP_ENV=local`.
@@ -23,7 +24,7 @@ Tailwind: `bg-<nombre>`, `text-<nombre>`, `border-<nombre>`. No se escriben colo
 | `accion-hover` | `#0077ED` | Botón al pasar el mouse | `hover:bg-accion-hover` |
 | `accion-presionado` | `#006EDB` | Botón mientras se presiona | `active:bg-accion-presionado` |
 | `enlace` | `#0066CC` | Enlaces y texto del botón secundario | `text-enlace` |
-| `aviso` | `#E8F2FD` | Fondo de los avisos informativos y del estado Confirmada | `bg-aviso` |
+| `aviso` | `#E8F2FD` | Fondo de los avisos informativos y de los estados Confirmada y Obtenido | `bg-aviso` |
 | `texto` | `#1D1D1F` | Texto principal | `text-texto` |
 | `texto-secundario` | `#6E6E73` | Descripciones, etiquetas de datos, segunda parte de los títulos | `text-texto-secundario` |
 | `exito` | `#00802F` | Borde y tilde del campo válido | `border-exito` |
@@ -59,6 +60,28 @@ layout con los pesos 400, 500, 600 y 700.
 Tamaños de referencia: título de página `text-5xl` (en la portada llega a `lg:text-7xl`), título de sección
 `text-3xl`/`sm:text-4xl`, título de tarjeta `text-2xl`, texto `text-[17px]` y ayudas `text-sm`. El texto nunca baja
 de `text-sm`.
+
+## Paleta reservada para un posible modo oscuro
+
+La paleta del prototipo aprobado original queda guardada para un posible modo oscuro. **No se implementa por ahora**:
+no hay modo oscuro en el portal y las vistas no llevan variantes `dark:`. Si algún día se hace, estos valores serían
+el punto de partida.
+
+| Rol | Valor |
+|---|---|
+| Fondo | `#000000` (negro) |
+| Tarjetas | `#221F1C` |
+| Divisores | `#242424` |
+| Acción principal | `#00F5D0` (turquesa), con texto negro |
+| Acción · hover | `#00A39E` |
+| Acción · presionado | `#007A76` |
+| Avisos (fondo) | `#0E2A28` |
+| Texto | `#F5F5F5` |
+| Texto secundario | `#B8B8B8` |
+| Error | `#FF6B6B` |
+| Ámbar | `#F5C451` |
+
+Tipografías de esa paleta: **Titillium Web** para los títulos y **DM Sans** para los textos.
 
 ## Layout
 
@@ -108,6 +131,15 @@ Livewire procesa la acción que disparó, el botón se atenúa; con `disabled` q
 <x-boton type="submit">Confirmar reserva</x-boton>
 <x-boton variante="secundario" href="/mi-reserva">Volver a mi reserva</x-boton>
 <x-boton wire:click="pagar">Pagar el saldo</x-boton>
+```
+
+Para una opción que todavía no tiene pantalla, botón deshabilitado con la leyenda abajo (así se usa en Mi reserva):
+
+```blade
+<x-boton disabled class="flex-col">
+    Pagar saldo
+    <span class="text-sm">Disponible próximamente</span>
+</x-boton>
 ```
 
 ### Campo de texto — `<x-campo>`
@@ -178,20 +210,21 @@ Fondo blanco, bordes redondeados y sombra suave. Agrupa un bloque de contenido. 
 
 | Atributo | Valores |
 |---|---|
-| `estado` | El enum `EstadoReserva` o su texto |
+| `estado` | El enum `EstadoReserva` o su texto, o el estado del permiso de un excursionista (`estado_permiso`) |
 
 El estado siempre va escrito: el color ayuda, pero no es lo único que lo indica.
 
 | Estado | Cómo se ve |
 |---|---|
-| Pendiente | Fondo ámbar claro, texto ámbar oscuro |
-| Confirmada | Fondo celeste, texto azul |
-| Sin Permiso | Fondo rosado, texto rojo |
+| Pendiente (reserva o permiso) | Fondo ámbar claro, texto ámbar oscuro |
+| Confirmada · permiso Obtenido | Fondo celeste, texto azul |
+| Sin Permiso · permiso No Obtenido | Fondo rosado, texto rojo |
 | Cancelada | Fondo gris, texto gris oscuro |
 | Finalizada | Sin fondo, contorno y texto negros |
 
 ```blade
 <x-chip-estado :estado="$reserva->estado" />
+<x-chip-estado :estado="$excursionista->estado_permiso" />
 ```
 
 ## Accesibilidad

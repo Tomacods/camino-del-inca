@@ -3,7 +3,6 @@
 use App\Models\Reserva;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
-use Illuminate\Http\Request;
 
 new class extends Component
 {
@@ -13,43 +12,56 @@ new class extends Component
 
     public bool $consultado = false;
 
-public function mount(): void
-{
-    $acceso = session('acceso_reserva');
-
-    if ($acceso) {
-        $this->correo = $acceso['correo'];
-        $this->numeroReserva = $acceso['numeroReserva'];
-        $this->consultado = true;
-    }
-}
-
-    public function consultar(): void
+    // Si el cliente ya consultó su reserva en esta sesión, la pantalla vuelve a mostrarla sin pedirle los datos.
+    public function mount(): void
     {
-        $this->validate([
+        $acceso = session('acceso_reserva');
+
+        if ($acceso) {
+            $this->correo = $acceso['correo'];
+            $this->numeroReserva = $acceso['numeroReserva'];
+            $this->consultado = true;
+        }
+    }
+
+    protected function rules(): array
+    {
+        return [
             'correo' => 'required|email',
             'numeroReserva' => ['required', 'regex:/^\d{6}-\d$/'],
-        ], [
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return [
             'correo.required' => 'Ingresá tu correo electrónico.',
             'correo.email' => 'El correo no tiene un formato válido.',
             'numeroReserva.required' => 'Ingresá el número de reserva.',
             'numeroReserva.regex' => 'El número de reserva no tiene un formato válido.',
-        ]);
-
-$this->consultado = true;
-
-if ($this->reserva === null) {
-    session()->forget('acceso_reserva');
-    $this->addError('numeroReserva', 'No encontramos una reserva con esos datos.');
-    return;
-}
-
-session(['acceso_reserva' => [
-    'correo' => $this->correo,
-    'numeroReserva' => $this->numeroReserva,
-]]);
+        ];
     }
 
+    public function consultar(): void
+    {
+        $this->validate();
+
+        $this->consultado = true;
+
+        if ($this->reserva === null) {
+            session()->forget('acceso_reserva');
+            $this->addError('numeroReserva', 'No encontramos una reserva con esos datos.');
+
+            return;
+        }
+
+        session(['acceso_reserva' => [
+            'correo' => $this->correo,
+            'numeroReserva' => $this->numeroReserva,
+        ]]);
+    }
+
+    // Trae la reserva con todo lo que muestra la pantalla, para que la vista no haga consultas.
     #[Computed]
     public function reserva(): ?Reserva
     {
@@ -57,22 +69,26 @@ session(['acceso_reserva' => [
             return null;
         }
 
-        return Reserva::buscarPorCorreoYNumero($this->correo, $this->numeroReserva);
+        return Reserva::buscarPorCorreoYNumero($this->correo, $this->numeroReserva)
+            ?->load(['excursion.paquete', 'excursionistas', 'pagos' => fn ($pagos) => $pagos->orderBy('fecha')]);
     }
 };
 
 ?>
 
 @use('App\Enums\EstadoReserva')
-@use('App\Enums\EstadoSaldo')
 
 @php
     $reserva = $this->reserva;
 
+    // Se piden una sola vez: con una reserva Finalizada, el modelo consulta si ya tiene valoración.
+    $opcionesHabilitadas = $reserva?->obtenerOpcionesHabilitadas() ?? [];
+    $saldoPorPagar = in_array(Reserva::OPCION_PAGAR_SALDO, $opcionesHabilitadas, true);
+
     // Qué se puede hacer desde Mi reserva y en qué estado se habilita cada opción (Reserva::obtenerOpcionesHabilitadas).
     $opciones = [
         [Reserva::OPCION_PAGAR_SALDO, 'Pagá lo que falta de tu reserva.', [EstadoReserva::Confirmada], 'M3 6.5h14v8H3zM3 9.5h14M6 12.5h3'],
-        [Reserva::OPCION_MODIFICAR, 'Cambiá los datos de tu reserva.', [EstadoReserva::Confirmada], 'M12.5 4.5l3 3L8 15H5v-3zM10.5 6.5l3 3'],
+        [Reserva::OPCION_MODIFICAR, 'Cambiá tu reserva a otra fecha de salida, hasta tres meses antes de la salida actual.', [EstadoReserva::Confirmada], 'M12.5 4.5l3 3L8 15H5v-3zM10.5 6.5l3 3'],
         [Reserva::OPCION_CANCELAR, 'Antes de confirmar, te mostramos cuánto se te devuelve.', [EstadoReserva::Pendiente, EstadoReserva::Confirmada], 'M6 6l8 8M14 6l-8 8'],
         [Reserva::OPCION_REINTEGRO, 'Si no se consiguieron los permisos, te devolvemos lo que pagaste.', [EstadoReserva::SinPermiso], 'M4 10a6 6 0 1 0 2-4.5M4 4v3h3'],
         [Reserva::OPCION_REPROGRAMAR, 'Si no se consiguieron los permisos, elegí otra fecha de salida.', [EstadoReserva::SinPermiso], 'M4 5.5h12v10H4zM4 8.5h12M7 3.5v3M13 3.5v3'],
@@ -136,35 +152,72 @@ session(['acceso_reserva' => [
                 <dl class="divide-y divide-divisor text-[17px]">
                     <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Paquete</dt><dd class="text-right">{{ $reserva->excursion->paquete->nombre }}</dd></div>
                     <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Salida</dt><dd class="tabular-nums">{{ $reserva->excursion->getFechaSalida()->format('d/m/Y') }}</dd></div>
+                </dl>
+
+                <h3 class="mt-8 text-lg font-semibold">Integrantes</h3>
+                <ul class="mt-1 divide-y divide-divisor text-[17px]">
+                    @foreach ($reserva->excursionistas as $excursionista)
+                        <li class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3">
+                            <span>{{ $excursionista->nombre }} {{ $excursionista->apellido }}</span>
+                            <span class="flex items-center gap-2 text-[15px] text-texto-secundario">
+                                Permiso
+                                <x-chip-estado :estado="$excursionista->estado_permiso" />
+                            </span>
+                        </li>
+                    @endforeach
+                </ul>
+
+                <h3 class="mt-8 text-lg font-semibold">Pagos</h3>
+                <dl class="mt-1 divide-y divide-divisor text-[17px]">
                     <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Monto total</dt><dd class="tabular-nums">USD {{ number_format($reserva->obtenerMontoTotal(), 0, ',', '.') }}</dd></div>
                     <div class="flex justify-between gap-4 py-3">
                         <dt class="text-texto-secundario">Saldo</dt>
-                        <dd class="text-right tabular-nums {{ $reserva->estado_saldo === EstadoSaldo::Adeudado ? 'font-semibold text-ambar' : '' }}">
+                        <dd class="text-right tabular-nums {{ $saldoPorPagar ? 'font-semibold text-ambar' : '' }}">
                             {{ $reserva->estado_saldo->value }} · USD {{ number_format($reserva->obtenerSaldoPendiente(), 0, ',', '.') }}
                         </dd>
                     </div>
-                    @foreach ($reserva->pagos as $pago)
-                        <div class="flex justify-between gap-4 py-3">
-                            <dt class="text-texto-secundario">Pago</dt>
-                            <dd class="text-right tabular-nums">{{ $pago->fecha->format('d/m/Y') }} · {{ $pago->tipo_pago }} · USD {{ number_format($pago->monto, 0, ',', '.') }}</dd>
-                        </div>
-                    @endforeach
                 </dl>
+
+                <ul class="mt-2 grid gap-2">
+                    @forelse ($reserva->pagos as $pago)
+                        <li class="flex items-start justify-between gap-4 rounded-xl bg-fondo px-4 py-3">
+                            <div>
+                                <p class="font-medium">{{ $pago->tipo_pago }}</p>
+                                <p class="text-[15px] text-texto-secundario">
+                                    <span class="tabular-nums">{{ $pago->fecha->format('d/m/Y') }}</span> · {{ $pago->medio_pago }}
+                                </p>
+                            </div>
+                            <p class="text-[17px] font-medium tabular-nums">USD {{ number_format($pago->monto, 0, ',', '.') }}</p>
+                        </li>
+                    @empty
+                        <li class="rounded-xl bg-fondo px-4 py-3 text-[15px] text-texto-secundario">Todavía no hay pagos registrados.</li>
+                    @endforelse
+                </ul>
             </x-tarjeta>
 
             <x-tarjeta titulo="Qué podés hacer">
                 <div class="grid gap-3">
-                    @forelse ($reserva->obtenerOpcionesHabilitadas() as $opcion)
+                    @forelse ($opcionesHabilitadas as $opcion)
                         @if ($opcion === Reserva::OPCION_CANCELAR)
                             <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/cancelar">{{ $opcion }}</x-boton>
                         @elseif ($opcion === Reserva::OPCION_REINTEGRO)
                             <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/reintegro">{{ $opcion }}</x-boton>
                         @else
-                            <x-boton :variante="$opcion === Reserva::OPCION_PAGAR_SALDO ? 'primario' : 'secundario'">{{ $opcion }}</x-boton>
+                            {{-- Pagar saldo, modificar, reprogramar y valorar todavía no tienen pantalla. --}}
+                            <x-boton disabled class="flex-col">
+                                {{ $opcion }}
+                                <span class="text-sm">Disponible próximamente</span>
+                            </x-boton>
                         @endif
                     @empty
                         <p class="text-[15px] text-texto-secundario">
-                            Una reserva «{{ $reserva->estado->value }}» no tiene opciones de gestión.
+                            @if ($reserva->estado === EstadoReserva::Finalizada)
+                                Ya valoraste los servicios de este viaje.
+                            @elseif ($reserva->estado === EstadoReserva::Cancelada)
+                                Esta reserva está cancelada y no tiene opciones de gestión.
+                            @else
+                                Una reserva «{{ $reserva->estado->value }}» no tiene opciones de gestión.
+                            @endif
                         </p>
                     @endforelse
                 </div>
