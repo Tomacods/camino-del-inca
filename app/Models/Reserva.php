@@ -14,20 +14,6 @@ use Illuminate\Support\Facades\DB;
 
 class Reserva extends Model
 {
-    public const ESTADO_PENDIENTE = 'Pendiente';
-
-    public const ESTADO_CONFIRMADA = 'Confirmada';
-
-    public const ESTADO_SIN_PERMISO = 'Sin Permiso';
-
-    public const ESTADO_CANCELADA = 'Cancelada';
-
-    public const ESTADO_FINALIZADA = 'Finalizada';
-
-    public const ESTADO_SALDO_ADEUDADO = 'Adeudado';
-
-    public const ESTADO_SALDO_ABONADO = 'Abonado';
-
     public const OPCION_PAGAR_SALDO = 'Pagar saldo';
 
     public const OPCION_MODIFICAR = 'Modificar reserva';
@@ -172,8 +158,8 @@ class Reserva extends Model
     {
         $diasAnticipacion = (int) $fecha_actual->copy()->startOfDay()
             ->diffInDays($fecha_salida->copy()->startOfDay());
-        $diasLimite = config('reservas.dias_anticipacion_reembolso');
-        $porcentaje = config('reservas.porcentaje_reembolso');
+        $diasLimite = config('reserva.dias_anticipacion_reembolso');
+        $porcentaje = config('reserva.porcentaje_reembolso');
 
         if ($diasAnticipacion > $diasLimite && $fecha_salida->greaterThan($fecha_actual)) {
             return $monto_abonado * $porcentaje;
@@ -216,7 +202,7 @@ class Reserva extends Model
                 $this->devolucion()->create([
                     'fecha' => $fecha,
                     'monto' => $monto,
-                    'motivo' => $motivo->value,
+                    'motivo' => $motivo,
                 ]);
             }
 

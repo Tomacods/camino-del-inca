@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Rol;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
 use Filament\Panel;
@@ -10,10 +11,6 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class Usuario extends Authenticatable implements FilamentUser, HasName
 {
-    public const ROL_ADMINISTRADOR = 'Administrador';
-
-    public const ROL_GUIA = 'Guía';
-
     protected $table = 'usuario';
 
     protected $primaryKey = 'id_usuario';
@@ -37,6 +34,7 @@ class Usuario extends Authenticatable implements FilamentUser, HasName
     {
         return [
             'password' => 'hashed',
+            'rol' => Rol::class,
         ];
     }
 
@@ -47,7 +45,7 @@ class Usuario extends Authenticatable implements FilamentUser, HasName
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return in_array($this->rol, [self::ROL_ADMINISTRADOR, self::ROL_GUIA], true);
+        return in_array($this->rol, [Rol::Administrador, Rol::Guia], true);
     }
 
     // Filament muestra este nombre en el menú de la cuenta; la tabla no tiene una columna de nombre.

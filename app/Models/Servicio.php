@@ -2,19 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\TipoServicio;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Servicio extends Model
 {
-    public const TIPO_HOTEL = 'Hotel';
-
-    public const TIPO_TRANSPORTE_EN_BUS = 'Transporte en Bus';
-
-    public const TIPO_TRANSPORTE_FERROVIARIO = 'Transporte Ferroviario';
-
-    public const TIPO_CAMPING_DE_ETAPA = 'Camping de Etapa';
-
     protected $table = 'servicio';
 
     protected $primaryKey = 'id_servicio';
@@ -25,6 +18,13 @@ class Servicio extends Model
         'tipo',
         'nombre',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'tipo' => TipoServicio::class,
+        ];
+    }
 
     public function paquetes(): BelongsToMany
     {

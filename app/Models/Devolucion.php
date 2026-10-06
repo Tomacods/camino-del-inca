@@ -2,15 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\MotivoDevolucion;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Devolucion extends Model
 {
-    public const MOTIVO_REINTEGRO = 'Reintegro';
-
-    public const MOTIVO_REEMBOLSO = 'Reembolso';
-
     protected $table = 'devolucion';
 
     protected $primaryKey = 'id_devolucion';
@@ -29,6 +26,7 @@ class Devolucion extends Model
         return [
             'fecha' => 'date',
             'monto' => 'decimal:2',
+            'motivo' => MotivoDevolucion::class,
         ];
     }
 

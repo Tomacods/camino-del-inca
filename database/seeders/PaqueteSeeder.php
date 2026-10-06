@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\EstadoPaquete;
 use App\Models\Paquete;
 use App\Models\Recorrido;
 use App\Models\Servicio;
@@ -80,7 +81,7 @@ class PaqueteSeeder extends Seeder
                 'costo_noche_extra_cusco' => self::COSTO_NOCHE_EXTRA_CUSCO,
                 'costo_equipo_camping' => self::COSTO_EQUIPO_CAMPING,
                 'cantidad_porteadores' => $cantidadPorteadores,
-                'estado' => Paquete::ESTADO_ACTIVO,
+                'estado' => EstadoPaquete::Activo,
                 'fecha_creacion' => today(),
             ],
         );

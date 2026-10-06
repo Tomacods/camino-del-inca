@@ -2,6 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\EstadoPaquete;
+use App\Enums\EstadoPermiso;
+use App\Enums\EstadoReserva;
+use App\Enums\EstadoSaldo;
+use App\Enums\Rol;
+use App\Enums\TipoPago;
 use App\Models\Excursion;
 use App\Models\Excursionista;
 use App\Models\Guia;
@@ -48,14 +54,14 @@ class ConsultarReservaTest extends TestCase
             ->assertHasNoErrors()
             ->assertSee('Federico Ríos')
             ->assertSee('Sofía Ríos')
-            ->assertSee('Obtenido')
-            ->assertSee('No Obtenido');
+            ->assertSee(EstadoPermiso::Obtenido->value)
+            ->assertSee(EstadoPermiso::NoObtenido->value);
     }
 
     public function test_muestra_el_medio_de_cada_pago(): void
     {
         $this->consultarReserva('000125-9')
-            ->assertSee('Seña')
+            ->assertSee(TipoPago::Sena->value)
             ->assertSee('Tarjeta de crédito')
             ->assertSee('USD 650');
     }
@@ -118,11 +124,11 @@ class ConsultarReservaTest extends TestCase
             'costo_noche_extra_cusco' => 40,
             'costo_equipo_camping' => 25,
             'cantidad_porteadores' => 2,
-            'estado' => Paquete::ESTADO_ACTIVO,
+            'estado' => EstadoPaquete::Activo,
             'fecha_creacion' => '2026-01-05',
         ]);
 
-        $usuario = Usuario::create(['correo' => 'guia@caminodelinca.test', 'password' => 'guia1234', 'rol' => Usuario::ROL_GUIA]);
+        $usuario = Usuario::create(['correo' => 'guia@caminodelinca.test', 'password' => 'guia1234', 'rol' => Rol::Guia]);
         Guia::create(['id_usuario' => $usuario->id_usuario, 'nombre' => 'Rosa', 'apellido' => 'Quispe']);
 
         $this->excursion = Excursion::create([
@@ -138,15 +144,15 @@ class ConsultarReservaTest extends TestCase
             'numero_reserva' => '000125-9',
             'correo_electronico' => 'federico.rios@mail.com',
             'fecha_reserva' => '2026-10-01 10:00:00',
-            'estado' => Reserva::ESTADO_CONFIRMADA,
-            'estado_saldo' => Reserva::ESTADO_SALDO_ADEUDADO,
+            'estado' => EstadoReserva::Confirmada,
+            'estado_saldo' => EstadoSaldo::Adeudado,
             'noches_extra_antes' => 0,
             'noches_extra_despues' => 0,
             'fecha_limite_saldo' => '2027-01-01 23:59:59',
             'fecha_limite_confirmacion' => '2027-01-01 23:59:59',
         ]);
 
-        foreach ([['Federico', Excursionista::ESTADO_PERMISO_OBTENIDO], ['Sofía', Excursionista::ESTADO_PERMISO_NO_OBTENIDO]] as $numero => [$nombre, $permiso]) {
+        foreach ([['Federico', EstadoPermiso::Obtenido], ['Sofía', EstadoPermiso::NoObtenido]] as $numero => [$nombre, $permiso]) {
             Excursionista::create([
                 'id_reserva' => $reserva->id_reserva,
                 'nombre' => $nombre,
@@ -161,7 +167,7 @@ class ConsultarReservaTest extends TestCase
             'id_reserva' => $reserva->id_reserva,
             'fecha' => '2026-10-01',
             'monto' => 650,
-            'tipo_pago' => Pago::TIPO_PAGO_SENA,
+            'tipo_pago' => TipoPago::Sena,
             'medio_pago' => 'Tarjeta de crédito',
         ]);
     }
@@ -173,8 +179,8 @@ class ConsultarReservaTest extends TestCase
             'numero_reserva' => $numeroReserva,
             'correo_electronico' => $correo,
             'fecha_reserva' => '2026-05-18 15:40:00',
-            'estado' => Reserva::ESTADO_FINALIZADA,
-            'estado_saldo' => Reserva::ESTADO_SALDO_ABONADO,
+            'estado' => EstadoReserva::Finalizada,
+            'estado_saldo' => EstadoSaldo::Abonado,
             'noches_extra_antes' => 0,
             'noches_extra_despues' => 0,
             'fecha_limite_saldo' => null,

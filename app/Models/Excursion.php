@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoPaquete;
+use App\Enums\EstadoReserva;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -66,9 +68,9 @@ class Excursion extends Model
         return Excursionista::whereHas('reserva', function ($consulta) {
             $consulta->where('id_excursion', $this->id_excursion)
                 ->whereIn('estado', [
-                    Reserva::ESTADO_PENDIENTE,
-                    Reserva::ESTADO_CONFIRMADA,
-                    Reserva::ESTADO_SIN_PERMISO,
+                    EstadoReserva::Pendiente,
+                    EstadoReserva::Confirmada,
+                    EstadoReserva::SinPermiso,
                 ]);
         })->count();
     }
@@ -90,7 +92,7 @@ class Excursion extends Model
             ->addMonthsNoOverflow(config('reserva.meses_anticipacion_minima'))
             ->startOfDay();
 
-        return $this->paquete->estado === Paquete::ESTADO_ACTIVO
+        return $this->paquete->estado === EstadoPaquete::Activo
             && $this->fecha_salida->greaterThanOrEqualTo($fechaMinimaSalida);
     }
 

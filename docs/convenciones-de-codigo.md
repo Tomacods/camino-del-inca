@@ -85,6 +85,31 @@ Tres tablas no tienen una clave propia de ese tipo:
 - `detalle_valoracion`: clave compuesta (`id_valoracion`, `categoria`), que Eloquent no maneja. Se crea y se lee siempre
   a través de la valoración, nunca por su clave.
 
+### Enumeraciones
+
+Las nueve enumeraciones del [esquema](esquema-base-de-datos.md#enumeraciones) son enums de PHP en `app/Enums`, con los
+valores exactos del esquema: `Rol`, `EstadoPaquete`, `TipoServicio`, `EstadoReserva`, `EstadoSaldo`, `EstadoPermiso`,
+`TipoPago`, `MotivoDevolucion` y `CategoriaValoracion`.
+
+- Los valores **siempre se escriben con el enum**, nunca como texto suelto: `EstadoReserva::SinPermiso`, no
+  `'Sin Permiso'`. Vale para modelos, *seeders*, pruebas, componentes, vistas y Filament.
+- Cada modelo convierte su columna al enum en `casts()`, así que al leerla se obtiene el enum y se compara con `===`:
+
+  ```php
+  protected function casts(): array
+  {
+      return [
+          'estado' => EstadoReserva::class,
+      ];
+  }
+
+  if ($reserva->estado === EstadoReserva::Confirmada) { ... }
+  ```
+
+- Para mostrar el texto en una vista: `{{ $reserva->estado->value }}`.
+- Un enum no puede ser clave de un arreglo: ahí se usa su valor (`TipoServicio::Hotel->value => [...]`).
+- Las migraciones siguen listando los valores en `$table->enum(...)`, como pide el esquema.
+
 ## Formato
 
 - El formato lo aplica **Pint**, que viene con Laravel: `./vendor/bin/pint` antes de cada *pull request*. No se discute
@@ -93,6 +118,9 @@ Tres tablas no tienen una clave propia de ese tipo:
   comentarios son para explicar *por qué*.
 - Sin valores sueltos en el código: los 5 minutos de retención, los porcentajes de devolución y los plazos van en
   constantes con nombre o en un archivo de `config/`.
+- Los parámetros de las reservas están en un solo archivo, `config/reserva.php` (anticipación mínima para reservar,
+  días de anticipación y porcentaje del reembolso), y se leen con `config('reserva.<clave>')`. Un parámetro nuevo de
+  reservas se agrega ahí, con su comentario.
 - Los textos que ve el usuario, en español.
 
 ## Datos y seguridad
