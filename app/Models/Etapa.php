@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Etapa extends Model
 {
@@ -22,5 +23,11 @@ class Etapa extends Model
     public function recorrido(): BelongsTo
     {
         return $this->belongsTo(Recorrido::class, 'id_recorrido', 'id_recorrido');
+    }
+
+    // Excursiones que tienen a esta etapa como etapa actual.
+    public function excursiones(): HasMany
+    {
+        return $this->hasMany(Excursion::class, 'id_etapa_actual', 'id_etapa');
     }
 }

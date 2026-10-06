@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Guia extends Model
 {
@@ -25,5 +26,10 @@ class Guia extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'id_usuario', 'id_usuario');
+    }
+
+    public function excursiones(): HasMany
+    {
+        return $this->hasMany(Excursion::class, 'id_guia', 'id_usuario');
     }
 }

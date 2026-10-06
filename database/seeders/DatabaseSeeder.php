@@ -20,6 +20,8 @@ class DatabaseSeeder extends Seeder
             RecorridoSeeder::class,
             ServicioSeeder::class,
             PaqueteSeeder::class,
+            ExcursionSeeder::class,
+            ReservaSeeder::class,
         ]);
     }
 }
