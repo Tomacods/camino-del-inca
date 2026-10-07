@@ -16,6 +16,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Máximo de noches extra en Cusco
+    |--------------------------------------------------------------------------
+    |
+    | Las noches extra antes y después del recorrido, sumadas, no pueden pasar de
+    | esta cantidad. Es un límite por reserva, para todo el grupo (CU-14
+    | Realizar Reserva).
+    |
+    */
+
+    'maximo_noches_extra' => 2,
+
+    /*
+    |--------------------------------------------------------------------------
     | Anticipación para el reembolso
     |--------------------------------------------------------------------------
     |
