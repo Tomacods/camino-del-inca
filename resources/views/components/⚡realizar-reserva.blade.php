@@ -54,6 +54,10 @@ new #[Title('Reservar')] class extends Component
     #[Locked]
     public int $nochesExtraDespues = 0;
 
+    // La retención que creó este formulario al confirmar, para liberarla si el cliente vuelve atrás y cancela.
+    #[Locked]
+    public ?string $idRetencion = null;
+
     public function mount(int $idPaquete, string $fechaSalida): void
     {
         $this->idPaquete = $idPaquete;
@@ -193,11 +197,16 @@ new #[Title('Reservar')] class extends Component
         $this->cargarIntegrante();
     }
 
-    // A6: se descarta lo cargado y se vuelve al inicio. Una reserva en curso que haya en la sesión (por ejemplo, la que el
-    // cliente está pagando en otra pestaña) no se toca: la liberan «Cancelar» en la pantalla de pago, la tarea al vencer
-    // o un nuevo «Confirmar».
+    // A6: si este mismo formulario retuvo el cupo (el cliente confirmó y volvió atrás con el navegador) y esa retención
+    // sigue en la sesión, se libera en el momento. Otra reserva en curso (por ejemplo, la que el cliente está pagando en
+    // otra pestaña) no se toca: la liberan «Cancelar» en la pantalla de pago, la tarea al vencer o un nuevo «Confirmar».
+    // Después se descarta lo cargado y se vuelve al inicio.
     public function cancelar(): void
     {
+        if ($this->idRetencion !== null && session('reserva_en_curso.id_retencion') === $this->idRetencion) {
+            $this->liberarReservaEnCurso();
+        }
+
         $this->descartarDatosReserva();
 
         $this->redirect('/');
@@ -254,6 +263,8 @@ new #[Title('Reservar')] class extends Component
             ], $this->integrantes),
             'vence' => $vence->toIso8601String(),
         ]]);
+
+        $this->idRetencion = $idRetencion;
 
         $this->redirect('/reservar/pago');
     }
