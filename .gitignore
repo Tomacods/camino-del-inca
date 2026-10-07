@@ -35,3 +35,5 @@ Thumbs.db
 !/respaldos/.gitkeep
 # Base SQLite que crea Laravel por defecto (usamos PostgreSQL)
 /database/*.sqlite
+
+/.claude/settings.local.json
