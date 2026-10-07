@@ -3,6 +3,7 @@
 use App\Jobs\LiberarCupoRetenido;
 use App\Models\Excursion;
 use App\Models\Reserva;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -22,8 +23,8 @@ new #[Title('Reservar')] class extends Component
     #[Locked]
     public int $paso = 1;
 
-    // Por qué no se puede reservar esta salida: 'no-disponible', 'anticipacion', 'sin-cupo' o 'cupo-ocupado' (A7: se
-    // ocupó al confirmar). Null si se puede.
+    // Por qué no se muestra el formulario: 'no-disponible', 'anticipacion', 'reserva-en-curso' (el cliente ya tiene lugares
+    // guardados para esta salida), 'sin-cupo' o 'cupo-ocupado' (A7: se ocupó al confirmar). Null si se puede reservar.
     #[Locked]
     public ?string $impedimento = null;
 
@@ -63,8 +64,17 @@ new #[Title('Reservar')] class extends Component
     }
 
     // En el orden del caso de uso: que exista la salida, la anticipación (A1), que el paquete esté activo y el cupo (A3).
+    // Antes del cupo se mira si el cliente ya tiene lugares guardados para esta salida (volvió atrás desde el pago):
+    // si no, su propia retención le haría ver que no quedan lugares.
     protected function iniciarReserva(): void
     {
+        // Si esa reserva en curso ya venció, se libera y el formulario se muestra normal.
+        $enCurso = $this->reservaEnCursoDeEstaSalida();
+
+        if ($enCurso !== null && now()->greaterThanOrEqualTo(Carbon::parse($enCurso['vence']))) {
+            $this->liberarReservaDeEstaSalida();
+        }
+
         $excursion = $this->excursion;
         $hoy = now();
 
@@ -72,6 +82,7 @@ new #[Title('Reservar')] class extends Component
             $excursion === null => 'no-disponible',
             ! $excursion->cumpleAnticipacionMinima($hoy) => 'anticipacion',
             ! $excursion->admiteReserva($hoy) => 'no-disponible',
+            $this->reservaEnCursoDeEstaSalida() !== null => 'reserva-en-curso',
             $excursion->obtenerCupoDisponible() <= 0 => 'sin-cupo',
             default => null,
         };
@@ -203,6 +214,21 @@ new #[Title('Reservar')] class extends Component
         $this->redirect('/');
     }
 
+    // «Cancelarla», en el aviso de lugares ya guardados: los libera en el momento y vuelve a controlar la salida, así
+    // el formulario queda listo para empezar de nuevo, con el cupo actualizado.
+    public function cancelarReservaEnCurso(): void
+    {
+        if ($this->impedimento !== 'reserva-en-curso') {
+            return;
+        }
+
+        if ($this->reservaEnCursoDeEstaSalida() !== null) {
+            $this->liberarReservaDeEstaSalida();
+        }
+
+        $this->iniciarReserva();
+    }
+
     // Pasos 18 a 21: vuelve a validar el cupo y lo retiene, guarda la reserva en curso en la sesión y deriva a Pagar
     // Reserva (CU-15). Todavía no se crea la reserva: se crea con el primer pago.
     public function confirmarReserva(): void
@@ -293,6 +319,15 @@ new #[Title('Reservar')] class extends Component
         }
     }
 
+    // Para el aviso de lugares ya guardados: cuánto falta para que venza esa reserva, con la hora del servidor.
+    #[Computed]
+    public function segundosParaPagar(): int
+    {
+        $enCurso = $this->reservaEnCursoDeEstaSalida();
+
+        return $enCurso === null ? 0 : max(0, (int) ceil(now()->diffInSeconds(Carbon::parse($enCurso['vence']))));
+    }
+
     // Un campo se marca como válido cuando tiene un dato y ese dato cumple su regla.
     #[Computed]
     public function camposValidos(): array
@@ -379,6 +414,23 @@ new #[Title('Reservar')] class extends Component
         }
     }
 
+    // La reserva en curso de la sesión, si es de esta misma salida. Se lee de la sesión cada vez, porque en el mismo
+    // pedido puede cambiar al liberarla.
+    private function reservaEnCursoDeEstaSalida(): ?array
+    {
+        $enCurso = session('reserva_en_curso');
+
+        return $enCurso !== null && $enCurso['id_excursion'] === $this->excursion?->id_excursion ? $enCurso : null;
+    }
+
+    // Libera en el momento la reserva en curso de esta salida y vuelve a leer la excursión, para que el cupo
+    // disponible ya cuente las plazas liberadas.
+    private function liberarReservaDeEstaSalida(): void
+    {
+        $this->liberarReservaEnCurso();
+        $this->excursion->refresh();
+    }
+
     private function mensajeMaximoNoches(): string
     {
         return 'Podés sumar hasta '.config('reserva.maximo_noches_extra').' noches extra en total.';
@@ -402,7 +454,28 @@ new #[Title('Reservar')] class extends Component
 @endphp
 
 <div class="mx-auto max-w-3xl">
-    @if ($impedimento)
+    @if ($impedimento === 'reserva-en-curso')
+        {{-- El cliente ya tiene lugares guardados para esta salida (por ejemplo, volvió atrás desde el pago). --}}
+        @php
+            $segundos = $this->segundosParaPagar;
+        @endphp
+
+        <header>
+            <h1 class="text-4xl font-semibold sm:text-5xl">{{ $this->excursion->paquete->nombre }}</h1>
+            <p class="mt-3 text-[17px] text-texto-secundario">
+                Salida del <span class="tabular-nums">{{ $this->excursion->getFechaSalida()->format('d/m/Y') }}</span>
+            </p>
+        </header>
+
+        <x-aviso titulo="Ya tenés lugares guardados para esta salida" class="mt-8">
+            Te quedan {{ sprintf('%02d:%02d', intdiv($segundos, 60), $segundos % 60) }} para completar el pago.
+        </x-aviso>
+
+        <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+            <x-boton href="/reservar/pago">Ir al pago</x-boton>
+            <x-boton variante="secundario" wire:click="cancelarReservaEnCurso">Cancelarla</x-boton>
+        </div>
+    @elseif ($impedimento)
         {{-- La salida no se puede reservar: se avisa por qué y no se muestra el formulario. --}}
         <h1 class="text-4xl font-semibold sm:text-5xl">Reservar.</h1>
 

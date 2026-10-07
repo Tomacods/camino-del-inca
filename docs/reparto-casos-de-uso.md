@@ -125,3 +125,11 @@ Los dos pendientes de diseño que frenaban al Área B se resolvieron con CU-14, 
 2. **Concurrencia.** `Excursion::retenerCupo()` verifica y retiene en una transacción con la fila de la excursión
    bloqueada: dos clientes a la vez quedan uno detrás del otro. La tarea anota en la caché cada retención que libera,
    así una retención nunca se descuenta dos veces.
+
+Si el cliente confirma y vuelve atrás con el navegador, el formulario se carga de cero: Livewire manda las páginas con
+`Cache-Control: no-store` y el navegador no las guarda. Por eso, al abrir el formulario de una salida en la que el
+cliente ya tiene lugares guardados, en vez del formulario aparece el aviso «Ya tenés lugares guardados para esta
+salida», con el tiempo que queda, «Ir al pago» y «Cancelarla» (que los libera en el momento). Ese control va antes que
+el de cupo, para que su propia retención no le muestre que no quedan lugares. Si esa reserva en curso ya venció, se
+libera y el formulario se muestra normal. Una reserva en curso de otra salida no cambia nada: al confirmar se libera,
+como antes.

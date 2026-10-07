@@ -382,14 +382,16 @@ class RealizarReservaTest extends TestCase
         // La cola es la de la base, como en desarrollo: la retención anterior se libera en el momento y la tarea
         // demorada de la nueva queda guardada en la tabla jobs.
         config(['queue.default' => 'database']);
-        $excursion = $this->crearExcursion('2027-01-18', plazasRetenidas: 3);
-        session(['reserva_en_curso' => $this->reservaEnCurso($excursion, 'retencion-anterior', cantidadIntegrantes: 3)]);
+        $excursion = $this->crearExcursion('2027-01-18');
+        $otraSalida = $this->crearExcursion('2027-02-01', plazasRetenidas: 3);
+        session(['reserva_en_curso' => $this->reservaEnCurso($otraSalida, 'retencion-anterior', cantidadIntegrantes: 3)]);
 
         $this->llegarAlResumen()
             ->call('confirmarReserva')
             ->assertRedirect('/reservar/pago');
 
-        // Se liberaron las 3 plazas de la anterior y se retuvieron las 2 de la nueva.
+        // Se liberaron las 3 plazas de la anterior, en la otra salida, y se retuvieron las 2 de la nueva.
+        $this->assertSame(0, $otraSalida->fresh()->plazas_retenidas);
         $this->assertSame(2, $excursion->fresh()->plazas_retenidas);
         $this->assertNotSame('retencion-anterior', session('reserva_en_curso.id_retencion'));
         $this->assertDatabaseCount('jobs', 1);
@@ -443,17 +445,98 @@ class RealizarReservaTest extends TestCase
 
     public function test_cancelar_en_el_formulario_deja_intacta_la_reserva_en_curso(): void
     {
-        // 5 plazas retenidas: 2 de una reserva en curso del cliente (la que está pagando en otra pestaña) y 3 de otros.
-        $excursion = $this->crearExcursion('2027-01-18', plazasRetenidas: 5);
-        $enCurso = $this->reservaEnCurso($excursion, 'retencion-1', cantidadIntegrantes: 2);
+        // El cliente está pagando otra salida en otra pestaña: 2 de sus plazas y 3 de otros clientes.
+        $this->crearExcursion('2027-01-18');
+        $otraSalida = $this->crearExcursion('2027-02-01', plazasRetenidas: 5);
+        $enCurso = $this->reservaEnCurso($otraSalida, 'retencion-1', cantidadIntegrantes: 2);
         session(['reserva_en_curso' => $enCurso]);
 
         $this->abrir('2027-01-18')
+            ->assertSee('Titular de la reserva')
             ->set('correoElectronico', 'ana.perez@mail.com')
             ->call('cancelar')
             ->assertRedirect('/');
 
-        $this->assertSame(5, $excursion->fresh()->plazas_retenidas);
+        $this->assertSame(5, $otraSalida->fresh()->plazas_retenidas);
+        $this->assertSame($enCurso, session('reserva_en_curso'));
+    }
+
+    public function test_si_ya_tiene_lugares_guardados_para_esta_salida_lo_avisa_en_vez_del_formulario(): void
+    {
+        config(['reserva.minutos_retencion' => 3]);
+        $excursion = $this->crearExcursion('2027-01-18', plazasRetenidas: 2);
+        session(['reserva_en_curso' => $this->reservaEnCurso($excursion, 'retencion-1', cantidadIntegrantes: 2)]);
+
+        // El cliente confirmó hace 30 segundos y volvió atrás con el navegador.
+        $this->travel(30)->seconds();
+
+        $this->abrir('2027-01-18')
+            ->assertSet('impedimento', 'reserva-en-curso')
+            ->assertSee('Ya tenés lugares guardados para esta salida')
+            ->assertSee('Te quedan 02:30 para completar el pago.')
+            ->assertSeeHtml('href="/reservar/pago"')
+            ->assertSee('Ir al pago')
+            ->assertSee('Cancelarla')
+            ->assertDontSee('Titular de la reserva')
+            ->assertDontSee('Ver los paquetes');
+
+        $this->assertSame(2, $excursion->fresh()->plazas_retenidas);
+    }
+
+    public function test_si_retuvo_los_ultimos_lugares_y_vuelve_atras_ve_sus_lugares_y_no_sin_cupo(): void
+    {
+        // Quedaban 2 lugares y el cliente los retuvo: el cupo disponible es 0 por su propia retención.
+        $excursion = $this->crearExcursion('2027-01-18', cupo: 2, plazasRetenidas: 2);
+        session(['reserva_en_curso' => $this->reservaEnCurso($excursion, 'retencion-1', cantidadIntegrantes: 2)]);
+
+        $this->abrir('2027-01-18')
+            ->assertSee('Ya tenés lugares guardados para esta salida')
+            ->assertDontSee('No quedan lugares en esta salida.');
+    }
+
+    public function test_cancelarla_libera_los_lugares_y_deja_el_formulario_listo_con_el_cupo_actualizado(): void
+    {
+        $excursion = $this->crearExcursion('2027-01-18', cupo: 2, plazasRetenidas: 2);
+        session(['reserva_en_curso' => $this->reservaEnCurso($excursion, 'retencion-1', cantidadIntegrantes: 2)]);
+
+        $this->abrir('2027-01-18')
+            ->call('cancelarReservaEnCurso')
+            ->assertSet('impedimento', null)
+            ->assertSee('Titular de la reserva')
+            ->assertSee('Quedan 2 lugares');
+
+        $this->assertSame(0, $excursion->fresh()->plazas_retenidas);
+        $this->assertNull(session('reserva_en_curso'));
+    }
+
+    public function test_si_la_reserva_en_curso_de_esta_salida_ya_vencio_la_libera_y_muestra_el_formulario(): void
+    {
+        $excursion = $this->crearExcursion('2027-01-18', cupo: 2, plazasRetenidas: 2);
+        session(['reserva_en_curso' => $this->reservaEnCurso($excursion, 'retencion-1', cantidadIntegrantes: 2)]);
+        $this->travel(config('reserva.minutos_retencion') + 1)->minutes();
+
+        $this->abrir('2027-01-18')
+            ->assertSet('impedimento', null)
+            ->assertSee('Titular de la reserva')
+            ->assertSee('Quedan 2 lugares');
+
+        $this->assertSame(0, $excursion->fresh()->plazas_retenidas);
+        $this->assertNull(session('reserva_en_curso'));
+    }
+
+    public function test_una_reserva_en_curso_de_otra_salida_no_cambia_nada(): void
+    {
+        $this->crearExcursion('2027-01-18');
+        $otraSalida = $this->crearExcursion('2027-02-01', plazasRetenidas: 2);
+        $enCurso = $this->reservaEnCurso($otraSalida, 'retencion-1', cantidadIntegrantes: 2);
+        session(['reserva_en_curso' => $enCurso]);
+
+        $this->abrir('2027-01-18')
+            ->assertSet('impedimento', null)
+            ->assertSee('Titular de la reserva')
+            ->assertDontSee('Ya tenés lugares guardados para esta salida');
+
+        $this->assertSame(2, $otraSalida->fresh()->plazas_retenidas);
         $this->assertSame($enCurso, session('reserva_en_curso'));
     }
 
