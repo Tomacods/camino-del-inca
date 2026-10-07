@@ -29,6 +29,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Plazo de la retención del cupo
+    |--------------------------------------------------------------------------
+    |
+    | Minutos que se guardan los lugares cuando el cliente confirma, para que
+    | complete el pago. Si en ese plazo no paga, las plazas se liberan solas
+    | (CU-14 Realizar Reserva). Se puede achicar con RESERVA_MINUTOS_RETENCION
+    | en el .env para probar el vencimiento sin esperar.
+    |
+    */
+
+    'minutos_retencion' => (int) env('RESERVA_MINUTOS_RETENCION', 5),
+
+    /*
+    |--------------------------------------------------------------------------
     | Anticipación para el reembolso
     |--------------------------------------------------------------------------
     |

@@ -1,8 +1,10 @@
 <?php
 
+use App\Jobs\LiberarCupoRetenido;
 use App\Models\Excursion;
 use App\Models\Reserva;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -20,7 +22,8 @@ new #[Title('Reservar')] class extends Component
     #[Locked]
     public int $paso = 1;
 
-    // Por qué no se puede reservar esta salida: 'no-disponible', 'anticipacion' o 'sin-cupo'. Null si se puede.
+    // Por qué no se puede reservar esta salida: 'no-disponible', 'anticipacion', 'sin-cupo' o 'cupo-ocupado' (A7: se
+    // ocupó al confirmar). Null si se puede.
     #[Locked]
     public ?string $impedimento = null;
 
@@ -190,10 +193,68 @@ new #[Title('Reservar')] class extends Component
         $this->cargarIntegrante();
     }
 
-    // A6: lo cargado vive sólo en este componente, así que al salir se descarta.
+    // A6: se descarta lo cargado y, si ya se había retenido el cupo (el cliente volvió atrás desde el pago), se libera.
     public function cancelar(): void
     {
+        $this->descartarDatosReserva();
+        $this->liberarReservaEnCurso();
+
         $this->redirect('/');
+    }
+
+    // Pasos 18 a 21: vuelve a validar el cupo y lo retiene, guarda la reserva en curso en la sesión y deriva a Pagar
+    // Reserva (CU-15). Todavía no se crea la reserva: se crea con el primer pago.
+    public function confirmarReserva(): void
+    {
+        if (! $this->enPantalla(2) || count($this->integrantes) !== (int) $this->cantidadIntegrantes) {
+            return;
+        }
+
+        // El correo pasa a la sesión y de ahí a la reserva: se valida otra vez, por si cambió desde la pantalla 1.
+        $this->validateOnly('correoElectronico');
+
+        if (! Reserva::validarNochesExtra($this->nochesExtraAntes, $this->nochesExtraDespues)) {
+            $this->addError('nochesExtra', $this->mensajeMaximoNoches());
+
+            return;
+        }
+
+        // Si el cliente volvió atrás y confirma de nuevo, primero se libera lo que había retenido.
+        $this->liberarReservaEnCurso();
+
+        // retenerCupo() verifica el cupo y lo retiene con la fila bloqueada: entre una cosa y la otra no se puede meter
+        // otro cliente. Si ya no alcanza, es el curso A7.
+        $cantidadPlazas = count($this->integrantes);
+
+        if (! $this->excursion->retenerCupo($cantidadPlazas)) {
+            $this->descartarDatosReserva();
+            $this->impedimento = 'cupo-ocupado';
+
+            return;
+        }
+
+        $idRetencion = (string) Str::uuid();
+        $vence = now()->addMinutes(config('reserva.minutos_retencion'));
+
+        // Si el cliente no paga a tiempo, esta tarea libera las plazas al vencer el plazo, aunque haya cerrado el navegador.
+        LiberarCupoRetenido::dispatch($this->excursion->id_excursion, $cantidadPlazas, $idRetencion)->delay($vence);
+
+        session(['reserva_en_curso' => [
+            'id_retencion' => $idRetencion,
+            'id_excursion' => $this->excursion->id_excursion,
+            'correo_electronico' => $this->correoElectronico,
+            'noches_extra_antes' => $this->nochesExtraAntes,
+            'noches_extra_despues' => $this->nochesExtraDespues,
+            'integrantes' => array_map(fn ($integrante) => [
+                'nombre' => $integrante['nombre'],
+                'apellido' => $integrante['apellido'],
+                'documento_pasaporte' => $integrante['documentoPasaporte'],
+                'equipo_camping' => $integrante['equipoCamping'],
+            ], $this->integrantes),
+            'vence' => $vence->toIso8601String(),
+        ]]);
+
+        $this->redirect('/reservar/pago');
     }
 
     public function sumarNoche(string $momento): void
@@ -206,7 +267,7 @@ new #[Title('Reservar')] class extends Component
         $despues = $this->nochesExtraDespues + ($momento === 'despues' ? 1 : 0);
 
         if (! Reserva::validarNochesExtra($antes, $despues)) {
-            $this->addError('nochesExtra', 'Podés sumar hasta '.config('reserva.maximo_noches_extra').' noches extra en total.');
+            $this->addError('nochesExtra', $this->mensajeMaximoNoches());
 
             return;
         }
@@ -296,6 +357,32 @@ new #[Title('Reservar')] class extends Component
         return false;
     }
 
+    // DS-14, «el cupo se ocupó antes de confirmar»: se vacía todo lo cargado.
+    private function descartarDatosReserva(): void
+    {
+        $this->reset([
+            'paso', 'correoElectronico', 'cantidadIntegrantes', 'integranteActual', 'nombre', 'apellido',
+            'documentoPasaporte', 'equipoCamping', 'integrantes', 'nochesExtraAntes', 'nochesExtraDespues',
+        ]);
+        $this->resetValidation();
+    }
+
+    // Libera en el momento la retención que haya en la sesión y la saca de ahí. Si la tarea demorada ya la había
+    // liberado, no descuenta de nuevo.
+    private function liberarReservaEnCurso(): void
+    {
+        $enCurso = session()->pull('reserva_en_curso');
+
+        if ($enCurso !== null) {
+            LiberarCupoRetenido::dispatchSync($enCurso['id_excursion'], count($enCurso['integrantes']), $enCurso['id_retencion']);
+        }
+    }
+
+    private function mensajeMaximoNoches(): string
+    {
+        return 'Podés sumar hasta '.config('reserva.maximo_noches_extra').' noches extra en total.';
+    }
+
     private function mensajeLugaresDisponibles(): string
     {
         $lugares = $this->excursion->obtenerCupoDisponible();
@@ -309,6 +396,8 @@ new #[Title('Reservar')] class extends Component
 
 @php
     $maximoNoches = config('reserva.maximo_noches_extra');
+    $minutosRetencion = config('reserva.minutos_retencion');
+    $plazoRetencion = $minutosRetencion === 1 ? '1 minuto' : $minutosRetencion.' minutos';
 @endphp
 
 <div class="mx-auto max-w-3xl">
@@ -322,6 +411,10 @@ new #[Title('Reservar')] class extends Component
             </x-aviso>
         @elseif ($impedimento === 'sin-cupo')
             <x-aviso tipo="error" class="mt-8">No quedan lugares en esta salida. Elegí otra fecha u otro paquete.</x-aviso>
+        @elseif ($impedimento === 'cupo-ocupado')
+            <x-aviso tipo="error" titulo="Los lugares ya no están disponibles" class="mt-8">
+                Mientras cargabas los datos se ocuparon los lugares que quedaban en esta salida. Elegí otra fecha u otro paquete.
+            </x-aviso>
         @else
             <x-aviso tipo="error" class="mt-8">Esta salida no está disponible para reservar.</x-aviso>
         @endif
@@ -482,17 +575,17 @@ new #[Title('Reservar')] class extends Component
                     </dl>
                 </x-tarjeta>
 
-                <x-aviso>Cuando confirmes, guardamos tus lugares durante 5 minutos para que completes el pago.</x-aviso>
+                <x-aviso>Cuando confirmes, guardamos tus lugares durante {{ $plazoRetencion }} para que completes el pago.</x-aviso>
 
                 <div class="mt-3 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <x-boton variante="secundario" wire:click="cancelar">Cancelar</x-boton>
 
                     <div class="flex flex-col-reverse gap-3 sm:flex-row">
                         <x-boton variante="secundario" wire:click="volver">Volver</x-boton>
-                        {{-- Se conecta en la etapa 3: confirmar, retener el cupo y pasar a Pagar Reserva (CU-15). --}}
-                        <x-boton disabled class="flex-col">
-                            Confirmar y pagar
-                            <span class="text-sm">Disponible próximamente</span>
+                        {{-- Mientras se procesa queda deshabilitado, para que no se confirme dos veces. --}}
+                        <x-boton wire:click="confirmarReserva" wire:loading.attr="disabled" wire:target="confirmarReserva">
+                            <span wire:loading.remove wire:target="confirmarReserva">Confirmar y pagar</span>
+                            <span wire:loading wire:target="confirmarReserva">Guardando tus lugares…</span>
                         </x-boton>
                     </div>
                 </div>

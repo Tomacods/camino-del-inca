@@ -4,13 +4,17 @@ namespace Tests\Feature;
 
 use App\Enums\EstadoPaquete;
 use App\Enums\Rol;
+use App\Jobs\LiberarCupoRetenido;
 use App\Models\Excursion;
 use App\Models\Guia;
 use App\Models\Paquete;
 use App\Models\Recorrido;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -311,12 +315,144 @@ class RealizarReservaTest extends TestCase
             ->assertRedirect('/');
     }
 
-    public function test_confirmar_y_pagar_esta_deshabilitado(): void
+    public function test_confirmar_retiene_el_cupo_y_deriva_al_pago(): void
     {
+        Queue::fake();
+        $excursion = $this->crearExcursion('2027-01-18');
+        $vence = now()->addMinutes(config('reserva.minutos_retencion'));
+
+        $this->llegarAlResumen(correo: 'Ana.Perez@Mail.com')
+            ->call('sumarNoche', 'antes')
+            ->call('confirmarReserva')
+            ->assertHasNoErrors()
+            ->assertRedirect('/reservar/pago');
+
+        $enCurso = session('reserva_en_curso');
+
+        $this->assertSame(2, $excursion->fresh()->plazas_retenidas);
+        $this->assertTrue(Str::isUuid($enCurso['id_retencion']));
+        $this->assertSame([
+            'id_excursion' => $excursion->id_excursion,
+            'correo_electronico' => 'ana.perez@mail.com',
+            'noches_extra_antes' => 1,
+            'noches_extra_despues' => 0,
+            'integrantes' => [
+                ['nombre' => 'Ana', 'apellido' => 'Pérez', 'documento_pasaporte' => 'AAA111', 'equipo_camping' => true],
+                ['nombre' => 'Bruno', 'apellido' => 'Gómez', 'documento_pasaporte' => 'BBB222', 'equipo_camping' => false],
+            ],
+            'vence' => $vence->toIso8601String(),
+        ], Arr::except($enCurso, 'id_retencion'));
+
+        Queue::assertPushedTimes(LiberarCupoRetenido::class, 1);
+        Queue::assertPushed(LiberarCupoRetenido::class, fn ($tarea) => $tarea->idExcursion === $excursion->id_excursion
+            && $tarea->cantidadPlazas === 2
+            && $tarea->idRetencion === $enCurso['id_retencion']
+            && $tarea->delay->equalTo($vence));
+
+        $this->assertDatabaseCount('reserva', 0);
+        $this->assertDatabaseCount('excursionista', 0);
+    }
+
+    public function test_si_otro_cliente_ocupa_los_lugares_antes_de_confirmar_no_retiene_nada(): void
+    {
+        Queue::fake();
+        $excursion = $this->crearExcursion('2027-01-18', cupo: 3);
+        $componente = $this->llegarAlResumen();
+
+        // Mientras el cliente carga los datos, otro retiene dos de los tres lugares.
+        $excursion->update(['plazas_retenidas' => 2]);
+
+        $componente->call('confirmarReserva')
+            ->assertNoRedirect()
+            ->assertSee('Los lugares ya no están disponibles')
+            ->assertSee('Mientras cargabas los datos se ocuparon los lugares que quedaban en esta salida. Elegí otra fecha u otro paquete.')
+            ->assertSee('Ver los paquetes')
+            ->assertSet('integrantes', [])
+            ->assertSet('correoElectronico', '')
+            ->assertSet('nombre', '')
+            ->assertSet('paso', 1);
+
+        $this->assertSame(2, $excursion->fresh()->plazas_retenidas);
+        $this->assertNull(session('reserva_en_curso'));
+        Queue::assertNothingPushed();
+    }
+
+    public function test_confirmar_con_otra_reserva_en_curso_libera_primero_la_anterior(): void
+    {
+        // La cola es la de la base, como en desarrollo: la retención anterior se libera en el momento y la tarea
+        // demorada de la nueva queda guardada en la tabla jobs.
+        config(['queue.default' => 'database']);
+        $excursion = $this->crearExcursion('2027-01-18', plazasRetenidas: 3);
+        session(['reserva_en_curso' => $this->reservaEnCurso($excursion, 'retencion-anterior', cantidadIntegrantes: 3)]);
+
+        $this->llegarAlResumen()
+            ->call('confirmarReserva')
+            ->assertRedirect('/reservar/pago');
+
+        // Se liberaron las 3 plazas de la anterior y se retuvieron las 2 de la nueva.
+        $this->assertSame(2, $excursion->fresh()->plazas_retenidas);
+        $this->assertNotSame('retencion-anterior', session('reserva_en_curso.id_retencion'));
+        $this->assertDatabaseCount('jobs', 1);
+    }
+
+    public function test_no_se_puede_confirmar_desde_la_pantalla_1(): void
+    {
+        Queue::fake();
+        $excursion = $this->crearExcursion('2027-01-18');
+
+        $this->abrir('2027-01-18')
+            ->set('correoElectronico', 'ana.perez@mail.com')
+            ->call('confirmarReserva')
+            ->assertNoRedirect()
+            ->assertSet('paso', 1);
+
+        $this->assertSame(0, $excursion->fresh()->plazas_retenidas);
+        $this->assertNull(session('reserva_en_curso'));
+        Queue::assertNothingPushed();
+    }
+
+    public function test_no_se_puede_confirmar_con_integrantes_sin_cargar(): void
+    {
+        Queue::fake();
+        $excursion = $this->crearExcursion('2027-01-18');
+
+        // Desde el navegador se cambia la cantidad en la pantalla 2: quedan 2 integrantes cargados para 3 lugares.
+        $this->llegarAlResumen()
+            ->set('cantidadIntegrantes', 3)
+            ->call('confirmarReserva')
+            ->assertNoRedirect();
+
+        $this->assertSame(0, $excursion->fresh()->plazas_retenidas);
+        $this->assertNull(session('reserva_en_curso'));
+        Queue::assertNothingPushed();
+    }
+
+    public function test_el_plazo_de_la_retencion_sale_de_la_configuracion(): void
+    {
+        Queue::fake();
+        config(['reserva.minutos_retencion' => 1]);
         $this->crearExcursion('2027-01-18');
 
         $this->llegarAlResumen()
-            ->assertSeeHtmlInOrder(['disabled="disabled"', 'Confirmar y pagar', 'Disponible próximamente']);
+            ->assertSee('Cuando confirmes, guardamos tus lugares durante 1 minuto para que completes el pago.')
+            ->call('confirmarReserva');
+
+        $this->assertSame(now()->addMinute()->toIso8601String(), session('reserva_en_curso.vence'));
+        Queue::assertPushed(LiberarCupoRetenido::class, fn ($tarea) => $tarea->delay->equalTo(now()->addMinute()));
+    }
+
+    public function test_cancelar_libera_la_retencion_en_curso(): void
+    {
+        // 5 plazas retenidas: 2 de la reserva en curso de este cliente y 3 de otros.
+        $excursion = $this->crearExcursion('2027-01-18', plazasRetenidas: 5);
+        session(['reserva_en_curso' => $this->reservaEnCurso($excursion, 'retencion-1', cantidadIntegrantes: 2)]);
+
+        $this->abrir('2027-01-18')
+            ->call('cancelar')
+            ->assertRedirect('/');
+
+        $this->assertSame(3, $excursion->fresh()->plazas_retenidas);
+        $this->assertNull(session('reserva_en_curso'));
     }
 
     public function test_el_navegador_no_puede_cambiar_el_paso(): void
@@ -343,15 +479,35 @@ class RealizarReservaTest extends TestCase
             ->call('siguienteIntegrante');
     }
 
-    private function llegarAlResumen()
+    private function llegarAlResumen(string $correo = 'ana.perez@mail.com')
     {
         $componente = $this->abrir('2027-01-18')
-            ->set('correoElectronico', 'ana.perez@mail.com')
+            ->set('correoElectronico', $correo)
             ->set('cantidadIntegrantes', 2);
 
         $this->cargarIntegrante($componente, 'Ana', 'Pérez', 'AAA111', equipoCamping: true);
 
         return $this->cargarIntegrante($componente, 'Bruno', 'Gómez', 'BBB222')->assertSet('paso', 2);
+    }
+
+    // Lo que deja en la sesión una confirmación anterior: sólo importan la excursión, los integrantes y el identificador.
+    private function reservaEnCurso(Excursion $excursion, string $idRetencion, int $cantidadIntegrantes): array
+    {
+        $integrantes = [];
+
+        for ($numero = 1; $numero <= $cantidadIntegrantes; $numero++) {
+            $integrantes[] = ['nombre' => 'Integrante', 'apellido' => (string) $numero, 'documento_pasaporte' => 'PAS'.$numero, 'equipo_camping' => false];
+        }
+
+        return [
+            'id_retencion' => $idRetencion,
+            'id_excursion' => $excursion->id_excursion,
+            'correo_electronico' => 'titular@mail.com',
+            'noches_extra_antes' => 0,
+            'noches_extra_despues' => 0,
+            'integrantes' => $integrantes,
+            'vence' => now()->addMinutes(config('reserva.minutos_retencion'))->toIso8601String(),
+        ];
     }
 
     private function crearExcursion(string $fechaSalida, int $cupo = 12, int $plazasRetenidas = 0): Excursion
