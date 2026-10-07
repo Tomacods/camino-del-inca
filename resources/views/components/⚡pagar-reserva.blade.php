@@ -12,9 +12,15 @@ use Livewire\Component;
 // retención, cancelarla (A6) y liberarla si se vence. El pago se completa con CU-15.
 new #[Title('Pagar reserva')] class extends Component
 {
-    // Qué muestra la pantalla: 'vigente', 'vencida' o 'sin-reserva'. Lo decide el servidor.
+    // Qué muestra la pantalla: 'vigente', 'vencida', 'ya-no-en-curso' (la retención que mostraba ya no es la de la
+    // sesión) o 'sin-reserva' (se entró sin nada en la sesión). Lo decide el servidor.
     #[Locked]
     public string $estado = 'sin-reserva';
+
+    // La retención que mostraba la pantalla al abrirse. El cliente puede haber confirmado otra en otra pestaña: la
+    // pantalla sólo actúa sobre ésta.
+    #[Locked]
+    public ?string $idRetencion = null;
 
     // Cuando la retención vence, la dirección para volver a reservar la misma salida.
     #[Locked]
@@ -22,6 +28,8 @@ new #[Title('Pagar reserva')] class extends Component
 
     public function mount(): void
     {
+        $this->idRetencion = session('reserva_en_curso.id_retencion');
+
         $this->comprobarVencimiento();
     }
 
@@ -31,10 +39,13 @@ new #[Title('Pagar reserva')] class extends Component
     {
         $enCurso = $this->reservaEnCurso;
 
+        if ($this->estado === 'vencida') {
+            return 0;
+        }
+
+        // Si la sesión ya no tiene la retención de esta pantalla, no se libera nada ni se borra la sesión.
         if ($enCurso === null) {
-            if ($this->estado !== 'vencida') {
-                $this->estado = 'sin-reserva';
-            }
+            $this->estado = $this->idRetencion === null ? 'sin-reserva' : 'ya-no-en-curso';
 
             return 0;
         }
@@ -53,20 +64,28 @@ new #[Title('Pagar reserva')] class extends Component
         return 0;
     }
 
-    // A6: el cliente cancela. Los lugares se liberan en el momento.
+    // A6: el cliente cancela. Los lugares se liberan en el momento, sólo si la retención de esta pantalla sigue siendo
+    // la de la sesión; si no, la pantalla sólo avisa que ya no está en curso.
     public function cancelar(): void
     {
-        if ($this->reservaEnCurso !== null) {
-            $this->liberarReservaEnCurso($this->reservaEnCurso);
+        if ($this->reservaEnCurso === null) {
+            $this->comprobarVencimiento();
+
+            return;
         }
+
+        $this->liberarReservaEnCurso($this->reservaEnCurso);
 
         $this->redirect('/');
     }
 
+    // La reserva en curso de la sesión, sólo si es la misma que mostraba esta pantalla al abrirse.
     #[Computed]
     public function reservaEnCurso(): ?array
     {
-        return session('reserva_en_curso');
+        $enCurso = session('reserva_en_curso');
+
+        return $enCurso !== null && $enCurso['id_retencion'] === $this->idRetencion ? $enCurso : null;
     }
 
     #[Computed]
@@ -207,6 +226,13 @@ new #[Title('Pagar reserva')] class extends Component
         </x-aviso>
 
         <x-boton :href="$direccionVolverAReservar" class="mt-6">Volver a reservar</x-boton>
+    @elseif ($estado === 'ya-no-en-curso')
+        {{-- Se canceló o se reemplazó desde otra pestaña: el cliente puede tener otra reserva en curso. --}}
+        <h1 class="text-4xl font-semibold sm:text-5xl">Pago de la reserva</h1>
+
+        <x-aviso class="mt-8">Esta reserva ya no está en curso.</x-aviso>
+
+        <x-boton href="/paquetes" class="mt-6">Ver los paquetes</x-boton>
     @else
         <h1 class="text-4xl font-semibold sm:text-5xl">Pago de la reserva</h1>
 

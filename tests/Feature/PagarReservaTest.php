@@ -140,6 +140,55 @@ class PagarReservaTest extends TestCase
         $this->assertNotNull(session('reserva_en_curso'));
     }
 
+    public function test_una_pantalla_abierta_para_otra_reserva_no_libera_la_que_esta_en_curso_al_cancelar(): void
+    {
+        $this->guardarReservaEnCurso();
+        $pantallaDeA = Livewire::test('pagar-reserva')->assertSee('Tus lugares están guardados');
+
+        // En otra pestaña el cliente confirmó otra reserva: la sesión ahora tiene B, con las 2 plazas del cliente.
+        $reservaB = $this->guardarReservaEnCurso();
+
+        $pantallaDeA->call('cancelar')
+            ->assertNoRedirect()
+            ->assertSee('Esta reserva ya no está en curso.')
+            ->assertDontSee('No tenés una reserva en curso.');
+
+        $this->assertSame(5, $this->excursion->fresh()->plazas_retenidas);
+        $this->assertSame($reservaB, session('reserva_en_curso'));
+    }
+
+    public function test_una_pantalla_abierta_para_otra_reserva_no_libera_la_que_esta_en_curso_al_comprobar(): void
+    {
+        $this->guardarReservaEnCurso();
+        $pantallaDeA = Livewire::test('pagar-reserva');
+
+        $reservaB = $this->guardarReservaEnCurso();
+
+        // Ni siquiera con el plazo pasado: B no es la reserva de esta pantalla.
+        $this->travel(4)->minutes();
+
+        $pantallaDeA->call('comprobarVencimiento')
+            ->assertReturned(0)
+            ->assertSee('Esta reserva ya no está en curso.')
+            ->assertDontSee('Se venció el plazo');
+
+        $this->assertSame(5, $this->excursion->fresh()->plazas_retenidas);
+        $this->assertSame($reservaB, session('reserva_en_curso'));
+    }
+
+    public function test_si_la_reserva_se_cancelo_en_otra_pestana_avisa_que_ya_no_esta_en_curso(): void
+    {
+        $this->guardarReservaEnCurso();
+        $componente = Livewire::test('pagar-reserva');
+
+        // En otra pestaña el cliente canceló esta misma reserva.
+        session()->forget('reserva_en_curso');
+
+        $componente->call('comprobarVencimiento')
+            ->assertSee('Esta reserva ya no está en curso.')
+            ->assertDontSee('No tenés una reserva en curso.');
+    }
+
     private function guardarReservaEnCurso(): array
     {
         $enCurso = [
