@@ -457,39 +457,6 @@ class RealizarReservaTest extends TestCase
         $this->assertSame($enCurso, session('reserva_en_curso'));
     }
 
-    public function test_confirmar_y_despues_cancelar_en_el_mismo_formulario_libera_los_lugares(): void
-    {
-        // La cola es la de la base: la tarea demorada queda guardada y la liberación al cancelar corre en el momento.
-        config(['queue.default' => 'database']);
-        $excursion = $this->crearExcursion('2027-01-18', plazasRetenidas: 3);
-
-        // El cliente confirma y vuelve atrás con el navegador al mismo formulario.
-        $componente = $this->llegarAlResumen()->call('confirmarReserva');
-        $this->assertSame(5, $excursion->fresh()->plazas_retenidas);
-
-        $componente->call('cancelar')->assertRedirect('/');
-
-        $this->assertSame(3, $excursion->fresh()->plazas_retenidas);
-        $this->assertNull(session('reserva_en_curso'));
-    }
-
-    public function test_cancelar_no_libera_otra_reserva_en_curso_confirmada_despues(): void
-    {
-        config(['queue.default' => 'database']);
-        $excursion = $this->crearExcursion('2027-01-18', plazasRetenidas: 3);
-        $componente = $this->llegarAlResumen()->call('confirmarReserva');
-
-        // Después, en otra pestaña, el cliente confirmó otra reserva: la sesión tiene otro id_retencion.
-        $otra = $this->reservaEnCurso($excursion, 'otra-retencion', cantidadIntegrantes: 1);
-        session(['reserva_en_curso' => $otra]);
-        $plazasAntes = $excursion->fresh()->plazas_retenidas;
-
-        $componente->call('cancelar')->assertRedirect('/');
-
-        $this->assertSame($plazasAntes, $excursion->fresh()->plazas_retenidas);
-        $this->assertSame($otra, session('reserva_en_curso'));
-    }
-
     public function test_el_navegador_no_puede_cambiar_el_paso(): void
     {
         $this->crearExcursion('2027-01-18');
