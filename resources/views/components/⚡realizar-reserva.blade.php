@@ -193,11 +193,12 @@ new #[Title('Reservar')] class extends Component
         $this->cargarIntegrante();
     }
 
-    // A6: se descarta lo cargado y, si ya se había retenido el cupo (el cliente volvió atrás desde el pago), se libera.
+    // A6: se descarta lo cargado y se vuelve al inicio. Una reserva en curso que haya en la sesión (por ejemplo, la que el
+    // cliente está pagando en otra pestaña) no se toca: la liberan «Cancelar» en la pantalla de pago, la tarea al vencer
+    // o un nuevo «Confirmar».
     public function cancelar(): void
     {
         $this->descartarDatosReserva();
-        $this->liberarReservaEnCurso();
 
         $this->redirect('/');
     }

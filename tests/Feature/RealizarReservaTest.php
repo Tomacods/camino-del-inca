@@ -441,18 +441,20 @@ class RealizarReservaTest extends TestCase
         Queue::assertPushed(LiberarCupoRetenido::class, fn ($tarea) => $tarea->delay->equalTo(now()->addMinute()));
     }
 
-    public function test_cancelar_libera_la_retencion_en_curso(): void
+    public function test_cancelar_en_el_formulario_deja_intacta_la_reserva_en_curso(): void
     {
-        // 5 plazas retenidas: 2 de la reserva en curso de este cliente y 3 de otros.
+        // 5 plazas retenidas: 2 de una reserva en curso del cliente (la que está pagando en otra pestaña) y 3 de otros.
         $excursion = $this->crearExcursion('2027-01-18', plazasRetenidas: 5);
-        session(['reserva_en_curso' => $this->reservaEnCurso($excursion, 'retencion-1', cantidadIntegrantes: 2)]);
+        $enCurso = $this->reservaEnCurso($excursion, 'retencion-1', cantidadIntegrantes: 2);
+        session(['reserva_en_curso' => $enCurso]);
 
         $this->abrir('2027-01-18')
+            ->set('correoElectronico', 'ana.perez@mail.com')
             ->call('cancelar')
             ->assertRedirect('/');
 
-        $this->assertSame(3, $excursion->fresh()->plazas_retenidas);
-        $this->assertNull(session('reserva_en_curso'));
+        $this->assertSame(5, $excursion->fresh()->plazas_retenidas);
+        $this->assertSame($enCurso, session('reserva_en_curso'));
     }
 
     public function test_el_navegador_no_puede_cambiar_el_paso(): void
