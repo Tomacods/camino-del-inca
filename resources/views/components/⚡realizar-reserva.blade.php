@@ -236,7 +236,7 @@ new #[Title('Reservar')] class extends Component
         $idRetencion = (string) Str::uuid();
         $vence = now()->addMinutes(config('reserva.minutos_retencion'));
 
-        // Si el cliente no paga a tiempo, esta tarea libera las plazas al vencer el plazo, aunque haya cerrado el navegador.
+        // Si el cliente no paga a tiempo, esta tarea libera las plazas al vencer, aunque haya cerrado el navegador.
         LiberarCupoRetenido::dispatch($this->excursion->id_excursion, $cantidadPlazas, $idRetencion)->delay($vence);
 
         session(['reserva_en_curso' => [
@@ -357,7 +357,7 @@ new #[Title('Reservar')] class extends Component
         return false;
     }
 
-    // DS-14, «el cupo se ocupó antes de confirmar»: se vacía todo lo cargado.
+    // Vacía todo lo cargado: cuando el cupo se ocupó antes de confirmar (A7, el diagrama del DS-14) y al cancelar (A6).
     private function descartarDatosReserva(): void
     {
         $this->reset([
