@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\EstadoReserva;
 use App\Enums\EstadoSaldo;
 use App\Enums\MotivoDevolucion;
+use App\Enums\TipoServicio;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -231,5 +233,32 @@ class Reserva extends Model
     private function validarEstado(array $estados): bool
     {
         return in_array($this->estado, $estados, true);
+    }
+
+    /* ------------------- Filtros del listado (CU-07) ------------------- */
+
+    public function scopeDeEstado(Builder $consulta, EstadoReserva $estado): Builder
+    {
+        return $consulta->where('estado', $estado->value);
+    }
+
+    public function scopeDePaquete(Builder $consulta, int $idPaquete): Builder
+    {
+        return $consulta->whereHas('excursion', fn (Builder $excursion) => $excursion->where('id_paquete', $idPaquete));
+    }
+
+    public function scopeDeGuia(Builder $consulta, int $idGuia): Builder
+    {
+        return $consulta->whereHas('excursion', fn (Builder $excursion) => $excursion->where('id_guia', $idGuia));
+    }
+
+    public function scopeConEquipoCamping(Builder $consulta): Builder
+    {
+        return $consulta->whereHas('excursionistas', fn (Builder $integrante) => $integrante->where('equipo_camping', true));
+    }
+
+    public function scopeConServicio(Builder $consulta, TipoServicio $tipo): Builder
+    {
+        return $consulta->whereHas('excursion.paquete.servicios', fn (Builder $servicio) => $servicio->where('tipo', $tipo->value));
     }
 }
