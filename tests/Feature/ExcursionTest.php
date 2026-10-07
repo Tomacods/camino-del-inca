@@ -112,6 +112,37 @@ class ExcursionTest extends TestCase
         $this->assertFalse($excursion->admiteReserva('2026-10-04'));
     }
 
+    public function test_cumple_la_anticipacion_minima_a_tres_meses_exactos(): void
+    {
+        $excursion = $this->crearExcursion(cupo: 12, fechaSalida: '2027-01-04');
+
+        $this->assertTrue($excursion->cumpleAnticipacionMinima('2026-10-04 18:30:00'));
+    }
+
+    public function test_no_cumple_la_anticipacion_minima_un_dia_antes(): void
+    {
+        $excursion = $this->crearExcursion(cupo: 12, fechaSalida: '2027-01-04');
+
+        $this->assertFalse($excursion->cumpleAnticipacionMinima('2026-10-05'));
+    }
+
+    public function test_busca_la_excursion_del_paquete_en_esa_fecha_de_salida(): void
+    {
+        $excursion = $this->crearExcursion(cupo: 12, fechaSalida: '2027-01-18');
+
+        $encontrada = Excursion::buscarPorFechaSalida($excursion->id_paquete, '2027-01-18');
+
+        $this->assertSame($excursion->id_excursion, $encontrada?->id_excursion);
+    }
+
+    public function test_no_encuentra_una_fecha_de_salida_que_el_paquete_no_tiene(): void
+    {
+        $excursion = $this->crearExcursion(cupo: 12, fechaSalida: '2027-01-18');
+        $this->crearExcursion(cupo: 12, fechaSalida: '2027-02-01');
+
+        $this->assertNull(Excursion::buscarPorFechaSalida($excursion->id_paquete, '2027-02-01'));
+    }
+
     public function test_retiene_el_cupo_si_alcanza_justo(): void
     {
         $excursion = $this->crearExcursion(cupo: 8, plazasRetenidas: 2);

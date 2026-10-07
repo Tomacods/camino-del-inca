@@ -83,11 +83,23 @@ class Reserva extends Model
         return $this->hasOne(Valoracion::class, 'id_reserva', 'id_reserva');
     }
 
+    /* ----------------------------- CU-14 Realizar ----------------------------- */
+
+    // Es estático porque cuando el cliente elige las noches todavía no existe la reserva: se guarda con el primer pago.
+    public static function validarNochesExtra(int $nochesExtraAntes, int $nochesExtraDespues): bool
+    {
+        return $nochesExtraAntes >= 0
+            && $nochesExtraDespues >= 0
+            && $nochesExtraAntes + $nochesExtraDespues <= config('reserva.maximo_noches_extra');
+    }
+
     /* ----------------------------- CU-18 Consultar ---------------------------- */
 
+    // Los correos se guardan en minúsculas y sin espacios en las puntas: el que escribe el cliente se convierte igual,
+    // así encuentra su reserva aunque lo escriba con otras mayúsculas.
     public static function buscarPorCorreoYNumero(string $correo, string $numeroReserva): ?self
     {
-        return self::where('correo_electronico', $correo)
+        return self::where('correo_electronico', mb_strtolower(trim($correo)))
             ->where('numero_reserva', $numeroReserva)
             ->first();
     }
