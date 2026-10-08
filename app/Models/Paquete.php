@@ -52,4 +52,15 @@ class Paquete extends Model
     {
         return $this->hasMany(Excursion::class, 'id_paquete', 'id_paquete');
     }
+
+    /* ------------------------------ CU-15 Pagar ------------------------------- */
+
+    // Las noches extra se contratan para todo el grupo y se cobran por persona; el equipo de camping, por equipo. Los
+    // precios llegan como texto ('750.00') por el cast decimal:2: se pasan a número antes de la cuenta.
+    public function calcularMonto(int $cantidadIntegrantes, int $nochesExtra, int $equiposCamping): float
+    {
+        return (float) $this->precio_base * $cantidadIntegrantes
+            + $nochesExtra * $cantidadIntegrantes * (float) $this->costo_noche_extra_cusco
+            + $equiposCamping * (float) $this->costo_equipo_camping;
+    }
 }

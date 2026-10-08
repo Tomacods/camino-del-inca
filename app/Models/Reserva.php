@@ -104,16 +104,13 @@ class Reserva extends Model
             ->first();
     }
 
-    public function obtenerMontoTotal(): float // puse este aca aunq vaya en paquete para usarlo momentaneamente, cuando este el metodo correspondinete uso ese
+    public function calcularMontoTotal(): float
     {
-        $paquete = $this->excursion->paquete;
-        $integrantes = $this->excursionistas->count();
-        $conEquipo = $this->excursionistas->where('equipo_camping', true)->count();
-        $nochesExtra = $this->noches_extra_antes + $this->noches_extra_despues;
-
-        return $integrantes * $paquete->precio_base
-            + $conEquipo * $paquete->costo_equipo_camping
-            + $nochesExtra * $integrantes * $paquete->costo_noche_extra_cusco;
+        return $this->excursion->paquete->calcularMonto(
+            $this->excursionistas->count(),
+            $this->noches_extra_antes + $this->noches_extra_despues,
+            $this->excursionistas->where('equipo_camping', true)->count(),
+        );
     }
 
     public function getDetalle(): self
@@ -127,7 +124,7 @@ class Reserva extends Model
 
     public function calcularSaldoPendiente(): float
     {
-        return $this->obtenerMontoTotal() - $this->sumarPagos();
+        return $this->calcularMontoTotal() - $this->sumarPagos();
     }
 
     public function getOpcionesHabilitadas(): array
