@@ -80,6 +80,81 @@ class ReservaTest extends TestCase
         $this->assertSame(1350.0, $reserva->calcularSaldoPendiente());
     }
 
+    public function test_calcula_el_digito_verificador_con_modulo_11(): void
+    {
+        $digitos = [118 => 1, 119 => 3, 121 => 1, 122 => 3, 123 => 5, 124 => 7, 125 => 9, 126 => 0];
+
+        foreach ($digitos as $numero => $digito) {
+            $this->assertSame($digito, Reserva::calcularDigitoVerificador($numero), "Dígito de {$numero}");
+        }
+    }
+
+    public function test_el_digito_verificador_puede_dar_10(): void
+    {
+        $this->assertSame(10, Reserva::calcularDigitoVerificador(120));
+    }
+
+    public function test_sin_reservas_el_primer_numero_es_el_1(): void
+    {
+        $this->assertSame('000001-2', Reserva::generarNumeroReserva());
+    }
+
+    public function test_el_numero_sigue_al_ultimo_emitido(): void
+    {
+        $this->crearReserva('000124-7');
+        $this->crearReserva('000125-9');
+
+        $this->assertSame('000126-0', Reserva::generarNumeroReserva());
+    }
+
+    public function test_saltea_los_numeros_con_resto_10(): void
+    {
+        $this->crearReserva('000119-3');
+
+        $this->assertSame('000121-1', Reserva::generarNumeroReserva());
+    }
+
+    public function test_con_la_sena_las_dos_fechas_limite_vencen_un_mes_antes_de_la_salida(): void
+    {
+        $reserva = new Reserva(['estado_saldo' => EstadoSaldo::Adeudado]);
+
+        $reserva->fijarFechasLimite('2027-01-18');
+
+        $this->assertSame('2026-12-18 23:59:59', $reserva->fecha_limite_confirmacion->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-12-18 23:59:59', $reserva->fecha_limite_saldo->format('Y-m-d H:i:s'));
+    }
+
+    public function test_con_el_total_abonado_no_hay_fecha_limite_de_saldo(): void
+    {
+        $reserva = new Reserva(['estado_saldo' => EstadoSaldo::Abonado]);
+
+        $reserva->fijarFechasLimite('2027-01-18');
+
+        $this->assertSame('2026-12-18 23:59:59', $reserva->fecha_limite_confirmacion->format('Y-m-d H:i:s'));
+        $this->assertNull($reserva->fecha_limite_saldo);
+    }
+
+    public function test_la_fecha_limite_no_se_pasa_al_mes_siguiente(): void
+    {
+        $reserva = new Reserva(['estado_saldo' => EstadoSaldo::Adeudado]);
+
+        // Febrero de 2027 no tiene 29: queda en el último día del mes.
+        $reserva->fijarFechasLimite('2027-03-29');
+
+        $this->assertSame('2027-02-28 23:59:59', $reserva->fecha_limite_confirmacion->format('Y-m-d H:i:s'));
+        $this->assertSame('2027-02-28 23:59:59', $reserva->fecha_limite_saldo->format('Y-m-d H:i:s'));
+    }
+
+    public function test_el_plazo_de_las_fechas_limite_sale_de_la_configuracion(): void
+    {
+        config(['reserva.meses_anticipacion_fechas_limite' => 2]);
+        $reserva = new Reserva(['estado_saldo' => EstadoSaldo::Adeudado]);
+
+        $reserva->fijarFechasLimite('2027-01-18');
+
+        $this->assertSame('2026-11-18 23:59:59', $reserva->fecha_limite_confirmacion->format('Y-m-d H:i:s'));
+    }
+
     // La del prototipo: 3 integrantes, 2 con equipo de camping y una noche extra antes y una después.
     private function crearReservaDelPrototipo(): Reserva
     {

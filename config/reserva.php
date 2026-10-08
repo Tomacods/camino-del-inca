@@ -55,6 +55,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Anticipación de las fechas límite
+    |--------------------------------------------------------------------------
+    |
+    | Meses antes de la salida en que vencen la confirmación de la reserva y, si
+    | se pagó la seña, el pago del saldo. Vencen a las 23:59:59 de ese día
+    | (CU-15 Pagar Reserva).
+    |
+    */
+
+    'meses_anticipacion_fechas_limite' => 1,
+
+    /*
+    |--------------------------------------------------------------------------
     | Anticipación para el reembolso
     |--------------------------------------------------------------------------
     |

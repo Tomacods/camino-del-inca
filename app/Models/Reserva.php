@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class Reserva extends Model
 {
@@ -27,6 +28,11 @@ class Reserva extends Model
     public const OPCION_REPROGRAMAR = 'Solicitar reprogramación';
 
     public const OPCION_VALORAR = 'Valorar servicios';
+
+    // Número de reserva (CU-15): seis cifras, guion y dígito verificador, módulo 11 con pesos 2 a 7 desde la derecha.
+    private const CIFRAS_NUMERO_RESERVA = 6;
+
+    private const PESOS_DIGITO_VERIFICADOR = [2, 3, 4, 5, 6, 7];
 
     protected $table = 'reserva';
 
@@ -91,6 +97,52 @@ class Reserva extends Model
         return $nochesExtraAntes >= 0
             && $nochesExtraDespues >= 0
             && $nochesExtraAntes + $nochesExtraDespues <= config('reserva.maximo_noches_extra');
+    }
+
+    /* ------------------------------ CU-15 Pagar ------------------------------- */
+
+    // Cada cifra, desde la derecha, se multiplica por su peso (2, 3, ..., 7 y vuelve a empezar); el dígito es el resto
+    // de dividir la suma por 11. Devuelve de 0 a 10: quien lo usa decide qué hacer con el 10.
+    public static function calcularDigitoVerificador(int $numero): int
+    {
+        $cifras = array_reverse(str_split((string) $numero));
+        $pesos = self::PESOS_DIGITO_VERIFICADOR;
+        $suma = 0;
+
+        foreach ($cifras as $posicion => $cifra) {
+            $suma += (int) $cifra * $pesos[$posicion % count($pesos)];
+        }
+
+        return $suma % 11;
+    }
+
+    // El secuencial sigue al del último número emitido; sin reservas, empieza en 1. Como todos tienen seis cifras con
+    // ceros a la izquierda, ordenarlos como texto es ordenarlos como números.
+    public static function generarNumeroReserva(): string
+    {
+        $ultimoNumero = self::orderByDesc('numero_reserva')->value('numero_reserva');
+        $secuencial = $ultimoNumero === null ? 1 : (int) Str::before($ultimoNumero, '-') + 1;
+
+        // Un resto de 10 no entra en una cifra: esos números no se emiten.
+        while (self::calcularDigitoVerificador($secuencial) === 10) {
+            $secuencial++;
+        }
+
+        return str_pad((string) $secuencial, self::CIFRAS_NUMERO_RESERVA, '0', STR_PAD_LEFT)
+            .'-'.self::calcularDigitoVerificador($secuencial);
+    }
+
+    // Vencen a las 23:59:59, como en los seeders. subMonthsNoOverflow no se pasa al mes siguiente: del 29/03 va al 28/02
+    // y no al 01/03. Carbon::parse hace una copia, así no cambia la fecha de salida de la excursión. Usa estado_saldo:
+    // se llama después de asignarlo (en el DS-15 va antes de setEstadoSaldo). Sólo asigna: guarda quien la llama.
+    public function fijarFechasLimite($fechaSalida): void
+    {
+        $fechaLimite = Carbon::parse($fechaSalida)
+            ->subMonthsNoOverflow(config('reserva.meses_anticipacion_fechas_limite'))
+            ->endOfDay();
+
+        $this->fecha_limite_confirmacion = $fechaLimite;
+        $this->fecha_limite_saldo = $this->estado_saldo === EstadoSaldo::Adeudado ? $fechaLimite : null;
     }
 
     /* ----------------------------- CU-18 Consultar ---------------------------- */
