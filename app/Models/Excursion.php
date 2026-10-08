@@ -148,4 +148,12 @@ class Excursion extends Model
             $this->plazas_retenidas = $excursion->plazas_retenidas;
         });
     }
+
+    /* ------------------------------ CU-15 Pagar ------------------------------- */
+
+    // Asocia la reserva a esta excursión y la guarda.
+    public function agregarReserva(Reserva $reserva): void
+    {
+        $this->reservas()->save($reserva);
+    }
 }

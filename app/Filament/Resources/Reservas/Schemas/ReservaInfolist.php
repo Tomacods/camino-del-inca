@@ -37,7 +37,7 @@ class ReservaInfolist
                 ->columns(2)
                 ->schema([
                     TextEntry::make('monto_total')->label('Monto total')
-                        ->state(fn (Reserva $record) => $record->obtenerMontoTotal())
+                        ->state(fn (Reserva $record) => $record->calcularMontoTotal())
                         ->formatStateUsing(fn ($state) => self::dolares($state)),
                     TextEntry::make('saldo_pendiente')->label('Saldo pendiente')
                         ->state(fn (Reserva $record) => $record->calcularSaldoPendiente())

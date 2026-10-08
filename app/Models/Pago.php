@@ -6,6 +6,8 @@ use App\Enums\TipoPago;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
+use InvalidArgumentException;
 
 class Pago extends Model
 {
@@ -40,5 +42,33 @@ class Pago extends Model
     public function comprobante(): HasOne
     {
         return $this->hasOne(Comprobante::class, 'id_pago', 'id_pago');
+    }
+
+    /* ------------------------------ CU-15 Pagar ------------------------------- */
+
+    // Es estático porque el monto se calcula antes de que exista el pago. El saldo no se calcula acá: es de CU-16 y sale
+    // de Reserva::calcularSaldoPendiente().
+    public static function calcularMontoAPagar(float $montoTotal, TipoPago $tipoPago): float
+    {
+        return match ($tipoPago) {
+            TipoPago::Total => $montoTotal,
+            TipoPago::Sena => round($montoTotal * config('reserva.porcentaje_sena'), 2),
+            TipoPago::Saldo => throw new InvalidArgumentException('El saldo se calcula con Reserva::calcularSaldoPendiente().'),
+        };
+    }
+
+    // Crea el pago de la reserva y su comprobante. El pago guarda sólo el día; el comprobante, el momento del pago.
+    public static function registrarPago(Reserva $reserva, float $monto, $fecha, string $medioPago, TipoPago $tipoPago): self
+    {
+        $pago = $reserva->pagos()->create([
+            'fecha' => Carbon::parse($fecha)->toDateString(),
+            'monto' => $monto,
+            'tipo_pago' => $tipoPago,
+            'medio_pago' => $medioPago,
+        ]);
+
+        Comprobante::generarComprobante($pago, $fecha);
+
+        return $pago;
     }
 }

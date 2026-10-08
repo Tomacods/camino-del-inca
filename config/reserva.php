@@ -43,6 +43,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Porcentaje de la seña
+    |--------------------------------------------------------------------------
+    |
+    | La parte del monto total que se paga si el cliente elige abonar la seña,
+    | como fracción: 0.50 es el 50 % (CU-15 Pagar Reserva).
+    |
+    */
+
+    'porcentaje_sena' => 0.50,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Anticipación de las fechas límite
+    |--------------------------------------------------------------------------
+    |
+    | Meses antes de la salida en que vencen la confirmación de la reserva y, si
+    | se pagó la seña, el pago del saldo. Vencen a las 23:59:59 de ese día
+    | (CU-15 Pagar Reserva).
+    |
+    */
+
+    'meses_anticipacion_fechas_limite' => 1,
+
+    /*
+    |--------------------------------------------------------------------------
     | Anticipación para el reembolso
     |--------------------------------------------------------------------------
     |
