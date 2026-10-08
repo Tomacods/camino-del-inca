@@ -6,6 +6,7 @@ use App\Enums\EstadoReserva;
 use App\Enums\TipoServicio;
 use App\Models\Guia;
 use App\Models\Paquete;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -72,6 +73,9 @@ class ReservasTable
                     ->label('Con equipo de camping')
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->conEquipoCamping()),
+            ])
+            ->recordActions([
+                ViewAction::make()->label('Ver'),
             ]);
     }
 
