@@ -143,6 +143,39 @@ class GenerarReservaTest extends TestCase
         $this->assertNoSeGuardoNada();
     }
 
+    public function test_el_mismo_pago_dos_veces_registra_una_sola_reserva(): void
+    {
+        $enCurso = $this->reservaEnCurso();
+
+        $primera = Reserva::generarReserva($enCurso, TipoPago::Sena, 'Tarjeta de crédito');
+        $segunda = Reserva::generarReserva($enCurso, TipoPago::Sena, 'Tarjeta de crédito');
+
+        $this->assertNotNull($primera);
+        $this->assertNull($segunda);
+        $this->assertDatabaseCount('reserva', 1);
+        $this->assertDatabaseCount('excursionista', 3);
+        $this->assertDatabaseCount('pago', 1);
+        $this->assertDatabaseCount('comprobante', 1);
+        $this->assertSame(2, $this->excursion->fresh()->plazas_retenidas);
+    }
+
+    public function test_si_la_retencion_ya_se_libero_no_registra_nada_aunque_no_haya_vencido(): void
+    {
+        $enCurso = $this->reservaEnCurso();
+
+        // El cliente la canceló en otra pestaña: la retención se liberó antes de que se confirme el pago.
+        (new LiberarCupoRetenido($this->excursion->id_excursion, 3, $enCurso['id_retencion']))->handle();
+
+        $this->assertNull(Reserva::generarReserva($enCurso, TipoPago::Sena, 'Tarjeta de crédito'));
+        $this->assertDatabaseEmpty('reserva');
+        $this->assertDatabaseEmpty('excursionista');
+        $this->assertDatabaseEmpty('pago');
+        $this->assertDatabaseEmpty('comprobante');
+
+        // Bajó una sola vez, con la cancelación.
+        $this->assertSame(2, $this->excursion->fresh()->plazas_retenidas);
+    }
+
     public function test_si_algo_falla_en_el_medio_no_queda_nada_guardado(): void
     {
         $enCurso = $this->reservaEnCurso();

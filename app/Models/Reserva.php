@@ -116,19 +116,20 @@ class Reserva extends Model
 
     // Pasos 8 a 11 con el primer pago aprobado: registra la reserva con sus integrantes, el pago con su comprobante y
     // pasa las plazas de retenidas a reservadas. Recibe la reserva en curso que CU-14 guardó en la sesión; no la lee de
-    // ahí: se la pasa quien la llama. Es estático porque la reserva todavía no existe.
+    // ahí: se la pasa quien la llama. Es estático porque la reserva todavía no existe. Una retención genera una sola
+    // reserva: devuelve null si la retención venció (A3) o si ya se liberó.
     public static function generarReserva(array $reservaEnCurso, TipoPago $tipoPago, string $medioPago): ?self
     {
         if ($tipoPago === TipoPago::Saldo) {
             throw new InvalidArgumentException('El saldo se paga sobre una reserva ya registrada (CU-16).');
         }
 
-        // Una sola hora para la reserva, el pago y el comprobante.
-        $ahora = now();
-
         // A3: si la retención venció, no se crea nada. Decide la hora del servidor, igual que en la pantalla de pago; de
-        // liberar esas plazas ya se ocupan la tarea demorada y la pantalla.
-        if ($ahora->greaterThanOrEqualTo(Carbon::parse($reservaEnCurso['vence']))) {
+        // liberar esas plazas ya se ocupan la tarea demorada y la pantalla. Este primer control es para salir rápido,
+        // sin esperar el candado.
+        $vence = Carbon::parse($reservaEnCurso['vence']);
+
+        if (now()->greaterThanOrEqualTo($vence)) {
             return null;
         }
 
@@ -139,6 +140,18 @@ class Reserva extends Model
         $candado->block(self::SEGUNDOS_ESPERA_CANDADO);
 
         try {
+            // La hora se toma con el candado ya tomado: es el momento en que se registran la reserva, el pago y el
+            // comprobante, los tres con la misma.
+            $ahora = now();
+
+            // Se controla de nuevo, porque mientras se esperaba el candado la retención pudo vencer o liberarse: la
+            // canceló el cliente, la liberó la tarea demorada o la usó un pago anterior. Si el mismo pago llega dos
+            // veces, la segunda llamada espera a que la primera termine, encuentra la retención liberada y no
+            // registra otra reserva.
+            if ($ahora->greaterThanOrEqualTo($vence) || LiberarCupoRetenido::yaLiberada($reservaEnCurso['id_retencion'])) {
+                return null;
+            }
+
             // Todo en una sola transacción: o queda todo o no queda nada.
             return DB::transaction(function () use ($reservaEnCurso, $tipoPago, $medioPago, $ahora) {
                 $excursion = Excursion::findOrFail($reservaEnCurso['id_excursion']);
@@ -171,7 +184,9 @@ class Reserva extends Model
                 Pago::registrarPago($reserva, $monto, $ahora, $medioPago, $tipoPago);
 
                 // Se libera con la misma tarea que la demorada y dentro de la transacción: cuando la demorada llegue, no
-                // descuenta de nuevo. Las plazas pasan de retenidas a reservadas: el cupo disponible queda igual.
+                // descuenta de nuevo. Las plazas pasan de retenidas a reservadas: el cupo disponible queda igual. La
+                // marca de «ya liberada» se guarda con la transacción, antes de soltar el candado: un segundo pago con
+                // esta retención ya la encuentra.
                 LiberarCupoRetenido::dispatchSync($excursion->id_excursion, count($reservaEnCurso['integrantes']), $reservaEnCurso['id_retencion']);
 
                 return $reserva;
