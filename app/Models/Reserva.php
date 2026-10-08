@@ -2,18 +2,23 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoPermiso;
 use App\Enums\EstadoReserva;
 use App\Enums\EstadoSaldo;
 use App\Enums\MotivoDevolucion;
+use App\Enums\TipoPago;
 use App\Enums\TipoServicio;
+use App\Jobs\LiberarCupoRetenido;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 class Reserva extends Model
 {
@@ -33,6 +38,14 @@ class Reserva extends Model
     private const CIFRAS_NUMERO_RESERVA = 6;
 
     private const PESOS_DIGITO_VERIFICADOR = [2, 3, 4, 5, 6, 7];
+
+    // Candado de generarReserva() (CU-15). Se suelta solo a los 10 segundos, por si el proceso se cae con el candado
+    // tomado; un pago espera hasta 5 a que se suelte.
+    private const CANDADO_GENERAR_RESERVA = 'generar-reserva';
+
+    private const SEGUNDOS_CANDADO = 10;
+
+    private const SEGUNDOS_ESPERA_CANDADO = 5;
 
     protected $table = 'reserva';
 
@@ -100,6 +113,74 @@ class Reserva extends Model
     }
 
     /* ------------------------------ CU-15 Pagar ------------------------------- */
+
+    // Pasos 8 a 11 con el primer pago aprobado: registra la reserva con sus integrantes, el pago con su comprobante y
+    // pasa las plazas de retenidas a reservadas. Recibe la reserva en curso que CU-14 guardó en la sesión; no la lee de
+    // ahí: se la pasa quien la llama. Es estático porque la reserva todavía no existe.
+    public static function generarReserva(array $reservaEnCurso, TipoPago $tipoPago, string $medioPago): ?self
+    {
+        if ($tipoPago === TipoPago::Saldo) {
+            throw new InvalidArgumentException('El saldo se paga sobre una reserva ya registrada (CU-16).');
+        }
+
+        // Una sola hora para la reserva, el pago y el comprobante.
+        $ahora = now();
+
+        // A3: si la retención venció, no se crea nada. Decide la hora del servidor, igual que en la pantalla de pago; de
+        // liberar esas plazas ya se ocupan la tarea demorada y la pantalla.
+        if ($ahora->greaterThanOrEqualTo(Carbon::parse($reservaEnCurso['vence']))) {
+            return null;
+        }
+
+        // El número siguiente se calcula mirando el último emitido: si dos clientes pagan a la vez, los dos verían el
+        // mismo. Con el candado, mientras una reserva se registra la siguiente espera su turno. Si no lo consigue en el
+        // plazo, block() lanza una excepción y no se registra nada.
+        $candado = Cache::lock(self::CANDADO_GENERAR_RESERVA, self::SEGUNDOS_CANDADO);
+        $candado->block(self::SEGUNDOS_ESPERA_CANDADO);
+
+        try {
+            // Todo en una sola transacción: o queda todo o no queda nada.
+            return DB::transaction(function () use ($reservaEnCurso, $tipoPago, $medioPago, $ahora) {
+                $excursion = Excursion::findOrFail($reservaEnCurso['id_excursion']);
+
+                // En el DS-15 el pago va antes que la reserva, pero en la base el pago lleva la clave de la reserva
+                // (pago.id_reserva no admite nulos): se guarda primero la reserva.
+                $reserva = new self([
+                    'correo_electronico' => $reservaEnCurso['correo_electronico'],
+                    'noches_extra_antes' => $reservaEnCurso['noches_extra_antes'],
+                    'noches_extra_despues' => $reservaEnCurso['noches_extra_despues'],
+                    'fecha_reserva' => $ahora,
+                    'numero_reserva' => self::generarNumeroReserva(),
+                    'estado' => EstadoReserva::Pendiente,
+                    'estado_saldo' => $tipoPago === TipoPago::Total ? EstadoSaldo::Abonado : EstadoSaldo::Adeudado,
+                ]);
+                $reserva->fijarFechasLimite($excursion->getFechaSalida());
+                $excursion->agregarReserva($reserva);
+
+                foreach ($reservaEnCurso['integrantes'] as $integrante) {
+                    $reserva->excursionistas()->create([
+                        'nombre' => $integrante['nombre'],
+                        'apellido' => $integrante['apellido'],
+                        'documento_pasaporte' => $integrante['documento_pasaporte'],
+                        'equipo_camping' => $integrante['equipo_camping'],
+                        'estado_permiso' => EstadoPermiso::Pendiente,
+                    ]);
+                }
+
+                $monto = Pago::calcularMontoAPagar($reserva->calcularMontoTotal(), $tipoPago);
+                Pago::registrarPago($reserva, $monto, $ahora, $medioPago, $tipoPago);
+
+                // Se libera con la misma tarea que la demorada y dentro de la transacción: cuando la demorada llegue, no
+                // descuenta de nuevo. Las plazas pasan de retenidas a reservadas: el cupo disponible queda igual.
+                LiberarCupoRetenido::dispatchSync($excursion->id_excursion, count($reservaEnCurso['integrantes']), $reservaEnCurso['id_retencion']);
+
+                return $reserva;
+            });
+        } finally {
+            // Se suelta aunque la transacción falle: si no, el pago siguiente tendría que esperar a que venza solo.
+            $candado->release();
+        }
+    }
 
     // Cada cifra, desde la derecha, se multiplica por su peso (2, 3, ..., 7 y vuelve a empezar); el dígito es el resto
     // de dividir la suma por 11. Devuelve de 0 a 10: quien lo usa decide qué hacer con el 10.
