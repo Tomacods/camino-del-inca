@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoPaquete;
 use App\Enums\EstadoReserva;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -147,5 +148,21 @@ class Excursion extends Model
 
             $this->plazas_retenidas = $excursion->plazas_retenidas;
         });
+    }
+
+    // CU-05 y CU-06: una salida está disponible si todavía no salió y le queda al menos un lugar.
+    public static function getExcursionesDisponibles(int $idPaquete): Collection
+    {
+        return self::buscarFuturas($idPaquete)
+            ->filter(fn (Excursion $excursion) => $excursion->obtenerCupoDisponible() > 0)
+            ->values();
+    }
+
+    public static function buscarFuturas(int $idPaquete): Collection
+    {
+        return self::where('id_paquete', $idPaquete)
+            ->whereDate('fecha_salida', '>', today())
+            ->orderBy('fecha_salida')
+            ->get();
     }
 }
