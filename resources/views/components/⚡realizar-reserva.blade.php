@@ -1,8 +1,11 @@
 <?php
 
+use App\Jobs\LiberarCupoRetenido;
 use App\Models\Excursion;
 use App\Models\Reserva;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -20,7 +23,8 @@ new #[Title('Reservar')] class extends Component
     #[Locked]
     public int $paso = 1;
 
-    // Por qué no se puede reservar esta salida: 'no-disponible', 'anticipacion' o 'sin-cupo'. Null si se puede.
+    // Por qué no se muestra el formulario: 'no-disponible', 'anticipacion', 'reserva-en-curso' (el cliente ya tiene lugares
+    // guardados para esta salida), 'sin-cupo' o 'cupo-ocupado' (A7: se ocupó al confirmar). Null si se puede reservar.
     #[Locked]
     public ?string $impedimento = null;
 
@@ -60,8 +64,17 @@ new #[Title('Reservar')] class extends Component
     }
 
     // En el orden del caso de uso: que exista la salida, la anticipación (A1), que el paquete esté activo y el cupo (A3).
+    // Antes del cupo se mira si el cliente ya tiene lugares guardados para esta salida (volvió atrás desde el pago):
+    // si no, su propia retención le haría ver que no quedan lugares.
     protected function iniciarReserva(): void
     {
+        // Si esa reserva en curso ya venció, se libera y el formulario se muestra normal.
+        $enCurso = $this->reservaEnCursoDeEstaSalida();
+
+        if ($enCurso !== null && now()->greaterThanOrEqualTo(Carbon::parse($enCurso['vence']))) {
+            $this->liberarReservaDeEstaSalida();
+        }
+
         $excursion = $this->excursion;
         $hoy = now();
 
@@ -69,6 +82,7 @@ new #[Title('Reservar')] class extends Component
             $excursion === null => 'no-disponible',
             ! $excursion->cumpleAnticipacionMinima($hoy) => 'anticipacion',
             ! $excursion->admiteReserva($hoy) => 'no-disponible',
+            $this->reservaEnCursoDeEstaSalida() !== null => 'reserva-en-curso',
             $excursion->obtenerCupoDisponible() <= 0 => 'sin-cupo',
             default => null,
         };
@@ -190,10 +204,84 @@ new #[Title('Reservar')] class extends Component
         $this->cargarIntegrante();
     }
 
-    // A6: lo cargado vive sólo en este componente, así que al salir se descarta.
+    // A6: se descarta lo cargado y se vuelve al inicio. Una reserva en curso que haya en la sesión (por ejemplo, la que el
+    // cliente está pagando en otra pestaña) no se toca: la liberan «Cancelar» en la pantalla de pago, la tarea al vencer
+    // o un nuevo «Confirmar».
     public function cancelar(): void
     {
+        $this->descartarDatosReserva();
+
         $this->redirect('/');
+    }
+
+    // «Cancelarla», en el aviso de lugares ya guardados: los libera en el momento y vuelve a controlar la salida, así
+    // el formulario queda listo para empezar de nuevo, con el cupo actualizado.
+    public function cancelarReservaEnCurso(): void
+    {
+        if ($this->impedimento !== 'reserva-en-curso') {
+            return;
+        }
+
+        if ($this->reservaEnCursoDeEstaSalida() !== null) {
+            $this->liberarReservaDeEstaSalida();
+        }
+
+        $this->iniciarReserva();
+    }
+
+    // Pasos 18 a 21: vuelve a validar el cupo y lo retiene, guarda la reserva en curso en la sesión y deriva a Pagar
+    // Reserva (CU-15). Todavía no se crea la reserva: se crea con el primer pago.
+    public function confirmarReserva(): void
+    {
+        if (! $this->enPantalla(2) || count($this->integrantes) !== (int) $this->cantidadIntegrantes) {
+            return;
+        }
+
+        // El correo pasa a la sesión y de ahí a la reserva: se valida otra vez, por si cambió desde la pantalla 1.
+        $this->validateOnly('correoElectronico');
+
+        if (! Reserva::validarNochesExtra($this->nochesExtraAntes, $this->nochesExtraDespues)) {
+            $this->addError('nochesExtra', $this->mensajeMaximoNoches());
+
+            return;
+        }
+
+        // Si el cliente volvió atrás y confirma de nuevo, primero se libera lo que había retenido.
+        $this->liberarReservaEnCurso();
+
+        // retenerCupo() verifica el cupo y lo retiene con la fila bloqueada: entre una cosa y la otra no se puede meter
+        // otro cliente. Si ya no alcanza, es el curso A7.
+        $cantidadPlazas = count($this->integrantes);
+
+        if (! $this->excursion->retenerCupo($cantidadPlazas)) {
+            $this->descartarDatosReserva();
+            $this->impedimento = 'cupo-ocupado';
+
+            return;
+        }
+
+        $idRetencion = (string) Str::uuid();
+        $vence = now()->addMinutes(config('reserva.minutos_retencion'));
+
+        // Si el cliente no paga a tiempo, esta tarea libera las plazas al vencer, aunque haya cerrado el navegador.
+        LiberarCupoRetenido::dispatch($this->excursion->id_excursion, $cantidadPlazas, $idRetencion)->delay($vence);
+
+        session(['reserva_en_curso' => [
+            'id_retencion' => $idRetencion,
+            'id_excursion' => $this->excursion->id_excursion,
+            'correo_electronico' => $this->correoElectronico,
+            'noches_extra_antes' => $this->nochesExtraAntes,
+            'noches_extra_despues' => $this->nochesExtraDespues,
+            'integrantes' => array_map(fn ($integrante) => [
+                'nombre' => $integrante['nombre'],
+                'apellido' => $integrante['apellido'],
+                'documento_pasaporte' => $integrante['documentoPasaporte'],
+                'equipo_camping' => $integrante['equipoCamping'],
+            ], $this->integrantes),
+            'vence' => $vence->toIso8601String(),
+        ]]);
+
+        $this->redirect('/reservar/pago');
     }
 
     public function sumarNoche(string $momento): void
@@ -206,7 +294,7 @@ new #[Title('Reservar')] class extends Component
         $despues = $this->nochesExtraDespues + ($momento === 'despues' ? 1 : 0);
 
         if (! Reserva::validarNochesExtra($antes, $despues)) {
-            $this->addError('nochesExtra', 'Podés sumar hasta '.config('reserva.maximo_noches_extra').' noches extra en total.');
+            $this->addError('nochesExtra', $this->mensajeMaximoNoches());
 
             return;
         }
@@ -229,6 +317,15 @@ new #[Title('Reservar')] class extends Component
         } elseif ($momento === 'despues') {
             $this->nochesExtraDespues = max(0, $this->nochesExtraDespues - 1);
         }
+    }
+
+    // Para el aviso de lugares ya guardados: cuánto falta para que venza esa reserva, con la hora del servidor.
+    #[Computed]
+    public function segundosParaPagar(): int
+    {
+        $enCurso = $this->reservaEnCursoDeEstaSalida();
+
+        return $enCurso === null ? 0 : max(0, (int) ceil(now()->diffInSeconds(Carbon::parse($enCurso['vence']))));
     }
 
     // Un campo se marca como válido cuando tiene un dato y ese dato cumple su regla.
@@ -296,6 +393,49 @@ new #[Title('Reservar')] class extends Component
         return false;
     }
 
+    // Vacía todo lo cargado: cuando el cupo se ocupó antes de confirmar (A7, el diagrama del DS-14) y al cancelar (A6).
+    private function descartarDatosReserva(): void
+    {
+        $this->reset([
+            'paso', 'correoElectronico', 'cantidadIntegrantes', 'integranteActual', 'nombre', 'apellido',
+            'documentoPasaporte', 'equipoCamping', 'integrantes', 'nochesExtraAntes', 'nochesExtraDespues',
+        ]);
+        $this->resetValidation();
+    }
+
+    // Libera en el momento la retención que haya en la sesión y la saca de ahí. Si la tarea demorada ya la había
+    // liberado, no descuenta de nuevo.
+    private function liberarReservaEnCurso(): void
+    {
+        $enCurso = session()->pull('reserva_en_curso');
+
+        if ($enCurso !== null) {
+            LiberarCupoRetenido::dispatchSync($enCurso['id_excursion'], count($enCurso['integrantes']), $enCurso['id_retencion']);
+        }
+    }
+
+    // La reserva en curso de la sesión, si es de esta misma salida. Se lee de la sesión cada vez, porque en el mismo
+    // pedido puede cambiar al liberarla.
+    private function reservaEnCursoDeEstaSalida(): ?array
+    {
+        $enCurso = session('reserva_en_curso');
+
+        return $enCurso !== null && $enCurso['id_excursion'] === $this->excursion?->id_excursion ? $enCurso : null;
+    }
+
+    // Libera en el momento la reserva en curso de esta salida y vuelve a leer la excursión, para que el cupo
+    // disponible ya cuente las plazas liberadas.
+    private function liberarReservaDeEstaSalida(): void
+    {
+        $this->liberarReservaEnCurso();
+        $this->excursion->refresh();
+    }
+
+    private function mensajeMaximoNoches(): string
+    {
+        return 'Podés sumar hasta '.config('reserva.maximo_noches_extra').' noches extra en total.';
+    }
+
     private function mensajeLugaresDisponibles(): string
     {
         $lugares = $this->excursion->obtenerCupoDisponible();
@@ -309,10 +449,33 @@ new #[Title('Reservar')] class extends Component
 
 @php
     $maximoNoches = config('reserva.maximo_noches_extra');
+    $minutosRetencion = config('reserva.minutos_retencion');
+    $plazoRetencion = $minutosRetencion === 1 ? '1 minuto' : $minutosRetencion.' minutos';
 @endphp
 
 <div class="mx-auto max-w-3xl">
-    @if ($impedimento)
+    @if ($impedimento === 'reserva-en-curso')
+        {{-- El cliente ya tiene lugares guardados para esta salida (por ejemplo, volvió atrás desde el pago). --}}
+        @php
+            $segundos = $this->segundosParaPagar;
+        @endphp
+
+        <header>
+            <h1 class="text-4xl font-semibold sm:text-5xl">{{ $this->excursion->paquete->nombre }}</h1>
+            <p class="mt-3 text-[17px] text-texto-secundario">
+                Salida del <span class="tabular-nums">{{ $this->excursion->getFechaSalida()->format('d/m/Y') }}</span>
+            </p>
+        </header>
+
+        <x-aviso titulo="Ya tenés lugares guardados para esta salida" class="mt-8">
+            Te quedan {{ sprintf('%02d:%02d', intdiv($segundos, 60), $segundos % 60) }} para completar el pago.
+        </x-aviso>
+
+        <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+            <x-boton href="/reservar/pago">Ir al pago</x-boton>
+            <x-boton variante="secundario" wire:click="cancelarReservaEnCurso">Cancelarla</x-boton>
+        </div>
+    @elseif ($impedimento)
         {{-- La salida no se puede reservar: se avisa por qué y no se muestra el formulario. --}}
         <h1 class="text-4xl font-semibold sm:text-5xl">Reservar.</h1>
 
@@ -322,6 +485,10 @@ new #[Title('Reservar')] class extends Component
             </x-aviso>
         @elseif ($impedimento === 'sin-cupo')
             <x-aviso tipo="error" class="mt-8">No quedan lugares en esta salida. Elegí otra fecha u otro paquete.</x-aviso>
+        @elseif ($impedimento === 'cupo-ocupado')
+            <x-aviso tipo="error" titulo="Los lugares ya no están disponibles" class="mt-8">
+                Mientras cargabas los datos se ocuparon los lugares que quedaban en esta salida. Elegí otra fecha u otro paquete.
+            </x-aviso>
         @else
             <x-aviso tipo="error" class="mt-8">Esta salida no está disponible para reservar.</x-aviso>
         @endif
@@ -482,17 +649,17 @@ new #[Title('Reservar')] class extends Component
                     </dl>
                 </x-tarjeta>
 
-                <x-aviso>Cuando confirmes, guardamos tus lugares durante 5 minutos para que completes el pago.</x-aviso>
+                <x-aviso>Cuando confirmes, guardamos tus lugares durante {{ $plazoRetencion }} para que completes el pago.</x-aviso>
 
                 <div class="mt-3 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <x-boton variante="secundario" wire:click="cancelar">Cancelar</x-boton>
 
                     <div class="flex flex-col-reverse gap-3 sm:flex-row">
                         <x-boton variante="secundario" wire:click="volver">Volver</x-boton>
-                        {{-- Se conecta en la etapa 3: confirmar, retener el cupo y pasar a Pagar Reserva (CU-15). --}}
-                        <x-boton disabled class="flex-col">
-                            Confirmar y pagar
-                            <span class="text-sm">Disponible próximamente</span>
+                        {{-- Mientras se procesa queda deshabilitado, para que no se confirme dos veces. --}}
+                        <x-boton wire:click="confirmarReserva" wire:loading.attr="disabled" wire:target="confirmarReserva">
+                            <span wire:loading.remove wire:target="confirmarReserva">Confirmar y pagar</span>
+                            <span wire:loading wire:target="confirmarReserva">Guardando tus lugares…</span>
                         </x-boton>
                     </div>
                 </div>

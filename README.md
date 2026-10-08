@@ -70,12 +70,17 @@ Después:
    Son sólo para probar en tu PC. No hace falta crear usuarios a mano: `php artisan make:filament-user` no sirve, porque
    la tabla `usuario` no tiene las columnas que usa Filament por defecto.
 
-5. Levantar la aplicación, en dos ventanas de Git Bash:
+5. Levantar la aplicación, en tres ventanas de Git Bash:
 
    ```bash
-   php artisan serve     # http://localhost:8000   (panel: http://localhost:8000/admin)
-   npm run dev           # recompila los estilos mientras se trabaja
+   php artisan serve        # http://localhost:8000   (panel: http://localhost:8000/admin)
+   npm run dev              # recompila los estilos mientras se trabaja
+   php artisan queue:work   # corre las tareas de la cola
    ```
+
+   Sin `php artisan queue:work`, las retenciones de cupo que el cliente abandona no se liberan: las plazas quedan
+   retenidas hasta que se levante la cola. Si cambiás el código de una tarea (`app/Jobs`), cortá `queue:work` con
+   Ctrl+C y volvé a levantarlo, porque guarda el código en memoria.
 
 El archivo `.env` es de cada uno y no se sube. Si se agrega una variable nueva, se agrega también en `.env.example`.
 

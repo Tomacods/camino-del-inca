@@ -114,10 +114,22 @@ Las fechas de entrega son las de la planificación de la cátedra; las etapas in
 
 El lunes 09/11 se entrega la documentación del Punto de Control N.º 3.
 
-## Pendientes de diseño que frenan al Área B
+## Retención del cupo: cómo quedó resuelta
 
-Para consultar a la cátedra antes de programar CU-14 y CU-15:
+Los dos pendientes de diseño que frenaban al Área B se resolvieron con CU-14, sin tabla nueva (el detalle está en el
+[esquema](esquema-base-de-datos.md#retención-de-cupo)):
 
-1. **Vencimiento de la retención.** Con `plazas_retenidas` como contador en Excursión, falta definir dónde queda la
-   hora de inicio de cada retención para liberar las plazas a los 5 minutos si el cliente abandona el pago.
-2. **Concurrencia.** Sumar y restar sobre `plazas_retenidas` desde dos clientes a la vez tiene que ser atómico.
+1. **Vencimiento de la retención.** La hora en que vence queda en la sesión del cliente, junto con la reserva en curso
+   (`reserva_en_curso`). Al retener se despacha una tarea demorada, `LiberarCupoRetenido`, que libera las plazas cuando
+   se vence el plazo, aunque el cliente haya cerrado el navegador.
+2. **Concurrencia.** `Excursion::retenerCupo()` verifica y retiene en una transacción con la fila de la excursión
+   bloqueada: dos clientes a la vez quedan uno detrás del otro. La tarea anota en la caché cada retención que libera,
+   así una retención nunca se descuenta dos veces.
+
+Si el cliente confirma y vuelve atrás con el navegador, el formulario se carga de cero: Livewire manda las páginas con
+`Cache-Control: no-store` y el navegador no las guarda. Por eso, al abrir el formulario de una salida en la que el
+cliente ya tiene lugares guardados, en vez del formulario aparece el aviso «Ya tenés lugares guardados para esta
+salida», con el tiempo que queda, «Ir al pago» y «Cancelarla» (que los libera en el momento). Ese control va antes que
+el de cupo, para que su propia retención no le muestre que no quedan lugares. Si esa reserva en curso ya venció, se
+libera y el formulario se muestra normal. Una reserva en curso de otra salida no cambia nada: al confirmar se libera,
+como antes.

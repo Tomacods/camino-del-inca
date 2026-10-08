@@ -31,6 +31,9 @@ La arquitectura es Modelo–Vista–Controlador, sin capa de servicios:
   coordinan a los modelos. No tienen reglas de negocio. Desde acá se llama a Mercado Pago y se envían los correos.
 - **Vistas** — sólo muestran. No consultan la base ni calculan.
 - **Panel (`app/Filament`)** — pantallas del administrador y del guía.
+- **Tareas (`app/Jobs`)** — lo que corre en la cola, fuera del pedido del cliente: por ejemplo, liberar el cupo
+  retenido cuando vence el plazo (CU-14). Una tarea que descuenta o libera algo tiene que poder llegar dos veces sin
+  descontar dos veces.
 - **Tareas programadas** — las cancelaciones automáticas (CU-22 y CU-26).
 
 Regla práctica: si una cuenta o una condición del negocio aparece en un controlador o en una vista, va en el modelo.

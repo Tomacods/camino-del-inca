@@ -324,7 +324,21 @@ Tomadas el 05/10. Cómo se escriben en el código está en [convenciones](conven
 Las tablas `sessions`, `cache`, `jobs` y `migrations` son de Laravel: no forman parte del modelo de datos y se dejan
 como vienen.
 
-## Pendiente
+## Retención de cupo
 
-**Retención de cupo.** Dónde se guarda la hora de inicio de cada retención y cómo se asegura la concurrencia
-(ver [reparto](reparto-casos-de-uso.md), pendientes del Área B). Se consulta a la cátedra el 09/10.
+Resuelta con CU-14, sin tabla nueva: el esquema no cambia. Lo único que se escribe en la base al retener es
+`excursion.plazas_retenidas`.
+
+- **Concurrencia.** `Excursion::retenerCupo()` verifica que alcance el cupo y suma a `plazas_retenidas` en una sola
+  transacción, con la fila de la excursión bloqueada (`lockForUpdate`). Si dos clientes confirman a la vez, quedan uno
+  detrás del otro: el segundo ya ve lo que retuvo el primero. `liberarCupoRetenido()` también bloquea la fila.
+- **La reserva en curso, en la sesión.** Al confirmar se guarda en la sesión del cliente, con la clave
+  `reserva_en_curso`, lo que necesita Pagar Reserva (CU-15): un identificador de la retención, la excursión, el correo,
+  las noches extra, los integrantes y la hora en que vence. La reserva y sus excursionistas se crean recién con el
+  primer pago.
+- **Vencimiento.** Al retener se despacha la tarea `LiberarCupoRetenido` (`app/Jobs`), demorada hasta el vencimiento
+  (`minutos_retencion` en `config/reserva.php`; 5 minutos). Corre en la cola aunque el cliente haya cerrado el
+  navegador y descuenta esas plazas de `plazas_retenidas`. Para eso tiene que estar corriendo `php artisan queue:work`.
+- **Una sola vez por retención.** La misma tarea se ejecuta en el momento cuando el cliente cancela, y se va a ejecutar
+  cuando pague. Antes de descontar, anota en la caché que esa retención ya se liberó: si llega otra vez (la demorada
+  después de cancelar o de pagar), no descuenta de nuevo.
