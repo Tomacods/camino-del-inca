@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\TipoPago;
 use App\Models\Pago;
+use Illuminate\Support\Facades\Log;
+use MercadoPago\Exceptions\MPApiException;
 use Tests\MercadoPagoDePrueba;
 use Tests\TestCase;
 
@@ -67,6 +69,51 @@ class PagoMercadoPagoTest extends TestCase
         $this->assertSame('2026-10-06T10:03:00.000-03:00', $datos['expiration_date_to']);
     }
 
+    public function test_si_mercado_pago_rechaza_el_pedido_derivar_pago_lo_anota_con_el_motivo_y_lanza_la_excepcion(): void
+    {
+        Log::spy();
+        $this->mercadoPago->responder(['message' => 'expiration_date_to invalid format', 'error' => 'bad_request', 'status' => 400], 400);
+
+        try {
+            Pago::derivarPago($this->datosPago(), 832.5);
+            $this->fail('derivarPago() tenía que lanzar la excepción.');
+        } catch (MPApiException $excepcion) {
+            $this->assertSame(400, $excepcion->getStatusCode());
+        }
+
+        Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, 'HTTP 400')
+            && str_contains($mensaje, 'expiration_date_to invalid format'));
+    }
+
+    public function test_si_la_respuesta_de_error_no_es_json_igual_lo_anota(): void
+    {
+        Log::spy();
+        $this->mercadoPago->responder(null, 502);
+
+        $this->expectException(MPApiException::class);
+
+        try {
+            Pago::derivarPago($this->datosPago(), 832.5);
+        } finally {
+            Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, 'HTTP 502')
+                && str_contains($mensaje, 'sin contenido'));
+        }
+    }
+
+    public function test_si_mercado_pago_no_responde_derivar_pago_lo_anota_y_lanza_la_excepcion(): void
+    {
+        Log::spy();
+        $this->mercadoPago->noResponder();
+
+        $this->expectExceptionMessage('No se pudo conectar con Mercado Pago.');
+
+        try {
+            Pago::derivarPago($this->datosPago(), 832.5);
+        } finally {
+            Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, 'No se pudo conectar con Mercado Pago.'));
+        }
+    }
+
     public function test_consultar_transaccion_con_el_pago_aprobado_con_tarjeta_de_credito(): void
     {
         $this->mercadoPago->responder($this->pago('approved', 'retencion-1_Total', 'credit_card'));
@@ -119,9 +166,13 @@ class PagoMercadoPagoTest extends TestCase
 
     public function test_consultar_transaccion_devuelve_null_si_mercado_pago_no_conoce_el_pago(): void
     {
+        Log::spy();
         $this->mercadoPago->responder(['message' => 'Payment not found', 'status' => 404], 404);
 
         $this->assertNull(Pago::consultarTransaccion('999'));
+
+        Log::shouldHaveReceived('warning')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, 'HTTP 404')
+            && str_contains($mensaje, 'Payment not found'));
     }
 
     public function test_consultar_transaccion_devuelve_null_si_mercado_pago_no_responde(): void
@@ -161,6 +212,16 @@ class PagoMercadoPagoTest extends TestCase
         $this->assertNull(Pago::leerReferencia('_Total'));
         $this->assertNull(Pago::leerReferencia('9b1d2c3e-0f4a-4b5c-8d6e-7f8091a2b3c4_Saldo'));
         $this->assertNull(Pago::leerReferencia('9b1d2c3e-0f4a-4b5c-8d6e-7f8091a2b3c4_Regalo'));
+    }
+
+    private function datosPago(): array
+    {
+        return [
+            'descripcion' => 'Camino Inca Clásico, salida 18/01/2027 (seña)',
+            'referencia' => 'retencion-1_Sena',
+            'direccion_vuelta' => 'https://ejemplo.test/reservar/confirmada',
+            'vence' => '2026-10-06T10:03:00-03:00',
+        ];
     }
 
     // Lo que contesta Mercado Pago al consultar un pago, con lo que lee el sistema.

@@ -13,8 +13,10 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use MercadoPago\Client\Payment\PaymentClient;
 use MercadoPago\Client\Preference\PreferenceClient;
+use MercadoPago\Exceptions\MPApiException;
 use MercadoPago\MercadoPagoConfig;
 use RuntimeException;
+use TypeError;
 
 class Pago extends Model
 {
@@ -108,41 +110,48 @@ class Pago extends Model
     // Pasos 4 y 5 (derivarPago del DS-15): le pide a Mercado Pago el cobro y devuelve la dirección a la que se manda al
     // cliente. Es estático porque el pago todavía no existe: se registra recién cuando Mercado Pago lo aprueba. Los datos
     // los arma el servidor, nunca el navegador: así el monto no se puede tocar. Si Mercado Pago rechaza el pedido o no
-    // responde, la excepción sube a quien lo llama.
+    // responde, lo anota en el registro y la excepción sube a quien lo llama.
     public static function derivarPago(array $datosPago, float $monto): string
     {
         self::configurarMercadoPago();
 
         $vence = Carbon::parse($datosPago['vence'])->format(self::FORMATO_FECHA_MERCADO_PAGO);
 
-        $preferencia = (new PreferenceClient)->create([
-            'items' => [[
-                'title' => $datosPago['descripcion'],
-                'quantity' => 1,
-                'unit_price' => $monto,
-                'currency_id' => self::MONEDA,
-            ]],
-            'external_reference' => $datosPago['referencia'],
-            // Las tres a la misma pantalla: ella le pregunta a Mercado Pago cómo terminó el pago.
-            'back_urls' => [
-                'success' => $datosPago['direccion_vuelta'],
-                'failure' => $datosPago['direccion_vuelta'],
-                'pending' => $datosPago['direccion_vuelta'],
-            ],
-            'auto_return' => self::ESTADO_APROBADO,
-            // La retención dura minutos: el pago se aprueba o se rechaza en el momento, nunca queda pendiente.
-            'binary_mode' => true,
-            'payment_methods' => [
-                'excluded_payment_types' => array_map(fn ($tipo) => ['id' => $tipo], self::TIPOS_DE_PAGO_EXCLUIDOS),
-            ],
-            // Vence con la retención: después ya no se puede pagar.
-            'expires' => true,
-            'expiration_date_to' => $vence,
-        ]);
+        try {
+            $preferencia = (new PreferenceClient)->create([
+                'items' => [[
+                    'title' => $datosPago['descripcion'],
+                    'quantity' => 1,
+                    'unit_price' => $monto,
+                    'currency_id' => self::MONEDA,
+                ]],
+                'external_reference' => $datosPago['referencia'],
+                // Las tres a la misma pantalla: ella le pregunta a Mercado Pago cómo terminó el pago.
+                'back_urls' => [
+                    'success' => $datosPago['direccion_vuelta'],
+                    'failure' => $datosPago['direccion_vuelta'],
+                    'pending' => $datosPago['direccion_vuelta'],
+                ],
+                'auto_return' => self::ESTADO_APROBADO,
+                // La retención dura minutos: el pago se aprueba o se rechaza en el momento, nunca queda pendiente.
+                'binary_mode' => true,
+                'payment_methods' => [
+                    'excluded_payment_types' => array_map(fn ($tipo) => ['id' => $tipo], self::TIPOS_DE_PAGO_EXCLUIDOS),
+                ],
+                // Vence con la retención: después ya no se puede pagar.
+                'expires' => true,
+                'expiration_date_to' => $vence,
+            ]);
 
-        // El SDK carga sólo los datos que vinieron en la respuesta: si faltara la dirección, leerla daría un error que no
-        // es una Exception y quien llama no podría avisarle al cliente.
-        return $preferencia->init_point ?? throw new RuntimeException('Mercado Pago no devolvió la dirección de pago.');
+            // El SDK carga sólo los datos que vinieron en la respuesta: si faltara la dirección, leerla daría un error
+            // que no es una Exception y quien llama no podría avisarle al cliente.
+            return $preferencia->init_point ?? throw new RuntimeException('Mercado Pago no devolvió la dirección de pago.');
+        } catch (Exception $excepcion) {
+            // Todo lo que se anota sobre Mercado Pago sale de Pago. Quien llama sigue recibiendo la excepción.
+            Log::error('No se pudo crear el pedido de cobro en Mercado Pago: '.self::describirErrorMercadoPago($excepcion));
+
+            throw $excepcion;
+        }
     }
 
     // La «transacción aprobada» de los pasos 6 y 7. No está en el DS-15: ahí la pasarela contesta en el momento; con
@@ -156,7 +165,7 @@ class Pago extends Model
             $pago = (new PaymentClient)->get((int) $idTransaccion);
         } catch (Exception $excepcion) {
             // MPApiException si contestó con un error (por ejemplo, no conoce el pago); Exception si no se pudo conectar.
-            Log::warning('No se pudo consultar el pago '.$idTransaccion.' en Mercado Pago: '.$excepcion->getMessage());
+            Log::warning('No se pudo consultar el pago '.$idTransaccion.' en Mercado Pago: '.self::describirErrorMercadoPago($excepcion));
 
             return null;
         }
@@ -204,5 +213,25 @@ class Pago extends Model
     private static function configurarMercadoPago(): void
     {
         MercadoPagoConfig::setAccessToken((string) config('services.mercadopago.access_token'));
+    }
+
+    // El texto de un error de Mercado Pago para el registro. Cuando la API contesta con un error, el mensaje de la
+    // excepción es sólo «Api error. Check response for details»: el motivo (por ejemplo, qué campo rechazó) viene en la
+    // respuesta, que no trae el Access Token.
+    private static function describirErrorMercadoPago(Exception $excepcion): string
+    {
+        if (! $excepcion instanceof MPApiException) {
+            return $excepcion->getMessage();
+        }
+
+        // Si la respuesta no era JSON (por ejemplo, una página de error), el SDK no tiene contenido y getContent(), que
+        // promete un arreglo, da un error en lugar de devolver null.
+        try {
+            $respuesta = json_encode($excepcion->getApiResponse()->getContent(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (TypeError) {
+            $respuesta = 'sin contenido';
+        }
+
+        return $excepcion->getMessage().' (HTTP '.$excepcion->getStatusCode().'): '.$respuesta;
     }
 }

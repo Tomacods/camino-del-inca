@@ -38,8 +38,8 @@ class MercadoPagoDePrueba implements MPHttpClient
     }
 
     // Mercado Pago contesta con este contenido. Con un estado de error (400 o más), el SDK lanza MPApiException, como
-    // hace el cliente verdadero.
-    public function responder(array $contenido, int $estado = 200): self
+    // hace el cliente verdadero. null es una respuesta que no era JSON.
+    public function responder(?array $contenido, int $estado = 200): self
     {
         $this->respuestas[] = new MPResponse($estado, $contenido);
 

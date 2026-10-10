@@ -5,7 +5,6 @@ use App\Jobs\LiberarCupoRetenido;
 use App\Models\Excursion;
 use App\Models\Pago;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -104,9 +103,8 @@ new #[Title('Pagar reserva')] class extends Component
 
         try {
             $direccionMercadoPago = Pago::derivarPago($datosPago, $monto);
-        } catch (Exception $excepcion) {
-            // Sin credenciales en el registro: el mensaje de la excepción no las lleva.
-            Log::error('No se pudo crear el pedido de cobro en Mercado Pago: '.$excepcion->getMessage());
+        } catch (Exception) {
+            // El error ya quedó en el registro: lo anota Pago. Acá sólo se le avisa al cliente.
             $this->errorMercadoPago = true;
 
             return;
