@@ -410,7 +410,13 @@ class Reserva extends Model
 /* ----------------------------- CU-20 Modificar ---------------------------- */
 public static function modificarReserva(string $correo, string $numeroReserva)
 {
-    // tuyo: tramo 1
+    $reserva =  $this->buscarPorCorreoYNumero($correo, $numeroReserva);
+
+}
+public function iniciarModificacion(){
+    if ($this->validarEstado([EstadoReserva::Confirmada])) {
+        # code...
+    }
 }
 
 private function getCantidadExcursionistas(): int
