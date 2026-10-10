@@ -191,6 +191,16 @@ new class extends Component
                         <dt class="text-texto-secundario">Guía</dt>
                         <dd>{{ $cambio['destino']->guia->nombre }} {{ $cambio['destino']->guia->apellido }}</dd>
                     </div>
+                    <div class="flex justify-between py-2">
+                        <dt class="text-texto-secundario">Nueva fecha límite de confirmación</dt>
+                        <dd>{{ $cambio['fecha_limite']->format('d/m/Y') }}</dd>
+                    </div>
+                    @if ($cambio['fecha_limite_saldo'])
+                        <div class="flex justify-between py-2">
+                            <dt class="text-texto-secundario">Nueva fecha límite de pago del saldo</dt>
+                            <dd>{{ $cambio['fecha_limite_saldo']->format('d/m/Y') }}</dd>
+                        </div>
+                    @endif
                 </dl>
 
                 <div class="mb-6 rounded border-l-4 border-ambar bg-fondo p-3 text-sm text-texto">
