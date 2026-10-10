@@ -13,6 +13,7 @@ Route::livewire('/reservar/pago', 'pagar-reserva');
 Route::livewire('/mi-reserva', 'consultar-reserva');
 Route::livewire('/mi-reserva/{numeroReserva}/cancelar', 'cancelar-reserva');
 Route::livewire('/mi-reserva/{numeroReserva}/reintegro', 'solicitar-reintegro');
+Route::livewire('/mi-reserva/{numeroReserva}/modificar', 'modificar-reserva');
 
 // Muestrario de los componentes del portal, sólo para desarrollo.
 if (app()->isLocal()) {
