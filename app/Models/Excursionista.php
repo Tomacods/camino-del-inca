@@ -36,15 +36,15 @@ class Excursionista extends Model
         return $this->belongsTo(Reserva::class, 'id_reserva', 'id_reserva');
     }
 
-    private function setEstadoPermiso(string $estado_permiso){
-        $this->estado = $estado_permiso;
-        $this->save();
+private function setEstadoPermiso(EstadoPermiso $estadoPermiso): void
+{
+    $this->estado_permiso = $estadoPermiso;
+    $this->save();
+}
 
-    }
-     /* ----------------------------- CU-20 Modificar ---------------------------- */
-    public function actualizarPermisosPendiente(){
-        //loop por cada excursionista de la reserva
-        $this->setEstadoPermiso(EstadoPermiso::Pendiente);
-        $this->save();
-    }
+/* ----------------------------- CU-20 Modificar ---------------------------- */
+public function actualizarPermisosPendiente(): void
+{
+    $this->setEstadoPermiso(EstadoPermiso::Pendiente);
+}
 }

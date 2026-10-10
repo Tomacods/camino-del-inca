@@ -407,45 +407,68 @@ class Reserva extends Model
         return $consulta->whereHas('excursion.paquete.servicios', fn (Builder $servicio) => $servicio->where('tipo', $tipo->value));
     }
 
-    /* ----------------------------- CU-20 Modificar ---------------------------- */
-    public static function modificarReserva(string $correo, string $numeroReserva){
+/* ----------------------------- CU-20 Modificar ---------------------------- */
+public static function modificarReserva(string $correo, string $numeroReserva)
+{
+    // tuyo: tramo 1
+}
 
+private function getCantidadExcursionistas(): int
+{
+    return $this->excursionistas->count();
+}
+
+public function elegirExcursionDestino(Carbon $fechaElegida): array
+{
+    $habilitadas = Excursion::buscarOtrasDelPaquete(
+        $this->excursion->id_paquete,
+        $this->excursion->fecha_salida,
+        $this->getCantidadExcursionistas()
+    );
+
+    $destino = $habilitadas->first(
+        fn ($excursion) => $excursion->fecha_salida->isSameDay($fechaElegida)
+    );
+
+    if ($destino === null) {
+        throw new \DomainException('La excursión elegida ya no está disponible.');
     }
-    private function getCantidadExcursionistas(){
-        return  $this->excursionistas->count();
+
+    return [
+        'origen' => $this->excursion->getDatosExcursion(),
+        'destino' => $destino->getDatosExcursion(),
+    ];
+}
+
+private function cambiarExcursion(Excursion $destino): void
+{
+    $this->id_excursion = $destino->id_excursion;
+}
+
+public function recalcularFechasLimite(Carbon $fechaSalida): void
+{
+    $limite = $fechaSalida->copy()
+        ->subMonthsNoOverflow(config('reserva.meses_anticipacion_fechas_limite'));
+
+    $this->fecha_limite_confirmacion = $limite;
+
+    if ($this->estado_saldo === EstadoSaldo::Adeudado) {
+        $this->fecha_limite_saldo = $limite;
     }
+}
 
-    public function elegirExcursionDestino(Carbon $fecha_salida){
-    $excursionDestino = Excursion::buscarPorFechaDeSalida($id_paquete, $fecha_salida);
-    $habilitadas = Excursion::buscarOtrasDelPaquete($idPaquete, $fechaOrigen, $cantidad);
-    $destino = $habilitadas->firstWhere('fecha_salida', $fechaElegida);
+public function modificarExcursion(Excursion $destino): void
+{
+    DB::transaction(function () use ($destino) {
+        $this->cambiarExcursion($destino);
+        $this->estado = EstadoReserva::Pendiente;
 
-    }
-
-    private function cambiarExcursion(string $destino){
-        //set id excursion, id excursion de destino ?
-        
-            $this->estado = EstadoReserva::Cancelada;
-            $this->save();
-            Excursionista::actualizarPermisosPendiente();
-
-    }
-
-    public function recalcularFechasLimite(Carbon $fechaSalida): void
-    {
-        $limite = $fechaSalida->copy()->subMonthsNoOverflow(config.meses_anticipacion_fechas_limite);
-
-        $this->fecha_limite_confirmacion = $limite;
-
-        if ($this->estado_saldo === EstadoSaldo::Adeudado) {
-            $this->fecha_limite_saldo = $limite;
+        foreach ($this->excursionistas as $excursionista) {
+            $excursionista->actualizarPermisosPendiente();
         }
-    }
-    
 
-    public function modificarExcursion(string $destino){
-
-    }
-
-
+        $this->recalcularFechasLimite($destino->fecha_salida);
+        $this->save();
+    });
+}
 }

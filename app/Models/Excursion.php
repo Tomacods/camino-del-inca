@@ -157,35 +157,29 @@ class Excursion extends Model
         $this->reservas()->save($reserva);
     }
 
-        /* ------------------------------ CU-21 Modificar ------------------------------- */
+/* ------------------------------ CU-20 Modificar ------------------------------- */
 
-    public function getDatosExcursiones(){
-        Excursion::with(['paquete', 'guia'])
-        ->where('id_paquete', $this->excursion->id_paquete)
-        ->where('id_excursion', '!=', $this->id_excursion)
-        ->get();
-    }
+public function getDatosExcursion(): self
+{
+    return $this->load(['paquete', 'guia']);
+}
 
-        public function getDatosExcursion(){
-        return $this->load([
-            'paquete',
-            'guia',
-        ]);
-    }
-
-    public static function buscarOtrasDelPaquete($idPaquete, $fechaOrigen, int $cantidad)
-    {
-        $otras = self::where('id_paquete', $idPaquete)
+public static function buscarOtrasDelPaquete($idPaquete, $fechaOrigen, int $cantidad)
+{
+    $otras = self::with(['paquete', 'guia'])
+        ->where('id_paquete', $idPaquete)
         ->where('fecha_salida', '!=', $fechaOrigen)
         ->get();
-        return self::filtrarHabilitadas($otras, $cantidad);
-    }
 
-    public static function filtrarHabilitadas($excursiones, int $cantidad)
-    {
-        return $excursiones->filter(function ($excursion) use ($cantidad) {
-        return $excursion->cumpleAnticipacionMinima(now()) && $excursion->obtenerCupoDisponible() >= $cantidad;
-        })->values();
-    }
+    return self::filtrarHabilitadas($otras, $cantidad);
+}
+
+public static function filtrarHabilitadas($excursiones, int $cantidad)
+{
+    return $excursiones->filter(function ($excursion) use ($cantidad) {
+        return $excursion->cumpleAnticipacionMinima(now())
+            && $excursion->obtenerCupoDisponible() >= $cantidad;
+    })->values();
+}
 
 }
