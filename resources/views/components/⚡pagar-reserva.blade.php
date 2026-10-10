@@ -94,8 +94,9 @@ new #[Title('Pagar reserva')] class extends Component
         $monto = Pago::calcularMontoAPagar($this->montoTotal, $tipoPago);
         $tipoElegido = $tipoPago === TipoPago::Sena ? 'seña' : 'pago total';
 
+        // La fecha va con guiones: Mercado Pago saca las barras de la descripción y en el checkout se vería «18012027».
         $datosPago = [
-            'descripcion' => $excursion->paquete->nombre.', salida '.$excursion->getFechaSalida()->format('d/m/Y').' ('.$tipoElegido.')',
+            'descripcion' => $excursion->paquete->nombre.', salida '.$excursion->getFechaSalida()->format('d-m-Y').' ('.$tipoElegido.')',
             'referencia' => Pago::armarReferencia($enCurso['id_retencion'], $tipoPago),
             'direccion_vuelta' => url('/reservar/confirmada'),
             'vence' => $enCurso['vence'],

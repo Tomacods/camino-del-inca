@@ -134,7 +134,7 @@ class PagarReservaTest extends TestCase
             ->assertRedirect(self::DIRECCION_MERCADO_PAGO);
 
         $datos = $mercadoPago->datosDelPedido();
-        $this->assertSame('Camino Inca Clásico, salida 18/01/2027 (seña)', $datos['items'][0]['title']);
+        $this->assertSame('Camino Inca Clásico, salida 18-01-2027 (seña)', $datos['items'][0]['title']);
         $this->assertSame(832.5, $datos['items'][0]['unit_price']);
         $this->assertSame('USD', $datos['items'][0]['currency_id']);
         $this->assertSame($enCurso['id_retencion'].'_Sena', $datos['external_reference']);

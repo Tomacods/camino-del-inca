@@ -36,7 +36,7 @@ class PagoMercadoPagoTest extends TestCase
         $this->mercadoPago->responder(['id' => '123-abc', 'init_point' => self::DIRECCION_MERCADO_PAGO]);
 
         $direccion = Pago::derivarPago([
-            'descripcion' => 'Camino Inca Clásico, salida 18/01/2027 (seña)',
+            'descripcion' => 'Camino Inca Clásico, salida 18-01-2027 (seña)',
             'referencia' => 'retencion-1_Sena',
             'direccion_vuelta' => 'https://ejemplo.test/reservar/confirmada',
             'vence' => '2026-10-06T10:03:00-03:00',
@@ -51,7 +51,7 @@ class PagoMercadoPagoTest extends TestCase
 
         $datos = $this->mercadoPago->datosDelPedido();
         $this->assertSame([[
-            'title' => 'Camino Inca Clásico, salida 18/01/2027 (seña)',
+            'title' => 'Camino Inca Clásico, salida 18-01-2027 (seña)',
             'quantity' => 1,
             'unit_price' => 832.5,
             'currency_id' => 'USD',
@@ -217,7 +217,7 @@ class PagoMercadoPagoTest extends TestCase
     private function datosPago(): array
     {
         return [
-            'descripcion' => 'Camino Inca Clásico, salida 18/01/2027 (seña)',
+            'descripcion' => 'Camino Inca Clásico, salida 18-01-2027 (seña)',
             'referencia' => 'retencion-1_Sena',
             'direccion_vuelta' => 'https://ejemplo.test/reservar/confirmada',
             'vence' => '2026-10-06T10:03:00-03:00',
