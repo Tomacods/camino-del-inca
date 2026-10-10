@@ -231,11 +231,10 @@ class Reserva extends Model
     // Vencen a las 23:59:59, como en los seeders. subMonthsNoOverflow no se pasa al mes siguiente: del 29/03 va al 28/02
     // y no al 01/03. Carbon::parse hace una copia, así no cambia la fecha de salida de la excursión. Usa estado_saldo:
     // se llama después de asignarlo (en el DS-15 va antes de setEstadoSaldo). Sólo asigna: guarda quien la llama.
+
     public function fijarFechasLimite($fechaSalida): void
     {
-        $fechaLimite = Carbon::parse($fechaSalida)
-            ->subMonthsNoOverflow(config('reserva.meses_anticipacion_fechas_limite'))
-            ->endOfDay();
+        $fechaLimite = self::calcularFechaLimite($fechaSalida);
 
         $this->fecha_limite_confirmacion = $fechaLimite;
         $this->fecha_limite_saldo = $this->estado_saldo === EstadoSaldo::Adeudado ? $fechaLimite : null;
@@ -405,5 +404,93 @@ class Reserva extends Model
     public function scopeConServicio(Builder $consulta, TipoServicio $tipo): Builder
     {
         return $consulta->whereHas('excursion.paquete.servicios', fn (Builder $servicio) => $servicio->where('tipo', $tipo->value));
+    }
+
+    /* ----------------------------- CU-20 Modificar ---------------------------- */
+    public static function modificarReserva(string $correo, string $numeroReserva)
+    {
+        $reserva = self::buscarPorCorreoYNumero($correo, $numeroReserva);
+
+        if ($reserva === null) {
+            throw new \DomainException('No encontramos una reserva con esos datos.');
+        }
+
+        return $reserva->iniciarModificacion();
+    }
+
+    public function iniciarModificacion()
+    {
+        if (! $this->validarEstado([EstadoReserva::Confirmada])) {
+            throw new \DomainException('La reserva no admite modificación.');
+        }
+
+        if (! $this->excursion->cumpleAnticipacionMinima(now())) {
+            throw new \DomainException('Ya no se puede modificar: falta poco para la salida.');
+        }
+
+        return Excursion::buscarOtrasDelPaquete(
+            $this->excursion->id_paquete,
+            $this->excursion->fecha_salida,
+            $this->getCantidadExcursionistas()
+        );
+    }
+
+    private function getCantidadExcursionistas(): int
+    {
+        return $this->excursionistas->count();
+    }
+
+    // Solo calcula: no asigna ni guarda. Lo usan fijarFechasLimite y el resumen de CU-20.
+    public static function calcularFechaLimite($fechaSalida): Carbon
+    {
+        return Carbon::parse($fechaSalida)
+            ->subMonthsNoOverflow(config('reserva.meses_anticipacion_fechas_limite'))
+            ->endOfDay();
+    }
+
+    public function elegirExcursionDestino(Carbon $fechaElegida): array
+    {
+        $habilitadas = Excursion::buscarOtrasDelPaquete(
+            $this->excursion->id_paquete,
+            $this->excursion->fecha_salida,
+            $this->getCantidadExcursionistas()
+        );
+
+        $destino = $habilitadas->first(
+            fn ($excursion) => $excursion->fecha_salida->isSameDay($fechaElegida)
+        );
+
+        if ($destino === null) {
+            throw new \DomainException('La excursión elegida ya no está disponible.');
+        }
+
+        $fechaLimite = self::calcularFechaLimite($destino->getFechaSalida());
+
+        return [
+            'origen' => $this->excursion->getDatosExcursion(),
+            'destino' => $destino->getDatosExcursion(),
+            'fecha_limite' => $fechaLimite,
+            'fecha_limite_saldo' => $this->estado_saldo === EstadoSaldo::Adeudado ? $fechaLimite : null,
+        ];
+    }
+
+    private function cambiarExcursion(Excursion $destino): void
+    {
+        $this->id_excursion = $destino->id_excursion;
+    }
+
+    public function modificarExcursion(Excursion $destino): void
+    {
+        DB::transaction(function () use ($destino) {
+            $this->cambiarExcursion($destino);
+            $this->estado = EstadoReserva::Pendiente;
+
+            foreach ($this->excursionistas as $excursionista) {
+                $excursionista->actualizarPermisosPendiente();
+            }
+
+            $this->fijarFechasLimite($destino->getFechaSalida());
+            $this->save();
+        });
     }
 }

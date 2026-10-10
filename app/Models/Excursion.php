@@ -156,4 +156,29 @@ class Excursion extends Model
     {
         $this->reservas()->save($reserva);
     }
+
+    /* ------------------------------ CU-20 Modificar ------------------------------- */
+
+    public function getDatosExcursion(): self
+    {
+        return $this->load(['paquete', 'guia']);
+    }
+
+    public static function buscarOtrasDelPaquete($idPaquete, $fechaOrigen, int $cantidad)
+    {
+        $otras = self::with(['paquete', 'guia'])
+            ->where('id_paquete', $idPaquete)
+            ->whereDate('fecha_salida', '!=', $fechaOrigen)
+            ->get();
+
+        return self::filtrarHabilitadas($otras, $cantidad);
+    }
+
+    public static function filtrarHabilitadas($excursiones, int $cantidad)
+    {
+        return $excursiones->filter(function ($excursion) use ($cantidad) {
+            return $excursion->cumpleAnticipacionMinima(now())
+                && $excursion->tieneCupoPara($cantidad);
+        })->values();
+    }
 }
