@@ -114,13 +114,14 @@ new #[Title('Pago de la reserva')] class extends Component
         $this->redirect('/reservar/confirmada');
     }
 
-    // El cliente volvió sin pagar o entró a mano.
+    // El cliente volvió sin pagar o entró a mano. Primero la reserva en curso: si ya registró una en esta sesión, empezó
+    // otra y volvió de Mercado Pago sin pagar, tiene que volver al pago de la nueva y no ver la anterior.
     private function mostrarSinPago(): void
     {
-        if (session('reserva_confirmada') !== null) {
-            $this->estado = 'registrada';
-        } elseif (session('reserva_en_curso') !== null) {
+        if (session('reserva_en_curso') !== null) {
             $this->redirect('/reservar/pago');
+        } elseif (session('reserva_confirmada') !== null) {
+            $this->estado = 'registrada';
         } else {
             $this->estado = 'sin-reserva';
         }

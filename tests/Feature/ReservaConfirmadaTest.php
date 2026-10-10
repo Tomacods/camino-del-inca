@@ -252,6 +252,52 @@ class ReservaConfirmadaTest extends TestCase
         $this->assertSame(0, Reserva::count());
     }
 
+    public function test_con_una_reserva_registrada_y_otra_en_curso_volver_sin_pagar_lleva_al_pago_de_la_nueva(): void
+    {
+        $this->registrarUnaReserva();
+        $nueva = $this->guardarReservaEnCurso();
+
+        foreach (['/reservar/confirmada', '/reservar/confirmada?payment_id=null&status=null'] as $direccion) {
+            $this->get($direccion)->assertRedirect('/reservar/pago');
+        }
+
+        // Sólo el pedido de la primera reserva: volver sin pagar no consulta a Mercado Pago.
+        $this->assertCount(1, $this->mercadoPago->pedidos);
+        $this->assertSame($nueva, session('reserva_en_curso'));
+    }
+
+    public function test_con_una_reserva_registrada_y_otra_en_curso_una_referencia_que_no_es_del_sistema_lleva_al_pago(): void
+    {
+        $this->registrarUnaReserva();
+        $this->guardarReservaEnCurso();
+        $this->mercadoPago->responder($this->pago('approved', null));
+
+        $this->volverDeMercadoPago()->assertRedirect('/reservar/pago');
+
+        $this->assertSame(1, Reserva::count());
+    }
+
+    public function test_con_solo_la_reserva_registrada_volver_sin_pagar_la_sigue_mostrando(): void
+    {
+        $numeroReserva = $this->registrarUnaReserva();
+
+        foreach (['/reservar/confirmada', '/reservar/confirmada?payment_id=null&status=null'] as $direccion) {
+            $this->get($direccion)
+                ->assertOk()
+                ->assertSeeInOrder(['Tu número de reserva', $numeroReserva]);
+        }
+    }
+
+    // Registra una reserva por el camino normal (pago aprobado y vuelta) y devuelve su número.
+    private function registrarUnaReserva(): string
+    {
+        $enCurso = $this->guardarReservaEnCurso();
+        $this->mercadoPago->responder($this->pago('approved', $enCurso['id_retencion'].'_Total'));
+        $this->volverDeMercadoPago()->assertRedirect('/reservar/confirmada');
+
+        return Reserva::sole()->numero_reserva;
+    }
+
     // Como vuelve Mercado Pago: con el número de operación y lo que dice del pago, que no se cree.
     private function volverDeMercadoPago(array $parametros = [])
     {
