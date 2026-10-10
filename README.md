@@ -91,6 +91,29 @@ Mientras se arma la base (hasta la etiqueta `v0.1`) las migraciones se corrigen 
 solo falla o deja la base a medias: por eso se reconstruye entera. Se pierden los datos cargados a mano; los de prueba
 los repone el *seeder*. A partir de `v0.1` alcanza con `php artisan migrate`.
 
+## Probar el pago con Mercado Pago
+
+Sólo lo necesita quien pruebe el pago de la reserva (CU-15). El resto del sistema funciona sin esto.
+
+1. En `.env`, completar `MERCADOPAGO_ACCESS_TOKEN` con el *Access Token* de las credenciales **de prueba** de tu cuenta
+   de Mercado Pago Developers. Empieza con `APP_USR-`, igual que el de producción: en Checkout Pro es así. Nunca las
+   credenciales reales.
+2. Mercado Pago no acepta `localhost` como dirección de vuelta, así que el sitio se abre por un túnel de ngrok:
+
+   ```bash
+   ngrok http 8000
+   ```
+
+   y se copia la dirección `https://…` que muestra a `APP_URL`, en `.env`.
+3. Compilar los estilos una vez con `npm run build`, en lugar de dejar `npm run dev`: el servidor de Vite escucha en
+   `localhost` y desde la dirección del túnel no se alcanza.
+4. Levantar `php artisan serve` y `php artisan queue:work` como siempre, y entrar **siempre por la dirección del túnel**,
+   no por `localhost`: la reserva en curso queda en la sesión, y la sesión es de una sola dirección.
+
+Para pagar se usa el comprador de prueba de la cuenta y las tarjetas de prueba de Mercado Pago: con el titular `APRO`
+el pago se aprueba; con `FUND` u `OTHE`, se rechaza. Mercado Pago cobra en pesos el equivalente de los dólares, con su
+cotización del momento.
+
 ## Cómo trabajamos
 
 Las reglas están en [CONTRIBUTING.md](CONTRIBUTING.md). En corto: `main` siempre funciona, cada caso de uso se hace
