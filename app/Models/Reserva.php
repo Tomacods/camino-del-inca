@@ -406,4 +406,46 @@ class Reserva extends Model
     {
         return $consulta->whereHas('excursion.paquete.servicios', fn (Builder $servicio) => $servicio->where('tipo', $tipo->value));
     }
+
+    /* ----------------------------- CU-20 Modificar ---------------------------- */
+    public static function modificarReserva(string $correo, string $numeroReserva){
+
+    }
+    private function getCantidadExcursionistas(){
+        return  $this->excursionistas->count();
+    }
+
+    public function elegirExcursionDestino(Carbon $fecha_salida){
+    $excursionDestino = Excursion::buscarPorFechaDeSalida($id_paquete, $fecha_salida);
+    $habilitadas = Excursion::buscarOtrasDelPaquete($idPaquete, $fechaOrigen, $cantidad);
+    $destino = $habilitadas->firstWhere('fecha_salida', $fechaElegida);
+
+    }
+
+    private function cambiarExcursion(string $destino){
+        //set id excursion, id excursion de destino ?
+        
+            $this->estado = EstadoReserva::Cancelada;
+            $this->save();
+            Excursionista::actualizarPermisosPendiente();
+
+    }
+
+    public function recalcularFechasLimite(Carbon $fechaSalida): void
+    {
+        $limite = $fechaSalida->copy()->subMonthsNoOverflow(config.meses_anticipacion_fechas_limite);
+
+        $this->fecha_limite_confirmacion = $limite;
+
+        if ($this->estado_saldo === EstadoSaldo::Adeudado) {
+            $this->fecha_limite_saldo = $limite;
+        }
+    }
+    
+
+    public function modificarExcursion(string $destino){
+
+    }
+
+
 }

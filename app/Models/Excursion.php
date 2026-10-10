@@ -181,11 +181,11 @@ class Excursion extends Model
         return self::filtrarHabilitadas($otras, $cantidad);
     }
 
-    // el paso de filtrado queda aparte (puede ser private)
-    private static function filtrarHabilitadas($excursiones, int $cantidad)
+    public static function filtrarHabilitadas($excursiones, int $cantidad)
     {
         return $excursiones->filter(function ($excursion) use ($cantidad) {
         return $excursion->cumpleAnticipacionMinima(now()) && $excursion->obtenerCupoDisponible() >= $cantidad;
         })->values();
     }
+
 }
