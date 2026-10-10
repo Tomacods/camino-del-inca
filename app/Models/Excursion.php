@@ -168,7 +168,7 @@ public static function buscarOtrasDelPaquete($idPaquete, $fechaOrigen, int $cant
 {
     $otras = self::with(['paquete', 'guia'])
         ->where('id_paquete', $idPaquete)
-        ->where('fecha_salida', '!=', $fechaOrigen)
+        ->whereDate('fecha_salida', '!=', $fechaOrigen)
         ->get();
 
     return self::filtrarHabilitadas($otras, $cantidad);
@@ -178,7 +178,7 @@ public static function filtrarHabilitadas($excursiones, int $cantidad)
 {
     return $excursiones->filter(function ($excursion) use ($cantidad) {
         return $excursion->cumpleAnticipacionMinima(now())
-            && $excursion->obtenerCupoDisponible() >= $cantidad;
+            && $excursion->tieneCupoPara($cantidad);
     })->values();
 }
 

@@ -410,13 +410,30 @@ class Reserva extends Model
 /* ----------------------------- CU-20 Modificar ---------------------------- */
 public static function modificarReserva(string $correo, string $numeroReserva)
 {
-    $reserva =  $this->buscarPorCorreoYNumero($correo, $numeroReserva);
+    $reserva = self::buscarPorCorreoYNumero($correo, $numeroReserva);
 
-}
-public function iniciarModificacion(){
-    if ($this->validarEstado([EstadoReserva::Confirmada])) {
-        # code...
+    if ($reserva === null) {
+        throw new \DomainException('No encontramos una reserva con esos datos.');
     }
+
+    return $reserva->iniciarModificacion();
+}
+
+public function iniciarModificacion()
+{
+    if (! $this->validarEstado([EstadoReserva::Confirmada])) {
+        throw new \DomainException('La reserva no admite modificación.');
+    }
+
+    if (! $this->excursion->cumpleAnticipacionMinima(now())) {
+        throw new \DomainException('Ya no se puede modificar: falta poco para la salida.');
+    }
+
+    return Excursion::buscarOtrasDelPaquete(
+        $this->excursion->id_paquete,
+        $this->excursion->fecha_salida,
+        $this->getCantidadExcursionistas()
+    );
 }
 
 private function getCantidadExcursionistas(): int
@@ -451,18 +468,6 @@ private function cambiarExcursion(Excursion $destino): void
     $this->id_excursion = $destino->id_excursion;
 }
 
-public function recalcularFechasLimite(Carbon $fechaSalida): void
-{
-    $limite = $fechaSalida->copy()
-        ->subMonthsNoOverflow(config('reserva.meses_anticipacion_fechas_limite'));
-
-    $this->fecha_limite_confirmacion = $limite;
-
-    if ($this->estado_saldo === EstadoSaldo::Adeudado) {
-        $this->fecha_limite_saldo = $limite;
-    }
-}
-
 public function modificarExcursion(Excursion $destino): void
 {
     DB::transaction(function () use ($destino) {
@@ -473,7 +478,7 @@ public function modificarExcursion(Excursion $destino): void
             $excursionista->actualizarPermisosPendiente();
         }
 
-        $this->recalcularFechasLimite($destino->fecha_salida);
+        $this->fijarFechasLimite($destino->getFechaSalida());
         $this->save();
     });
 }
