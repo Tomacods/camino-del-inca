@@ -1,6 +1,8 @@
 {{--
-    Línea de tiempo con los cinco hitos del Camino Inca de 4 días. Cada hito se abre para leer cómo aclimatarse y qué
-    tan exigente es el tramo; al final, el botón para elegir la fecha de salida.
+    El recorrido de la portada como un paseo con el scroll: una foto de fondo por hito, que pasa a la siguiente y se
+    acerca de a poco a medida que se baja (resources/js/recorrido.js), y encima la tarjeta de cada hito, que se abre para
+    leer cómo aclimatarse y qué tan exigente es el tramo. Al final, el botón para elegir la fecha de salida.
+    La idea es la de midudev/mcp-higgsfield-landing, con fotos fijas en vez de video y sin GSAP.
     <x-hitos-del-camino class="mt-24" />
     <x-hitos-del-camino href="#fechas" />   (en la pantalla de un paquete, para ir directo a sus fechas)
 --}}
@@ -10,7 +12,8 @@
     // Los nombres son los de las etapas del «Camino Inca de 4 días» que carga RecorridoSeeder. La altitud, la distancia
     // y las recomendaciones no están en la tabla ETAPA (sólo tiene nombre y orden): guardarlas ahí sería un cambio de
     // esquema, así que por ahora son texto de la portada. Altitudes y distancias aproximadas.
-    // Las fotos todavía no existen (PRODUCT.md): cuando estén, van en public/img/recorrido y la ruta se escribe en 'foto'.
+    // Las fotos son de Pexels y Pixabay, de uso libre. Cada una está en public/img/recorrido en dos recortes: horizontal
+    // (computadora) y vertical (celular). Las que no muestran el lugar exacto del hito se marcan como ilustrativas.
     $hitos = [
         [
             'nombre' => 'Kilómetro 82 (Piscacucho)',
@@ -25,7 +28,14 @@
                 'Tomá agua seguido, aunque no tengas sed.',
                 'Caminá a tu ritmo desde el primer paso, sin apurarte.',
             ],
-            'foto' => null,
+            'foto' => [
+                'archivo' => 'img/recorrido/km-82',
+                'muestra' => 'Sendero junto a un río',
+                'ilustrativa' => true,
+                'autor' => 'Marinella Grce Orell',
+                'sitio' => 'Pexels',
+                'enlace' => 'https://www.pexels.com/photo/31257475/',
+            ],
         ],
         [
             'nombre' => 'Wayllabamba',
@@ -40,7 +50,14 @@
                 'Un dolor de cabeza leve es común las primeras noches. Si es fuerte o viene con mareos o náuseas, avisale al guía.',
                 'Dormí abrigado: de noche la temperatura baja mucho.',
             ],
-            'foto' => null,
+            'foto' => [
+                'archivo' => 'img/recorrido/wayllabamba',
+                'muestra' => 'Andenes incas',
+                'ilustrativa' => true,
+                'autor' => 'Daiji Umemoto',
+                'sitio' => 'Pexels',
+                'enlace' => 'https://www.pexels.com/photo/39065251/',
+            ],
         ],
         [
             'nombre' => 'Abra Warmiwañusca',
@@ -57,7 +74,14 @@
                 'Arriba hace frío y hay viento: abrigate antes de parar.',
                 'Si los síntomas de la altura empeoran mientras subís, decíselo al guía: bajar es lo que más los alivia.',
             ],
-            'foto' => null,
+            'foto' => [
+                'archivo' => 'img/recorrido/abra-warmiwanusca',
+                'muestra' => 'Caminantes en un sendero de los Andes',
+                'ilustrativa' => true,
+                'autor' => 'davidexpedition',
+                'sitio' => 'Pexels',
+                'enlace' => 'https://www.pexels.com/photo/31048804/',
+            ],
         ],
         [
             'nombre' => 'Wiñay Wayna',
@@ -72,7 +96,14 @@
                 'Bajando, la altura ya no es el problema: cuidá las rodillas. Los bastones de trekking ayudan mucho.',
                 'Acostate temprano: el último día se sale de madrugada.',
             ],
-            'foto' => null,
+            'foto' => [
+                'archivo' => 'img/recorrido/winay-wayna',
+                'muestra' => 'Andenes sobre el valle',
+                'ilustrativa' => true,
+                'autor' => 'Gilmer Diaz Estela',
+                'sitio' => 'Pexels',
+                'enlace' => 'https://www.pexels.com/photo/6780760/',
+            ],
         ],
         [
             'nombre' => 'Machu Picchu',
@@ -86,9 +117,28 @@
                 'Es el punto más bajo del recorrido: a esta altura el cuerpo ya está adaptado.',
                 'Llevá protector solar, sombrero y agua para recorrer la ciudadela.',
             ],
-            'foto' => null,
+            'foto' => [
+                'archivo' => 'img/recorrido/machu-picchu',
+                'muestra' => 'Machu Picchu',
+                'ilustrativa' => false,
+                'autor' => 'Poswiecie',
+                'sitio' => 'Pixabay',
+                'enlace' => 'https://pixabay.com/photos/machu-picchu-peru-inca-travel-2773629/',
+            ],
         ],
     ];
+
+    // La foto que acompaña al botón final.
+    $fotoFinal = [
+        'archivo' => 'img/recorrido/inti-punku',
+        'muestra' => 'Cartel hacia Inti Punku, en Machu Picchu',
+        'ilustrativa' => false,
+        'autor' => 'Paolo Salazar',
+        'sitio' => 'Pexels',
+        'enlace' => 'https://www.pexels.com/photo/13923043/',
+    ];
+
+    $fotos = [...array_column($hitos, 'foto'), $fotoFinal];
 
     $nivelesDificultad = [1 => 'Baja', 2 => 'Moderada', 3 => 'Alta', 4 => 'Muy alta'];
 @endphp
@@ -99,126 +149,154 @@
         <span class="text-texto-secundario">De Piscacucho a Machu Picchu en cuatro días.</span>
     </h2>
     <p class="mt-4 max-w-[60ch] text-[17px] leading-relaxed text-texto-secundario">
-        Los cinco hitos del Camino Inca de 4 días. Abrí cada uno para ver cómo aclimatarte y qué tan exigente es el tramo.
-        Las altitudes y las distancias son aproximadas.
+        Bajá para recorrer los cinco hitos del Camino Inca de 4 días. Abrí cada uno para ver cómo aclimatarte y qué tan
+        exigente es el tramo. Las altitudes y las distancias son aproximadas.
     </p>
 
-    <ol class="mt-10 space-y-6">
-        @foreach ($hitos as $indice => $hito)
-            <li class="relative grid grid-cols-[2.5rem_1fr] gap-x-3 sm:gap-x-6">
-                {{-- Tramo de la línea que une este hito con el siguiente, o con el botón final. --}}
-                <span class="absolute top-10 -bottom-6 left-5 -ml-px border-l-2 border-dashed border-divisor" aria-hidden="true"></span>
-
-                <span class="flex size-10 items-center justify-center rounded-full bg-aviso font-semibold text-enlace tabular-nums" aria-hidden="true">
-                    {{ $indice + 1 }}
-                </span>
-
-                <article class="min-w-0 overflow-hidden rounded-[18px] bg-tarjeta shadow-tarjeta">
-                    <div class="md:flex">
-                        <div class="aspect-video md:aspect-auto md:min-h-64 md:w-2/5 md:shrink-0">
-                            @if ($hito['foto'])
-                                <img src="{{ asset($hito['foto']) }}" alt="{{ $hito['nombre'] }}" loading="lazy" class="size-full object-cover">
-                            @else
-                                {{-- Lugar de la foto mientras no exista. --}}
-                                <div class="flex size-full items-center justify-center bg-linear-to-br from-aviso to-fondo" aria-hidden="true">
-                                    <svg class="w-28 text-accion/30" viewBox="0 0 120 64" fill="none" stroke="currentColor" stroke-width="2.5"
-                                         stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M4 60 38 20l16 18 22-30 40 52" />
-                                        <circle cx="96" cy="14" r="7" />
-                                    </svg>
-                                </div>
-                            @endif
-                        </div>
-
-                        <div class="p-6 sm:p-8 md:flex-1">
-                            <p class="text-sm font-medium text-texto-secundario">Día {{ $hito['dia'] }}</p>
-                            <h3 class="mt-1 text-2xl font-semibold">{{ $hito['nombre'] }}</h3>
-                            <p class="mt-3 text-[17px] leading-relaxed text-texto-secundario">{{ $hito['resumen'] }}</p>
-
-                            <dl class="mt-6 flex flex-wrap gap-x-10 gap-y-4">
-                                <div>
-                                    <dt class="text-sm text-texto-secundario">Altitud</dt>
-                                    <dd class="mt-1 text-2xl font-semibold tabular-nums">
-                                        {{ number_format($hito['altitud'], 0, ',', '.') }}
-                                        <abbr title="metros sobre el nivel del mar" class="text-base font-normal text-texto-secundario no-underline">msnm</abbr>
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt class="text-sm text-texto-secundario">Desde el inicio</dt>
-                                    <dd class="mt-1 text-2xl font-semibold tabular-nums">
-                                        {{ $hito['kilometro'] }}
-                                        <span class="text-base font-normal text-texto-secundario">km</span>
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt class="text-sm text-texto-secundario">Dificultad</dt>
-                                    <dd class="mt-1 flex h-8 items-center gap-2.5">
-                                        <span class="flex gap-1" aria-hidden="true">
-                                            @foreach (array_keys($nivelesDificultad) as $nivel)
-                                                <span class="h-2 w-5 rounded-full {{ $nivel <= $hito['dificultad'] ? 'bg-accion' : 'bg-divisor' }}"></span>
-                                            @endforeach
-                                        </span>
-                                        <span class="text-[17px] font-semibold">{{ $nivelesDificultad[$hito['dificultad']] }}</span>
-                                    </dd>
-                                </div>
-                            </dl>
-                        </div>
+    {{-- Ocupa todo el ancho de la ventana aunque la página tenga un ancho máximo (el html recorta lo que sobra). --}}
+    <div class="relative mt-10 ml-[calc(50%-50vw)] w-screen">
+        {{-- El escenario queda fijo mientras pasan las paradas. Una foto encima de la otra: el script decide cuál se ve. --}}
+        <div data-escenario class="sticky top-0 h-lvh overflow-hidden bg-gris-fondo">
+            <div aria-hidden="true">
+                @foreach ($fotos as $indice => $foto)
+                    <div data-foto class="absolute inset-0" @if ($indice > 0) style="opacity: 0" @endif>
+                        <picture class="block size-full">
+                            <source media="(orientation: portrait)" srcset="{{ asset($foto['archivo'].'-vertical.webp') }}">
+                            <img src="{{ asset($foto['archivo'].'-horizontal.webp') }}" alt="" loading="lazy" class="size-full object-cover">
+                        </picture>
+                        <p class="absolute top-18 right-4 max-w-[calc(100%-2rem)] rounded-xl bg-texto/60 px-3 py-1 text-sm text-white transition-opacity duration-300 sm:right-6">
+                            {{ $foto['ilustrativa'] ? 'Foto ilustrativa: ' : '' }}{{ $foto['muestra'] }}
+                        </p>
                     </div>
+                @endforeach
+            </div>
 
-                    <details class="group border-t border-divisor">
-                        <summary class="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-6 text-[17px] text-enlace transition-colors duration-150 ease-out hover:bg-fondo focus-visible:-outline-offset-2 sm:px-8 [&::-webkit-details-marker]:hidden">
-                            <span>Aclimatación y dificultad<span class="sr-only"> en {{ $hito['nombre'] }}</span></span>
-                            <svg class="size-5 shrink-0 transition-transform duration-200 ease-out group-open:rotate-180" viewBox="0 0 20 20" fill="none"
-                                 stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="m5 7.5 5 5 5-5" />
-                            </svg>
-                        </summary>
+            {{-- Riel de hitos, en pantallas grandes: marca el hito actual y lleva a cualquiera. --}}
+            <nav aria-label="Hitos del recorrido" class="absolute top-1/2 right-6 hidden -translate-y-1/2 lg:block">
+                <span class="absolute top-3 right-[5px] bottom-3 w-0.5 rounded-full bg-tarjeta/50" aria-hidden="true">
+                    <span data-relleno class="absolute inset-0 origin-top scale-y-0 rounded-full bg-accion"></span>
+                </span>
+                <ol class="flex flex-col items-end gap-4">
+                    @foreach ($hitos as $indice => $hito)
+                        <li>
+                            {{-- El anillo blanco del foco y el borde del punto hacen que se vean sobre cualquier foto. --}}
+                            <a href="#hito-{{ $indice + 1 }}" data-ir-a
+                               class="group flex min-h-6 items-center gap-3 rounded-full focus-visible:ring-2 focus-visible:ring-tarjeta">
+                                <span class="rounded-full bg-tarjeta/90 px-3 py-1 text-sm whitespace-nowrap text-texto opacity-0 shadow-tarjeta transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100 group-aria-[current=step]:opacity-100">
+                                    {{ $hito['nombre'] }}
+                                </span>
+                                <span class="relative size-3 rounded-full bg-tarjeta ring-2 ring-texto/60 transition-[scale,background-color] duration-500 group-aria-[current=step]:scale-150 group-aria-[current=step]:bg-accion"></span>
+                            </a>
+                        </li>
+                    @endforeach
+                </ol>
+            </nav>
+        </div>
 
-                        <div class="grid gap-8 px-6 pt-2 pb-8 sm:px-8 md:grid-cols-2 md:gap-12">
-                            <div>
-                                <h4 class="text-[17px] font-semibold">Aclimatación</h4>
-                                <ul class="mt-3 space-y-3">
-                                    @foreach ($hito['aclimatacion'] as $recomendacion)
-                                        <li class="flex gap-3 text-[15px] leading-relaxed">
-                                            <svg class="mt-1 size-4 shrink-0 text-accion" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                                                 stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                                <path d="m3.5 8.5 3 3 6-7" />
-                                            </svg>
-                                            {{ $recomendacion }}
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            </div>
+        {{-- Las paradas pasan por encima del escenario. Sólo las tarjetas reciben clics, así el riel de abajo sigue andando. --}}
+        <div class="pointer-events-none relative -mt-[100lvh]">
+            <ol>
+                @foreach ($hitos as $indice => $hito)
+                    <li id="hito-{{ $indice + 1 }}" data-parada class="flex min-h-[150lvh] items-start pt-[25lvh]">
+                        <div class="mx-auto w-full max-w-5xl px-4 sm:px-6">
+                            <article class="pointer-events-auto max-w-lg overflow-hidden rounded-[18px] bg-tarjeta shadow-tarjeta-elevada">
+                                <div class="p-6 sm:p-8">
+                                    <p class="text-sm font-medium text-texto-secundario">
+                                        Hito {{ $indice + 1 }} de {{ count($hitos) }} · Día {{ $hito['dia'] }}
+                                    </p>
+                                    <h3 class="mt-1 text-2xl font-semibold">{{ $hito['nombre'] }}</h3>
+                                    <p class="mt-3 text-[17px] leading-relaxed text-texto-secundario">{{ $hito['resumen'] }}</p>
 
-                            <div>
-                                <h4 class="text-[17px] font-semibold">Dificultad del tramo</h4>
-                                <p class="mt-3 text-[15px] leading-relaxed">{{ $hito['detalleDificultad'] }}</p>
-                            </div>
+                                    <dl class="mt-6 flex flex-wrap gap-x-10 gap-y-4">
+                                        <div>
+                                            <dt class="text-sm text-texto-secundario">Altitud</dt>
+                                            <dd class="mt-1 text-2xl font-semibold tabular-nums">
+                                                {{ number_format($hito['altitud'], 0, ',', '.') }}
+                                                <abbr title="metros sobre el nivel del mar" class="text-base font-normal text-texto-secundario no-underline">msnm</abbr>
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-sm text-texto-secundario">Desde el inicio</dt>
+                                            <dd class="mt-1 text-2xl font-semibold tabular-nums">
+                                                {{ $hito['kilometro'] }}
+                                                <span class="text-base font-normal text-texto-secundario">km</span>
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-sm text-texto-secundario">Dificultad</dt>
+                                            <dd class="mt-1 flex h-8 items-center gap-2.5">
+                                                <span class="flex gap-1" aria-hidden="true">
+                                                    @foreach (array_keys($nivelesDificultad) as $nivel)
+                                                        <span class="h-2 w-5 rounded-full {{ $nivel <= $hito['dificultad'] ? 'bg-accion' : 'bg-divisor' }}"></span>
+                                                    @endforeach
+                                                </span>
+                                                <span class="text-[17px] font-semibold">{{ $nivelesDificultad[$hito['dificultad']] }}</span>
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </div>
+
+                                <details class="group border-t border-divisor">
+                                    <summary class="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-6 text-[17px] text-enlace transition-colors duration-150 ease-out hover:bg-fondo focus-visible:-outline-offset-2 sm:px-8 [&::-webkit-details-marker]:hidden">
+                                        <span>Aclimatación y dificultad<span class="sr-only"> en {{ $hito['nombre'] }}</span></span>
+                                        <svg class="size-5 shrink-0 transition-transform duration-200 ease-out group-open:rotate-180" viewBox="0 0 20 20" fill="none"
+                                             stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="m5 7.5 5 5 5-5" />
+                                        </svg>
+                                    </summary>
+
+                                    <div class="space-y-6 px-6 pt-2 pb-8 sm:px-8">
+                                        <div>
+                                            <h4 class="text-[17px] font-semibold">Aclimatación</h4>
+                                            <ul class="mt-3 space-y-3">
+                                                @foreach ($hito['aclimatacion'] as $recomendacion)
+                                                    <li class="flex gap-3 text-[15px] leading-relaxed">
+                                                        <svg class="mt-1 size-4 shrink-0 text-accion" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                                             stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                            <path d="m3.5 8.5 3 3 6-7" />
+                                                        </svg>
+                                                        {{ $recomendacion }}
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+
+                                        <div>
+                                            <h4 class="text-[17px] font-semibold">Dificultad del tramo</h4>
+                                            <p class="mt-3 text-[15px] leading-relaxed">{{ $hito['detalleDificultad'] }}</p>
+                                        </div>
+                                    </div>
+                                </details>
+                            </article>
                         </div>
-                    </details>
-                </article>
-            </li>
-        @endforeach
-    </ol>
+                    </li>
+                @endforeach
+            </ol>
 
-    {{-- El final del camino: la línea del último hito llega hasta acá. --}}
-    <div class="mt-6 grid grid-cols-[2.5rem_1fr] gap-x-3 sm:gap-x-6">
-        <span class="flex size-10 items-center justify-center rounded-full bg-accion text-white" aria-hidden="true">
-            <svg class="size-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 17.5v-14M5 4h9.5l-2 3.5 2 3.5H5" />
-            </svg>
-        </span>
-
-        <div class="min-w-0 rounded-[18px] bg-linear-to-br from-tarjeta to-aviso px-6 py-10 shadow-tarjeta-elevada sm:px-12 sm:py-14">
-            <h3 class="max-w-2xl text-3xl font-semibold sm:text-4xl">
-                Tu lugar en el Camino.
-                <span class="text-texto-secundario">Elegí cuándo salir.</span>
-            </h3>
-            <p class="mt-4 max-w-[52ch] text-[17px] leading-relaxed text-texto-secundario">
-                Las salidas son los lunes y se reservan con al menos {{ config('reserva.meses_anticipacion_minima') }} meses de
-                anticipación. Elegí una fecha con lugares disponibles y reservá para vos y tus acompañantes.
-            </p>
-            <x-boton :href="$href" class="mt-8">Ver fechas de salida</x-boton>
+            {{-- El final del camino, sobre la última foto. --}}
+            <div data-parada class="flex min-h-lvh items-center">
+                <div class="mx-auto w-full max-w-5xl px-4 sm:px-6">
+                    <div class="pointer-events-auto max-w-2xl rounded-[18px] bg-tarjeta px-6 py-10 shadow-tarjeta-elevada sm:px-12 sm:py-14">
+                        <h3 class="text-3xl font-semibold sm:text-4xl">
+                            Tu lugar en el Camino.
+                            <span class="text-texto-secundario">Elegí cuándo salir.</span>
+                        </h3>
+                        <p class="mt-4 max-w-[52ch] text-[17px] leading-relaxed text-texto-secundario">
+                            Las salidas son los lunes y se reservan con al menos {{ config('reserva.meses_anticipacion_minima') }} meses de
+                            anticipación. Elegí una fecha con lugares disponibles y reservá para vos y tus acompañantes.
+                        </p>
+                        <x-boton :href="$href" class="mt-8">Ver fechas de salida</x-boton>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <p class="mt-4 text-sm leading-relaxed text-texto-secundario">
+        Fotos:
+        @foreach ($fotos as $foto)
+            <a href="{{ $foto['enlace'] }}" class="text-enlace underline">{{ $foto['muestra'] }}</a>{{ $foto['ilustrativa'] ? ' (ilustrativa)' : '' }},
+            de {{ $foto['autor'] }} en {{ $foto['sitio'] }}{{ $loop->last ? '.' : ';' }}
+        @endforeach
+    </p>
 </section>

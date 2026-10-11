@@ -233,10 +233,19 @@ El estado siempre va escrito: el color ayuda, pero no es lo único que lo indica
 |---|---|---|
 | `href` | Adónde lleva el botón final «Ver fechas de salida» | `/paquetes` |
 
-Sección completa, con título: la línea de tiempo con los cinco hitos del Camino Inca de 4 días (foto, altitud,
-distancia desde el inicio y dificultad) y, al final, el botón para elegir la fecha. Cada hito se abre con
-`<details>`, sin JavaScript, para leer las recomendaciones de aclimatación y la dificultad del tramo. Hoy está en la
-portada.
+Sección completa, con título: los cinco hitos del Camino Inca de 4 días como un paseo con el scroll, a la manera de
+[midudev/mcp-higgsfield-landing](https://github.com/midudev/mcp-higgsfield-landing) pero con fotos fijas en vez de video
+y sin GSAP. Hoy está en la portada.
+
+- **Escenario.** Ocupa todo el ancho y queda fijo (`sticky`) mientras pasan las paradas. Tiene una foto por hito y una
+  para el botón final, una encima de la otra. `resources/js/recorrido.js` calcula en qué punto del recorrido está el
+  visitante (0 en el primer hito, 1 en el segundo, 2.5 a mitad de camino entre el tercero y el cuarto) y con eso
+  funde cada foto con la siguiente y la acerca un 6 %. Con «reducir movimiento» del sistema, no la acerca.
+- **Tarjetas.** Cada hito muestra altitud, distancia desde el inicio y dificultad, y se abre con `<details>`, sin
+  JavaScript, para leer la aclimatación y la dificultad del tramo.
+- **Riel.** En pantallas grandes, a la derecha: marca el hito actual (`aria-current="step"`) y lleva a cualquiera.
+  Las paradas tienen `pointer-events-none` (sólo las tarjetas reciben clics) porque se pintan encima del riel.
+- **Sin JavaScript** se ve la primera foto todo el tiempo; el resto de la sección funciona igual.
 
 ```blade
 <x-hitos-del-camino class="mt-24 sm:mt-32" />
@@ -244,8 +253,15 @@ portada.
 ```
 
 Los datos están en el mismo componente: la tabla `etapa` no tiene altitud ni distancia. Los nombres son los de las
-etapas de `RecorridoSeeder`, y `HitosDelCaminoTest` avisa si dejan de coincidir. Las fotos todavía no existen: cada
-hito tiene `'foto' => null` y muestra un dibujo de relleno; cuando estén, van en `public/img/recorrido/`.
+etapas de `RecorridoSeeder`, y `HitosDelCaminoTest` avisa si dejan de coincidir o si falta alguna foto.
+
+**Fotos.** Son de Pexels y Pixabay, de uso libre, y están en `public/img/recorrido/` en dos recortes: `-horizontal`
+(hasta 1920 × 1280, para pantallas apaisadas) y `-vertical` (hasta 900 × 1350, para celulares); el `<picture>` elige
+según la orientación de la pantalla. La de Machu Picchu es más chica porque la descarga de Pixabay mide 1280 × 853. Las que no muestran el lugar exacto del hito dicen «Foto ilustrativa» en la leyenda, y los
+créditos van debajo de la sección. Para cambiar una foto: reemplazar los dos archivos con el mismo nombre y actualizar
+sus datos (`muestra`, `ilustrativa`, `autor`, `sitio`, `enlace`) en el componente.
+
+Para que el escenario ocupe todo el ancho sin barra horizontal, `html` lleva `overflow-x: clip` en `app.css`.
 
 ## Accesibilidad
 

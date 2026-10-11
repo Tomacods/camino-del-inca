@@ -44,6 +44,9 @@
     html {
         color-scheme: light;
         scrollbar-color: var(--color-borde-campo) var(--color-fondo);
+        /* El escenario del recorrido de la portada ocupa todo el ancho (100vw), que en Windows incluye la barra de
+           desplazamiento: sin esto, aparecería una barra horizontal. */
+        overflow-x: clip;
     }
 
     body {

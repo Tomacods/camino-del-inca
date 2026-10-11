@@ -41,6 +41,22 @@ class HitosDelCaminoTest extends TestCase
         $this->assertSame($ordenDeCadaHito->sort()->values()->all(), $ordenDeCadaHito->all());
     }
 
+    // Cada hito y el botón final tienen su foto en dos recortes; una ruta mal escrita deja el fondo vacío sin dar error.
+    public function test_las_fotos_del_recorrido_existen_y_llevan_sus_creditos(): void
+    {
+        $html = $this->get('/')->assertOk()->getContent();
+
+        preg_match_all('#/(img/recorrido/[a-z0-9-]+-(?:horizontal|vertical)\.webp)#', $html, $coincidencias);
+        $fotos = array_unique($coincidencias[1]);
+
+        $this->assertCount(12, $fotos);
+        foreach ($fotos as $foto) {
+            $this->assertFileExists(public_path($foto));
+        }
+        $this->assertStringContainsString('Pexels', $html);
+        $this->assertStringContainsString('Pixabay', $html);
+    }
+
     public function test_el_boton_lleva_a_los_paquetes_o_a_la_direccion_que_se_le_indica(): void
     {
         $this->blade('<x-hitos-del-camino />')->assertSee('href="/paquetes"', false);
