@@ -44,4 +44,6 @@
             @endforeach
         </ol>
     </section>
+
+    <x-hitos-del-camino class="mt-24 sm:mt-32" />
 </x-layouts::app>

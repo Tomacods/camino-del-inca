@@ -227,6 +227,26 @@ El estado siempre va escrito: el color ayuda, pero no es lo único que lo indica
 <x-chip-estado :estado="$excursionista->estado_permiso" />
 ```
 
+### Hitos del recorrido — `<x-hitos-del-camino>`
+
+| Atributo | Para qué | Por defecto |
+|---|---|---|
+| `href` | Adónde lleva el botón final «Ver fechas de salida» | `/paquetes` |
+
+Sección completa, con título: la línea de tiempo con los cinco hitos del Camino Inca de 4 días (foto, altitud,
+distancia desde el inicio y dificultad) y, al final, el botón para elegir la fecha. Cada hito se abre con
+`<details>`, sin JavaScript, para leer las recomendaciones de aclimatación y la dificultad del tramo. Hoy está en la
+portada.
+
+```blade
+<x-hitos-del-camino class="mt-24 sm:mt-32" />
+<x-hitos-del-camino href="#fechas" />   {{-- en la pantalla de un paquete, directo a sus fechas --}}
+```
+
+Los datos están en el mismo componente: la tabla `etapa` no tiene altitud ni distancia. Los nombres son los de las
+etapas de `RecorridoSeeder`, y `HitosDelCaminoTest` avisa si dejan de coincidir. Las fotos todavía no existen: cada
+hito tiene `'foto' => null` y muestra un dibujo de relleno; cuando estén, van en `public/img/recorrido/`.
+
 ## Accesibilidad
 
 - Los botones y campos miden al menos 48 px de alto, para que sean fáciles de tocar.
