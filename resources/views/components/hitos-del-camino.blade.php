@@ -12,8 +12,9 @@
     // Los nombres son los de las etapas del «Camino Inca de 4 días» que carga RecorridoSeeder. La altitud, la distancia
     // y las recomendaciones no están en la tabla ETAPA (sólo tiene nombre y orden): guardarlas ahí sería un cambio de
     // esquema, así que por ahora son texto de la portada. Altitudes y distancias aproximadas.
-    // Las fotos son de Pexels y Pixabay, de uso libre. Cada una está en public/img/recorrido en dos recortes: horizontal
-    // (computadora) y vertical (celular). Las que no muestran el lugar exacto del hito se marcan como ilustrativas.
+    // Las fotos de Machu Picchu las sacó la tía de Tomás; las otras son de Pexels, de uso libre, y se marcan como
+    // ilustrativas porque no muestran el lugar exacto del hito. Cada una está en public/img/recorrido en dos recortes:
+    // horizontal (computadora) y vertical (celular). Las fotos propias no tienen sitio ni enlace.
     $hitos = [
         [
             'nombre' => 'Kilómetro 82 (Piscacucho)',
@@ -121,21 +122,21 @@
                 'archivo' => 'img/recorrido/machu-picchu',
                 'muestra' => 'Machu Picchu',
                 'ilustrativa' => false,
-                'autor' => 'Poswiecie',
-                'sitio' => 'Pixabay',
-                'enlace' => 'https://pixabay.com/photos/machu-picchu-peru-inca-travel-2773629/',
+                'autor' => 'la tía de Tomás Da Silva (Grupo 11)',
+                'sitio' => null,
+                'enlace' => null,
             ],
         ],
     ];
 
     // La foto que acompaña al botón final.
     $fotoFinal = [
-        'archivo' => 'img/recorrido/inti-punku',
-        'muestra' => 'Cartel hacia Inti Punku, en Machu Picchu',
+        'archivo' => 'img/recorrido/llegada',
+        'muestra' => 'Machu Picchu',
         'ilustrativa' => false,
-        'autor' => 'Paolo Salazar',
-        'sitio' => 'Pexels',
-        'enlace' => 'https://www.pexels.com/photo/13923043/',
+        'autor' => 'la tía de Tomás Da Silva (Grupo 11)',
+        'sitio' => null,
+        'enlace' => null,
     ];
 
     $fotos = [...array_column($hitos, 'foto'), $fotoFinal];
@@ -294,9 +295,14 @@
 
     <p class="mt-4 text-sm leading-relaxed text-texto-secundario">
         Fotos:
-        @foreach ($fotos as $foto)
-            <a href="{{ $foto['enlace'] }}" class="text-enlace underline">{{ $foto['muestra'] }}</a>{{ $foto['ilustrativa'] ? ' (ilustrativa)' : '' }},
-            de {{ $foto['autor'] }} en {{ $foto['sitio'] }}{{ $loop->last ? '.' : ';' }}
+        {{-- Dos fotos con el mismo crédito (las de Machu Picchu) se nombran una sola vez. --}}
+        @foreach (collect($fotos)->unique(fn ($foto) => $foto['muestra'].$foto['autor']) as $foto)
+            @if ($foto['enlace'])
+                <a href="{{ $foto['enlace'] }}" class="text-enlace underline">{{ $foto['muestra'] }}</a>{{ $foto['ilustrativa'] ? ' (ilustrativa)' : '' }},
+            @else
+                {{ $foto['muestra'] }},
+            @endif
+            de {{ $foto['autor'] }}{{ $foto['sitio'] ? ' en '.$foto['sitio'] : '' }}{{ $loop->last ? '.' : ';' }}
         @endforeach
     </p>
 </section>

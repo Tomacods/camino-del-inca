@@ -101,9 +101,9 @@ Tipografías de esa paleta: **Titillium Web** para los títulos y **DM Sans** pa
 
 - Textos de la ERS: descripciones de paquetes, recorridos, etapas y servicios, y las políticas de cancelación y
   reintegro (en el Drive del grupo, no en el repositorio).
-- **Fotos:** las del recorrido de la portada son de Pexels y Pixabay, de uso libre, con créditos debajo de la sección;
-  las que no muestran el lugar exacto del hito dicen «Foto ilustrativa» (ver `docs/guia-visual-portal.md`). Fotos
-  propias, todavía no hay. **Logotipo: todavía no existe.** No inventarlo ni usar imágenes de stock como si fueran
+- **Fotos:** en el recorrido de la portada, las de Machu Picchu las sacó la tía de Tomás; las otras son de Pexels, de
+  uso libre, y dicen «Foto ilustrativa» porque no muestran el lugar exacto del hito. Los créditos van debajo de la
+  sección (ver `docs/guia-visual-portal.md`). **Logotipo: todavía no existe.** No inventarlo ni usar imágenes de stock como si fueran
   propias; dejar el lugar preparado.
 - Sin testimonios, valoraciones reales ni cifras de clientes: no fabricarlos.
 

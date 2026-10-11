@@ -54,7 +54,7 @@ class HitosDelCaminoTest extends TestCase
             $this->assertFileExists(public_path($foto));
         }
         $this->assertStringContainsString('Pexels', $html);
-        $this->assertStringContainsString('Pixabay', $html);
+        $this->assertStringContainsString('la tía de Tomás Da Silva', $html);
     }
 
     public function test_el_boton_lleva_a_los_paquetes_o_a_la_direccion_que_se_le_indica(): void

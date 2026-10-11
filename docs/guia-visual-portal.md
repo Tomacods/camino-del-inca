@@ -255,11 +255,12 @@ y sin GSAP. Hoy está en la portada.
 Los datos están en el mismo componente: la tabla `etapa` no tiene altitud ni distancia. Los nombres son los de las
 etapas de `RecorridoSeeder`, y `HitosDelCaminoTest` avisa si dejan de coincidir o si falta alguna foto.
 
-**Fotos.** Son de Pexels y Pixabay, de uso libre, y están en `public/img/recorrido/` en dos recortes: `-horizontal`
-(hasta 1920 × 1280, para pantallas apaisadas) y `-vertical` (hasta 900 × 1350, para celulares); el `<picture>` elige
-según la orientación de la pantalla. La de Machu Picchu es más chica porque la descarga de Pixabay mide 1280 × 853. Las que no muestran el lugar exacto del hito dicen «Foto ilustrativa» en la leyenda, y los
-créditos van debajo de la sección. Para cambiar una foto: reemplazar los dos archivos con el mismo nombre y actualizar
-sus datos (`muestra`, `ilustrativa`, `autor`, `sitio`, `enlace`) en el componente.
+**Fotos.** Las de Machu Picchu (el hito 5 y el cierre) las sacó la tía de Tomás; las otras cuatro son de Pexels, de
+uso libre, y dicen «Foto ilustrativa» en la leyenda porque no muestran el lugar exacto del hito. Los créditos van debajo
+de la sección. Están en `public/img/recorrido/` en dos recortes: `-horizontal` (apaisada, hasta 1920 px de ancho) y
+`-vertical` (hasta 900 × 1350, para celulares); el `<picture>` elige según la orientación de la pantalla. Para cambiar
+una foto: reemplazar los dos archivos con el mismo nombre y actualizar sus datos (`muestra`, `ilustrativa`, `autor`,
+`sitio`, `enlace`) en el componente; una foto propia lleva `sitio` y `enlace` en `null`.
 
 Para que el escenario ocupe todo el ancho sin barra horizontal, `html` lleva `overflow-x: clip` en `app.css`.
 
