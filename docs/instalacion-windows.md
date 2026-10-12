@@ -150,10 +150,10 @@ Get-Service postgresql | Select-Object Name, Status, StartType
 Tiene que decir `Running`. Después alcanza con recargar la página: `php artisan serve` no hace falta reiniciarlo, pero
 `php artisan queue:work` sí, si estaba corriendo, porque se corta cuando pierde la conexión con la base.
 
-Para que no vuelva a pasar, fijarse qué dice `StartType`:
+No hace falta que PostgreSQL arranque con Windows: alcanza con arrancarlo así antes de trabajar. Si se prefiere que
+arranque solo, se fija qué dice `StartType`:
 
-- **`Manual`:** el servicio no arranca solo con la PC. Se cambia con
-  `Set-Service postgresql -StartupType Automatic`.
+- **`Manual`:** se cambia con `Set-Service postgresql -StartupType Automatic`.
 - **`Automatic`:** intentó arrancar con la PC y falló. El motivo queda en el Visor de eventos (menú Inicio → «Visor de
   eventos» → Registros de Windows → Aplicación), en las entradas con origen PostgreSQL.
 
