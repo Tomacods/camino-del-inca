@@ -123,6 +123,77 @@ Get-Service postgresql
 El primer comando pide dos veces la contraseña nueva del usuario `postgres`. El último tiene que mostrar `Running`; el
 servicio queda configurado para arrancar solo con la PC.
 
+### El sitio muestra *Connection refused* en el puerto 5432
+
+Síntoma: al abrir el sitio aparece una página de error `Illuminate\Database\QueryException` con *SQLSTATE[08006] [7]
+connection to server at "127.0.0.1", port 5432 failed: Connection refused*. Lo mismo responden `php artisan migrate` y
+`php artisan queue:work`. Las pruebas (`php artisan test`) siguen andando, porque usan otra base.
+
+Es que **el servicio de PostgreSQL existe pero está detenido**. Pasa sobre todo después de reiniciar la PC. No es un
+error del código.
+
+En **PowerShell como administrador**:
+
+```powershell
+Get-Service *postgres*
+```
+
+Muestra el servicio con su nombre (columna `Name`) y su estado. El nombre depende de cómo se instaló: el instalador lo
+llama `postgresql-x64-` y la versión (por ejemplo `postgresql-x64-18`); si se creó a mano con la sección anterior, se
+llama `postgresql`. Con ese nombre:
+
+```powershell
+Start-Service postgresql
+Get-Service postgresql | Select-Object Name, Status, StartType
+```
+
+Tiene que decir `Running`. Después alcanza con recargar la página: `php artisan serve` no hace falta reiniciarlo, pero
+`php artisan queue:work` sí, si estaba corriendo, porque se corta cuando pierde la conexión con la base.
+
+Para que no vuelva a pasar, fijarse qué dice `StartType`:
+
+- **`Manual`:** el servicio no arranca solo con la PC. Se cambia con
+  `Set-Service postgresql -StartupType Automatic`.
+- **`Automatic`:** intentó arrancar con la PC y falló. El motivo queda en el Visor de eventos (menú Inicio → «Visor de
+  eventos» → Registros de Windows → Aplicación), en las entradas con origen PostgreSQL.
+
+Si `Get-Service *postgres*` no muestra nada, es el caso de la sección anterior.
+
+### Mercado Pago: *unable to get local issuer certificate*
+
+Sólo le pasa a quien prueba el pago con Mercado Pago. Síntoma: «Pagar con Mercado Pago» muestra «No pudimos conectar con
+Mercado Pago», y en `storage/logs/laravel.log` queda *SSL certificate OpenSSL verify result: unable to get local issuer
+certificate (20)*.
+
+Es que el PHP para Windows no trae los certificados con los que se validan las conexiones `https`, así que no puede
+comprobar que del otro lado está Mercado Pago. Composer no tiene el problema porque trae los suyos.
+
+En PowerShell, bajar los certificados:
+
+```powershell
+mkdir C:\php\extras\ssl -Force
+curl.exe -L -o C:\php\extras\ssl\cacert.pem https://curl.se/ca/cacert.pem
+```
+
+`php --ini` dice qué `php.ini` se usa (normalmente `C:\php\php.ini`). Ahí, buscar estas dos líneas, sacarles el `;` del
+principio y dejarlas así:
+
+```ini
+curl.cainfo = "C:\php\extras\ssl\cacert.pem"
+openssl.cafile = "C:\php\extras\ssl\cacert.pem"
+```
+
+Cuidado con no dejar el nombre dos veces en la misma línea (`openssl.cafile=openssl.cafile = …`): PHP avisa *syntax
+error, unexpected '='* y no toma el valor. Para comprobarlo:
+
+```bash
+php -r "echo ini_get('curl.cainfo'), PHP_EOL, ini_get('openssl.cafile'), PHP_EOL;"
+```
+
+Tiene que imprimir la ruta dos veces. Después, reiniciar `php artisan serve` y `php artisan queue:work`, que leen el
+`php.ini` al arrancar. No usar `MercadoPagoConfig::setRuntimeEnviroment(LOCAL)` del SDK para esquivarlo: desactiva la
+verificación del certificado.
+
 ### Aviso "Parte de esta aplicación se ha bloqueado" al abrir pgAdmin
 
 También es el Control inteligente de aplicaciones, que bloquea un archivo secundario de pgAdmin. Normalmente pgAdmin

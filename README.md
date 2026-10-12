@@ -82,6 +82,9 @@ Después:
    retenidas hasta que se levante la cola. Si cambiás el código de una tarea (`app/Jobs`), cortá `queue:work` con
    Ctrl+C y volvé a levantarlo, porque guarda el código en memoria.
 
+Si al abrir el sitio aparece *Connection refused* en el puerto 5432, PostgreSQL está detenido: ver
+[Problemas conocidos](docs/instalacion-windows.md#problemas-conocidos) en la guía de instalación.
+
 El archivo `.env` es de cada uno y no se sube. Si se agrega una variable nueva, se agrega también en `.env.example`.
 
 Después de cada `git pull` que traiga cambios: `composer install`, `npm install` y
@@ -113,6 +116,9 @@ Sólo lo necesita quien pruebe el pago de la reserva (CU-15). El resto del siste
 Para pagar se usa el comprador de prueba de la cuenta y las tarjetas de prueba de Mercado Pago: con el titular `APRO`
 el pago se aprueba; con `FUND` u `OTHE`, se rechaza. Mercado Pago cobra en pesos el equivalente de los dólares, con su
 cotización del momento.
+
+Si al pagar aparece «No pudimos conectar con Mercado Pago» y el registro habla de un certificado, ver
+[Problemas conocidos](docs/instalacion-windows.md#problemas-conocidos) en la guía de instalación.
 
 ## Cómo trabajamos
 
