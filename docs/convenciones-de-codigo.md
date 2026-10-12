@@ -28,7 +28,8 @@ La arquitectura es Modelo–Vista–Controlador, sin capa de servicios:
   información): la excursión calcula su cupo disponible y retiene y libera plazas; la reserva resuelve sus cambios de
   estado, sus fechas límite, su saldo y sus devoluciones; el paquete calcula el monto de la reserva.
 - **Controladores y componentes Livewire** — reciben lo que hace el usuario, validan el formato de los datos y
-  coordinan a los modelos. No tienen reglas de negocio. Desde acá se llama a Mercado Pago y se envían los correos.
+  coordinan a los modelos. No tienen reglas de negocio. Desde acá se envían los correos. A Mercado Pago no lo llaman:
+  le habla el modelo `Pago`, con el SDK, como en el DS-15 y en el Documento de Arquitectura.
 - **Vistas** — sólo muestran. No consultan la base ni calculan.
 - **Panel (`app/Filament`)** — pantallas del administrador y del guía.
 - **Tareas (`app/Jobs`)** — lo que corre en la cola, fuera del pedido del cliente: por ejemplo, liberar el cupo
