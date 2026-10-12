@@ -175,7 +175,7 @@
                             <source media="(orientation: portrait)" {{ $prefijo }}srcset="{{ asset($foto['archivo'].'-vertical.webp') }}">
                             <img {{ $prefijo }}src="{{ asset($foto['archivo'].'-horizontal.webp') }}" alt="" loading="lazy" class="size-full object-cover">
                         </picture>
-                        <p class="absolute top-18 right-4 max-w-[calc(100%-2rem)] rounded-xl bg-texto/60 px-3 py-1 text-sm text-white transition-opacity duration-300 sm:right-6">
+                        <p class="absolute top-18 right-4 max-w-[calc(100%-2rem)] rounded-xl bg-texto/70 px-3 py-1 text-sm text-white transition-opacity duration-300 sm:right-6">
                             {{ $foto['muestra'] }}
                         </p>
                     </div>

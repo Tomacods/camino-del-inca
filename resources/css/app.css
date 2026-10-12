@@ -8,7 +8,8 @@
 /*
  * Inter, servida desde el proyecto. Antes venía de Google Fonts, y esa hoja externa frenaba el primer pintado de cada
  * página. Es la versión variable (pesos de 100 a 900) con los caracteres latinos, que alcanzan para el español; el
- * archivo es el mismo que trae Filament en public/fonts/filament. Licencia: SIL Open Font License 1.1.
+ * archivo es el mismo que trae Filament en public/fonts/filament. Copyright 2016 The Inter Project Authors; licencia
+ * SIL Open Font License 1.1, que tiene que viajar con la fuente: está en resources/fonts/OFL.txt.
  */
 @font-face {
     font-family: 'Inter';

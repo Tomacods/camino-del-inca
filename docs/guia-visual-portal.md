@@ -47,7 +47,8 @@ Reglas:
 
 Una sola familia, **Inter**, para títulos y textos (la más parecida a la de Apple entre las libres). Se sirve desde el
 proyecto: `resources/fonts/inter-latin.woff2`, declarada con `@font-face` en `app.css`, en su versión variable (todos
-los pesos). No se carga de Google Fonts porque esa hoja externa frenaba el primer pintado de cada página.
+los pesos). No se carga de Google Fonts porque esa hoja externa frenaba el primer pintado de cada página. Su licencia
+(SIL Open Font License 1.1) tiene que acompañar al archivo: está en `resources/fonts/OFL.txt`.
 
 - Títulos en `font-semibold`, con el espaciado entre letras un poco cerrado (ya aplicado a `h1`, `h2` y `h3`).
 - Títulos en dos tonos, como en la tienda de Apple: la primera frase en `texto` y la segunda en `texto-secundario`.

@@ -53,10 +53,15 @@ class HitosDelCaminoTest extends TestCase
         foreach ($fotos as $foto) {
             $this->assertFileExists(public_path($foto));
         }
-        // Las licencias CC BY y CC BY-SA piden nombrar al autor y la licencia.
-        $this->assertStringContainsString('Wikimedia Commons', $html);
-        $this->assertStringContainsString('CC BY-SA 4.0', $html);
-        $this->assertStringContainsString('la tía de Tomás Da Silva', $html);
+        // Las licencias CC BY y CC BY-SA piden nombrar al autor y la licencia de cada foto, en el orden de los hitos.
+        $this->get('/')->assertSeeInOrder([
+            'Fotos:',
+            'Sashimi-b', 'CC BY 4.0',
+            'Josefito123', 'CC BY-SA 4.0',
+            'Josefito123', 'CC BY-SA 4.0',
+            'Sashimi-b', 'CC BY 4.0',
+            'la tía de Tomás Da Silva',
+        ]);
     }
 
     public function test_el_boton_lleva_a_los_paquetes_o_a_la_direccion_que_se_le_indica(): void
