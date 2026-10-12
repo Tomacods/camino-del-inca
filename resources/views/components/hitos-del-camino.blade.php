@@ -12,9 +12,10 @@
     // Los nombres son los de las etapas del «Camino Inca de 4 días» que carga RecorridoSeeder. La altitud, la distancia
     // y las recomendaciones no están en la tabla ETAPA (sólo tiene nombre y orden): guardarlas ahí sería un cambio de
     // esquema, así que por ahora son texto de la portada. Altitudes y distancias aproximadas.
-    // Las fotos de Machu Picchu las sacó la tía de Tomás; las otras son de Pexels, de uso libre, y se marcan como
-    // ilustrativas porque no muestran el lugar exacto del hito. Cada una está en public/img/recorrido en dos recortes:
-    // horizontal (computadora) y vertical (celular). Las fotos propias no tienen sitio ni enlace.
+    // Cada foto muestra el lugar de su hito. Las de Machu Picchu las sacó la tía de Tomás; las otras son de Wikimedia
+    // Commons, con licencia CC BY o CC BY-SA, que piden nombrar al autor y la licencia (los créditos van al final de la
+    // sección). Cada una está en public/img/recorrido en dos recortes: horizontal (computadora) y vertical (celular).
+    // Las fotos propias no tienen licencia, sitio ni enlace.
     $hitos = [
         [
             'nombre' => 'Kilómetro 82 (Piscacucho)',
@@ -31,11 +32,12 @@
             ],
             'foto' => [
                 'archivo' => 'img/recorrido/km-82',
-                'muestra' => 'Sendero junto a un río',
-                'ilustrativa' => true,
-                'autor' => 'Marinella Grce Orell',
-                'sitio' => 'Pexels',
-                'enlace' => 'https://www.pexels.com/photo/31257475/',
+                'muestra' => 'Entrada al Camino Inca en Piscacucho',
+                'autor' => 'Sashimi-b',
+                'licencia' => 'CC BY 4.0',
+                'enlaceLicencia' => 'https://creativecommons.org/licenses/by/4.0/',
+                'sitio' => 'Wikimedia Commons',
+                'enlace' => 'https://commons.wikimedia.org/wiki/File:Inca_Trail_Entrance.jpg',
             ],
         ],
         [
@@ -53,11 +55,12 @@
             ],
             'foto' => [
                 'archivo' => 'img/recorrido/wayllabamba',
-                'muestra' => 'Andenes incas',
-                'ilustrativa' => true,
-                'autor' => 'Daiji Umemoto',
-                'sitio' => 'Pexels',
-                'enlace' => 'https://www.pexels.com/photo/39065251/',
+                'muestra' => 'Wayllabamba, en el Camino Inca',
+                'autor' => 'Josefito123',
+                'licencia' => 'CC BY-SA 4.0',
+                'enlaceLicencia' => 'https://creativecommons.org/licenses/by-sa/4.0/',
+                'sitio' => 'Wikimedia Commons',
+                'enlace' => 'https://commons.wikimedia.org/wiki/File:20250713_154756_-_Huayllabamba_en_el_camino_inca.jpg',
             ],
         ],
         [
@@ -77,11 +80,12 @@
             ],
             'foto' => [
                 'archivo' => 'img/recorrido/abra-warmiwanusca',
-                'muestra' => 'Caminantes en un sendero de los Andes',
-                'ilustrativa' => true,
-                'autor' => 'davidexpedition',
-                'sitio' => 'Pexels',
-                'enlace' => 'https://www.pexels.com/photo/31048804/',
+                'muestra' => 'Vista desde el Abra Warmiwañusca',
+                'autor' => 'Josefito123',
+                'licencia' => 'CC BY-SA 4.0',
+                'enlaceLicencia' => 'https://creativecommons.org/licenses/by-sa/4.0/',
+                'sitio' => 'Wikimedia Commons',
+                'enlace' => 'https://commons.wikimedia.org/wiki/File:20250714_115010_Abra_Warmiwa%C3%B1usca_(4.216_metros)_en_el_camino_inca.jpg',
             ],
         ],
         [
@@ -99,11 +103,12 @@
             ],
             'foto' => [
                 'archivo' => 'img/recorrido/winay-wayna',
-                'muestra' => 'Andenes sobre el valle',
-                'ilustrativa' => true,
-                'autor' => 'Gilmer Diaz Estela',
-                'sitio' => 'Pexels',
-                'enlace' => 'https://www.pexels.com/photo/6780760/',
+                'muestra' => 'Ruinas y andenes de Wiñay Wayna',
+                'autor' => 'Sashimi-b',
+                'licencia' => 'CC BY 4.0',
+                'enlaceLicencia' => 'https://creativecommons.org/licenses/by/4.0/',
+                'sitio' => 'Wikimedia Commons',
+                'enlace' => 'https://commons.wikimedia.org/wiki/File:WinayWayna-lowerstructure.jpg',
             ],
         ],
         [
@@ -121,8 +126,9 @@
             'foto' => [
                 'archivo' => 'img/recorrido/machu-picchu',
                 'muestra' => 'Machu Picchu',
-                'ilustrativa' => false,
                 'autor' => 'la tía de Tomás Da Silva (Grupo 11)',
+                'licencia' => null,
+                'enlaceLicencia' => null,
                 'sitio' => null,
                 'enlace' => null,
             ],
@@ -133,8 +139,9 @@
     $fotoFinal = [
         'archivo' => 'img/recorrido/llegada',
         'muestra' => 'Machu Picchu',
-        'ilustrativa' => false,
         'autor' => 'la tía de Tomás Da Silva (Grupo 11)',
+        'licencia' => null,
+        'enlaceLicencia' => null,
         'sitio' => null,
         'enlace' => null,
     ];
@@ -166,7 +173,7 @@
                             <img src="{{ asset($foto['archivo'].'-horizontal.webp') }}" alt="" loading="lazy" class="size-full object-cover">
                         </picture>
                         <p class="absolute top-18 right-4 max-w-[calc(100%-2rem)] rounded-xl bg-texto/60 px-3 py-1 text-sm text-white transition-opacity duration-300 sm:right-6">
-                            {{ $foto['ilustrativa'] ? 'Foto ilustrativa: ' : '' }}{{ $foto['muestra'] }}
+                            {{ $foto['muestra'] }}
                         </p>
                     </div>
                 @endforeach
@@ -298,11 +305,14 @@
         {{-- Dos fotos con el mismo crédito (las de Machu Picchu) se nombran una sola vez. --}}
         @foreach (collect($fotos)->unique(fn ($foto) => $foto['muestra'].$foto['autor']) as $foto)
             @if ($foto['enlace'])
-                <a href="{{ $foto['enlace'] }}" class="text-enlace underline">{{ $foto['muestra'] }}</a>{{ $foto['ilustrativa'] ? ' (ilustrativa)' : '' }},
+                <a href="{{ $foto['enlace'] }}" class="text-enlace underline">{{ $foto['muestra'] }}</a>,
             @else
                 {{ $foto['muestra'] }},
             @endif
-            de {{ $foto['autor'] }}{{ $foto['sitio'] ? ' en '.$foto['sitio'] : '' }}{{ $loop->last ? '.' : ';' }}
+            {{-- En una sola línea, para que no quede un espacio antes del punto y coma. --}}
+            de {{ $foto['autor'] }}@if ($foto['licencia']) (<a href="{{ $foto['enlaceLicencia'] }}" class="text-enlace underline">{{ $foto['licencia'] }}</a>) en {{ $foto['sitio'] }}@endif{{ $loop->last ? '.' : ';' }}
         @endforeach
+        {{-- Las licencias CC BY y CC BY-SA piden avisar si la foto se modificó; las CC BY-SA, además, compartirla igual. --}}
+        Las de Wikimedia Commons están recortadas, y las CC BY-SA se comparten con la misma licencia.
     </p>
 </section>

@@ -53,7 +53,9 @@ class HitosDelCaminoTest extends TestCase
         foreach ($fotos as $foto) {
             $this->assertFileExists(public_path($foto));
         }
-        $this->assertStringContainsString('Pexels', $html);
+        // Las licencias CC BY y CC BY-SA piden nombrar al autor y la licencia.
+        $this->assertStringContainsString('Wikimedia Commons', $html);
+        $this->assertStringContainsString('CC BY-SA 4.0', $html);
         $this->assertStringContainsString('la tía de Tomás Da Silva', $html);
     }
 
