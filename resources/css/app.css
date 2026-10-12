@@ -6,6 +6,19 @@
 @source '../**/*.js';
 
 /*
+ * Inter, servida desde el proyecto. Antes venía de Google Fonts, y esa hoja externa frenaba el primer pintado de cada
+ * página. Es la versión variable (pesos de 100 a 900) con los caracteres latinos, que alcanzan para el español; el
+ * archivo es el mismo que trae Filament en public/fonts/filament. Licencia: SIL Open Font License 1.1.
+ */
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('../fonts/inter-latin.woff2') format('woff2');
+}
+
+/*
  * Paleta y tipografía del portal: interfaz clara, tomando como referencia la tienda de Apple.
  * Se usan con las clases de Tailwind: bg-tarjeta, text-texto-secundario, border-divisor, etc.
  * La guía completa está en docs/guia-visual-portal.md.

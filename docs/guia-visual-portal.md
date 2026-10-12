@@ -45,8 +45,9 @@ Reglas:
 
 ## Tipografía
 
-Una sola familia, **Inter**, para títulos y textos (es la de Google Fonts más parecida a la de Apple). Se carga en el
-layout con los pesos 400, 500, 600 y 700.
+Una sola familia, **Inter**, para títulos y textos (la más parecida a la de Apple entre las libres). Se sirve desde el
+proyecto: `resources/fonts/inter-latin.woff2`, declarada con `@font-face` en `app.css`, en su versión variable (todos
+los pesos). No se carga de Google Fonts porque esa hoja externa frenaba el primer pintado de cada página.
 
 - Títulos en `font-semibold`, con el espaciado entre letras un poco cerrado (ya aplicado a `h1`, `h2` y `h3`).
 - Títulos en dos tonos, como en la tienda de Apple: la primera frase en `texto` y la segunda en `texto-secundario`.
@@ -240,7 +241,9 @@ y sin GSAP. Hoy está en la portada.
 - **Escenario.** Ocupa todo el ancho y queda fijo (`sticky`) mientras pasan las paradas. Tiene una foto por hito y una
   para el botón final, una encima de la otra. `resources/js/recorrido.js` calcula en qué punto del recorrido está el
   visitante (0 en el primer hito, 1 en el segundo, 2.5 a mitad de camino entre el tercero y el cuarto) y con eso
-  funde cada foto con la siguiente y la acerca un 6 %. Con «reducir movimiento» del sistema, no la acerca.
+  funde cada foto con la siguiente y la acerca un 6 %. Con «reducir movimiento» del sistema, no la acerca. Salvo la
+  primera, las fotos llevan la dirección en `data-srcset` y `data-src`, y el script las pide cuando el escenario está
+  a una pantalla de distancia: en el celular, quien no baja hasta la sección no las descarga.
 - **Tarjetas.** Cada hito muestra altitud, distancia desde el inicio y dificultad, y se abre con `<details>`, sin
   JavaScript, para leer la aclimatación y la dificultad del tramo.
 - **Riel.** En pantallas grandes, a la derecha: marca el hito actual (`aria-current="step"`) y lleva a cualquiera.

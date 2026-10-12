@@ -70,6 +70,20 @@ if (escenario) {
         });
     };
 
+    // Las fotos que esperan en data-srcset y data-src se piden cuando el escenario está a una pantalla de distancia.
+    // Primero el srcset del <source>, para que el <picture> elija la foto vertical u horizontal antes de pedirla.
+    const cargarFotos = new IntersectionObserver((entradas, observador) => {
+        if (!entradas.some((entrada) => entrada.isIntersecting)) {
+            return;
+        }
+
+        escenario.querySelectorAll('[data-srcset]').forEach((fuente) => (fuente.srcset = fuente.dataset.srcset));
+        escenario.querySelectorAll('[data-src]').forEach((imagen) => (imagen.src = imagen.dataset.src));
+        observador.disconnect();
+    }, { rootMargin: '100% 0px' });
+
+    cargarFotos.observe(escenario);
+
     window.addEventListener('scroll', pedirDibujo, { passive: true });
     window.addEventListener('resize', pedirDibujo);
     // Abrir o cerrar una tarjeta cambia el alto de su parada sin mover el scroll.

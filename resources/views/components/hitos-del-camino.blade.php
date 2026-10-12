@@ -168,9 +168,12 @@
             <div aria-hidden="true">
                 @foreach ($fotos as $indice => $foto)
                     <div data-foto class="absolute inset-0" @if ($indice > 0) style="opacity: 0" @endif>
+                        {{-- Salvo la primera, las fotos llevan la dirección en data-: el script las pide cuando el visitante se
+                             acerca, así la portada no baja de entrada fotos que quizás nadie ve. --}}
+                        @php($prefijo = $indice === 0 ? '' : 'data-')
                         <picture class="block size-full">
-                            <source media="(orientation: portrait)" srcset="{{ asset($foto['archivo'].'-vertical.webp') }}">
-                            <img src="{{ asset($foto['archivo'].'-horizontal.webp') }}" alt="" loading="lazy" class="size-full object-cover">
+                            <source media="(orientation: portrait)" {{ $prefijo }}srcset="{{ asset($foto['archivo'].'-vertical.webp') }}">
+                            <img {{ $prefijo }}src="{{ asset($foto['archivo'].'-horizontal.webp') }}" alt="" loading="lazy" class="size-full object-cover">
                         </picture>
                         <p class="absolute top-18 right-4 max-w-[calc(100%-2rem)] rounded-xl bg-texto/60 px-3 py-1 text-sm text-white transition-opacity duration-300 sm:right-6">
                             {{ $foto['muestra'] }}

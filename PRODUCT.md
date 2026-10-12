@@ -74,7 +74,7 @@ Proyecto académico: cátedra Desarrollo de Software (UNPSJB, 2026), Grupo 11. E
   | `ambar` / `ambar-fondo` | `#9A5B00` / `#FDF3DC` | Estado Pendiente y saldo adeudado |
   | `gris-fondo` | `#E8E8ED` | Estado Cancelada y botón deshabilitado |
 
-- **Tipografía: Inter**, una sola familia para títulos y textos, desde Google Fonts.
+- **Tipografía: Inter**, una sola familia para títulos y textos, servida desde el proyecto (`resources/fonts`).
 
 ## Paleta reservada para un posible modo oscuro
 
