@@ -74,7 +74,7 @@ Proyecto académico: cátedra Desarrollo de Software (UNPSJB, 2026), Grupo 11. E
   | `ambar` / `ambar-fondo` | `#9A5B00` / `#FDF3DC` | Estado Pendiente y saldo adeudado |
   | `gris-fondo` | `#E8E8ED` | Estado Cancelada y botón deshabilitado |
 
-- **Tipografía: Inter**, una sola familia para títulos y textos, desde Google Fonts.
+- **Tipografía: Inter**, una sola familia para títulos y textos, servida desde el proyecto (`resources/fonts`).
 
 ## Paleta reservada para un posible modo oscuro
 
@@ -101,8 +101,10 @@ Tipografías de esa paleta: **Titillium Web** para los títulos y **DM Sans** pa
 
 - Textos de la ERS: descripciones de paquetes, recorridos, etapas y servicios, y las políticas de cancelación y
   reintegro (en el Drive del grupo, no en el repositorio).
-- **Fotos y logotipo: todavía no existen; se buscarán más adelante.** No inventarlos ni usar imágenes de stock como si
-  fueran propias; dejar el lugar preparado.
+- **Fotos:** en el recorrido de la portada, las de Machu Picchu las sacó la tía de Tomás; las de los otros hitos son
+  de Wikimedia Commons (CC BY y CC BY-SA), con autor y licencia en los créditos, debajo de la sección (ver
+  `docs/guia-visual-portal.md`). **Logotipo: todavía no existe.** No inventarlo ni usar imágenes de stock como si fueran
+  propias; dejar el lugar preparado.
 - Sin testimonios, valoraciones reales ni cifras de clientes: no fabricarlos.
 
 ## Product Principles
