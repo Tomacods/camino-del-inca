@@ -107,7 +107,8 @@ Sólo lo necesita quien pruebe el pago de la reserva (CU-15). El resto del siste
    ngrok http 8000
    ```
 
-   y se copia la dirección `https://…` que muestra a `APP_URL`, en `.env`.
+   y se copia la dirección `https://…` que muestra a `APP_URL`, en `.env`. Cómo instalar ngrok y usar el túnel:
+   [paso 8 de la guía de instalación](docs/instalacion-windows.md#8-opcional-ngrok-para-probar-el-pago-con-mercado-pago).
 3. Compilar los estilos una vez con `npm run build`, en lugar de dejar `npm run dev`: el servidor de Vite escucha en
    `localhost` y desde la dirección del túnel no se alcanza.
 4. Levantar `php artisan serve` y `php artisan queue:work` como siempre, y entrar **siempre por la dirección del túnel**,

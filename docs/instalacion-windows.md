@@ -89,6 +89,53 @@ Sin esto, la base se puede crear igual desde pgAdmin, o llamando al programa con
 "/c/Program Files/PostgreSQL/18/bin/createdb" -U postgres camino_del_inca
 ```
 
+## 8. Opcional: ngrok, para probar el pago con Mercado Pago
+
+Sólo lo necesita quien pruebe el pago de la reserva (CU-15). Mercado Pago no acepta `localhost` como dirección de
+vuelta, así que el sitio se abre desde afuera con un túnel de ngrok: una dirección pública `https` que le pasa los
+pedidos a `localhost:8000`. Lo demás de la prueba del pago (credenciales y comprador de prueba) está en el
+[README](../README.md#probar-el-pago-con-mercado-pago).
+
+Una sola vez:
+
+1. Crear una cuenta gratis en [ngrok.com](https://ngrok.com).
+2. Instalarlo desde PowerShell, o buscando «ngrok» en la Microsoft Store:
+
+   ```powershell
+   winget install ngrok -s msstore
+   ```
+
+   Conviene la versión de la Microsoft Store: el `.exe` bajado suelto a veces lo bloquea Windows Defender.
+3. En una terminal nueva, comprobar que responde con `ngrok help`.
+4. Registrar el token de la cuenta, que se copia de
+   [dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken):
+
+   ```bash
+   ngrok config add-authtoken <token>
+   ```
+
+Cada vez que se prueba el pago, en una terminal aparte, además de `php artisan serve` y `php artisan queue:work`:
+
+```bash
+ngrok http 8000
+```
+
+La línea *Forwarding* muestra la dirección pública, del estilo `https://tres-palabras.ngrok-free.dev` (a algunas cuentas
+les toca `.ngrok-free.app`). En el plan gratis es siempre la misma, así que se configura una sola vez: va en `APP_URL`
+del `.env`, sin barra al final, y después `php artisan config:clear`. El túnel funciona mientras esa terminal esté
+abierta y se corta con `Ctrl+C`. En <http://127.0.0.1:4040> se ven los pedidos que pasan por él.
+
+Para usarlo:
+
+- **Entrar siempre por la dirección del túnel**, no por `localhost:8000`: la reserva en curso queda en la sesión, que es
+  de una sola dirección, y Mercado Pago devuelve al cliente a la del túnel.
+- **La primera visita** desde un navegador muestra una página de aviso de ngrok: se pasa con *Visit Site*. En una ventana
+  de incógnito aparece cada vez que se abre una nueva.
+- **Compilar con `npm run build`** y no dejar `npm run dev` corriendo: el servidor de Vite escucha en `localhost` y desde
+  el túnel no se alcanza, así que el sitio se vería sin estilos.
+
+El plan gratis alcanza de sobra para probar: 1 GB y 20.000 pedidos por mes.
+
 ## Problemas conocidos
 
 ### `php` no muestra nada y termina con código 127
