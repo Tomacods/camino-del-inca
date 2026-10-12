@@ -96,7 +96,8 @@ los repone el *seeder*. A partir de `v0.1` alcanza con `php artisan migrate`.
 
 ## Probar el pago con Mercado Pago
 
-Sólo lo necesita quien pruebe el pago de la reserva (CU-15). El resto del sistema funciona sin esto.
+Lo necesita quien pruebe el pago de la reserva (CU-15) y la PC con la que se muestre el sistema en la presentación. El
+resto del sistema funciona sin esto.
 
 1. En `.env`, completar `MERCADOPAGO_ACCESS_TOKEN` con el *Access Token* de las credenciales **de prueba** de tu cuenta
    de Mercado Pago Developers. Empieza con `APP_USR-`, igual que el de producción: en Checkout Pro es así. Nunca las
@@ -108,7 +109,8 @@ Sólo lo necesita quien pruebe el pago de la reserva (CU-15). El resto del siste
    ```
 
    y se copia la dirección `https://…` que muestra a `APP_URL`, en `.env`. Cómo instalar ngrok y usar el túnel:
-   [paso 8 de la guía de instalación](docs/instalacion-windows.md#8-opcional-ngrok-para-probar-el-pago-con-mercado-pago).
+   [paso 8 de la guía de instalación](docs/instalacion-windows.md#8-ngrok-para-probar-el-pago-y-para-la-presentación),
+   que también tiene la lista para la presentación.
 3. Compilar los estilos una vez con `npm run build`, en lugar de dejar `npm run dev`: el servidor de Vite escucha en
    `localhost` y desde la dirección del túnel no se alcanza.
 4. Levantar `php artisan serve` y `php artisan queue:work` como siempre, y entrar **siempre por la dirección del túnel**,

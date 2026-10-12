@@ -89,12 +89,12 @@ Sin esto, la base se puede crear igual desde pgAdmin, o llamando al programa con
 "/c/Program Files/PostgreSQL/18/bin/createdb" -U postgres camino_del_inca
 ```
 
-## 8. Opcional: ngrok, para probar el pago con Mercado Pago
+## 8. ngrok: para probar el pago y para la presentación
 
-Sólo lo necesita quien pruebe el pago de la reserva (CU-15). Mercado Pago no acepta `localhost` como dirección de
-vuelta, así que el sitio se abre desde afuera con un túnel de ngrok: una dirección pública `https` que le pasa los
-pedidos a `localhost:8000`. Lo demás de la prueba del pago (credenciales y comprador de prueba) está en el
-[README](../README.md#probar-el-pago-con-mercado-pago).
+Lo necesita quien pruebe el pago de la reserva (CU-15) y **la PC con la que se muestre el sistema en la presentación
+final**. Mercado Pago no acepta `localhost` como dirección de vuelta, así que el sitio se abre desde afuera con un túnel
+de ngrok: una dirección pública `https` que le pasa los pedidos a `localhost:8000`. Lo demás de la prueba del pago
+(credenciales y comprador de prueba) está en el [README](../README.md#probar-el-pago-con-mercado-pago).
 
 Una sola vez:
 
@@ -135,6 +135,23 @@ Para usarlo:
   el túnel no se alcanza, así que el sitio se vería sin estilos.
 
 El plan gratis alcanza de sobra para probar: 1 GB y 20.000 pedidos por mes.
+
+### Para la presentación
+
+La presentación se hace con la PC que tenga ngrok y las credenciales de prueba de Mercado Pago en su `.env`: la
+dirección del túnel es de una cuenta de ngrok, y las credenciales, de una cuenta de Mercado Pago. Antes de empezar:
+
+1. Internet andando: sin conexión no hay túnel ni Mercado Pago.
+2. PostgreSQL arrancado (`Start-Service postgresql`, ver «Problemas conocidos»).
+3. `npm run build`, y en tres terminales `php artisan serve`, `php artisan queue:work` y `ngrok http 8000`.
+4. En el `.env`, `APP_URL` con la dirección del túnel y `RESERVA_MINUTOS_RETENCION` en 5 o sin la línea, que es el
+   plazo del caso de uso.
+5. Una ventana de incógnito abierta en la dirección del túnel, con el aviso de ngrok ya pasado.
+6. A mano, el usuario y la contraseña del comprador de prueba y una tarjeta de prueba (titular `APRO` para aprobar,
+   `FUND` para mostrar un rechazo). Si se entra al checkout sin iniciar sesión, Mercado Pago pide un correo: va el del
+   comprador de prueba, nunca uno real.
+
+Conviene ensayarlo una vez con los 5 minutos reales de retención, y tener capturas del pago por si falla la conexión.
 
 ## Problemas conocidos
 
