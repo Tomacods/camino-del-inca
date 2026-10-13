@@ -139,7 +139,7 @@ Para una opción que todavía no tiene pantalla, botón deshabilitado con la ley
 
 ```blade
 <x-boton disabled class="flex-col">
-    Pagar saldo
+    Valorar servicios
     <span class="text-sm">Disponible próximamente</span>
 </x-boton>
 ```

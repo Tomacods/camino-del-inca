@@ -196,16 +196,16 @@ new #[Title('Pagar saldo')] class extends Component
                         <dd class="tabular-nums">{{ $dolares($pago->monto) }}</dd>
                     </div>
                 @endforeach
-                <div class="flex justify-between gap-4 py-3">
-                    <dt class="text-texto-secundario">Fecha límite para pagar el saldo</dt>
-                    <dd class="tabular-nums">{{ $fechaLimiteSaldo->format('d/m/Y') }}</dd>
-                </div>
             </dl>
 
             <div class="mt-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-1 border-t border-divisor pt-5">
                 <p class="text-[17px] font-semibold">Saldo pendiente</p>
                 <p class="text-4xl font-semibold tabular-nums text-ambar">{{ $dolares($saldoPendiente) }}</p>
             </div>
+            <dl class="mt-3 flex justify-between gap-4 text-[17px]">
+                <dt class="text-texto-secundario">Fecha límite para pagar el saldo</dt>
+                <dd class="font-semibold tabular-nums">{{ $fechaLimiteSaldo->format('d/m/Y') }}</dd>
+            </dl>
             <p class="mt-3 text-sm text-texto-secundario">
                 Mercado Pago te cobra el equivalente en pesos, con su cotización del momento.
             </p>

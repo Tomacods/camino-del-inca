@@ -216,6 +216,32 @@ class Pago extends Model
         return ['id_retencion' => $idRetencion, 'tipo_pago' => $tipoPago];
     }
 
+    // El único lugar donde se le pasa el Access Token al SDK. No se escribe en el registro ni en ningún mensaje.
+    private static function configurarMercadoPago(): void
+    {
+        MercadoPagoConfig::setAccessToken((string) config('services.mercadopago.access_token'));
+    }
+
+    // El texto de un error de Mercado Pago para el registro. Cuando la API contesta con un error, el mensaje de la
+    // excepción es sólo «Api error. Check response for details»: el motivo (por ejemplo, qué campo rechazó) viene en la
+    // respuesta, que no trae el Access Token.
+    private static function describirErrorMercadoPago(Exception $excepcion): string
+    {
+        if (! $excepcion instanceof MPApiException) {
+            return $excepcion->getMessage();
+        }
+
+        // Si la respuesta no era JSON (por ejemplo, una página de error), el SDK no tiene contenido y getContent(), que
+        // promete un arreglo, da un error en lugar de devolver null.
+        try {
+            $respuesta = json_encode($excepcion->getApiResponse()->getContent(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (TypeError) {
+            $respuesta = 'sin contenido';
+        }
+
+        return $excepcion->getMessage().' (HTTP '.$excepcion->getStatusCode().'): '.$respuesta;
+    }
+
     /* --------------------------- CU-16 Pagar saldo ---------------------------- */
 
     // La referencia del saldo es el número de reserva, el separador y «Saldo»: 000125-9_Saldo. A la vuelta dice qué
@@ -266,31 +292,5 @@ class Pago extends Model
 
             return $pago;
         });
-    }
-
-    // El único lugar donde se le pasa el Access Token al SDK. No se escribe en el registro ni en ningún mensaje.
-    private static function configurarMercadoPago(): void
-    {
-        MercadoPagoConfig::setAccessToken((string) config('services.mercadopago.access_token'));
-    }
-
-    // El texto de un error de Mercado Pago para el registro. Cuando la API contesta con un error, el mensaje de la
-    // excepción es sólo «Api error. Check response for details»: el motivo (por ejemplo, qué campo rechazó) viene en la
-    // respuesta, que no trae el Access Token.
-    private static function describirErrorMercadoPago(Exception $excepcion): string
-    {
-        if (! $excepcion instanceof MPApiException) {
-            return $excepcion->getMessage();
-        }
-
-        // Si la respuesta no era JSON (por ejemplo, una página de error), el SDK no tiene contenido y getContent(), que
-        // promete un arreglo, da un error en lugar de devolver null.
-        try {
-            $respuesta = json_encode($excepcion->getApiResponse()->getContent(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        } catch (TypeError) {
-            $respuesta = 'sin contenido';
-        }
-
-        return $excepcion->getMessage().' (HTTP '.$excepcion->getStatusCode().'): '.$respuesta;
     }
 }
