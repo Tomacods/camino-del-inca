@@ -214,6 +214,46 @@ class PagoMercadoPagoTest extends TestCase
         $this->assertNull(Pago::leerReferencia('9b1d2c3e-0f4a-4b5c-8d6e-7f8091a2b3c4_Regalo'));
     }
 
+    public function test_la_referencia_del_saldo_va_y_vuelve(): void
+    {
+        $referencia = Pago::armarReferenciaSaldo('000125-9');
+
+        $this->assertSame('000125-9_Saldo', $referencia);
+        $this->assertSame('000125-9', Pago::leerReferenciaSaldo($referencia));
+    }
+
+    public function test_una_referencia_que_no_es_la_del_saldo_no_se_lee(): void
+    {
+        foreach ([
+            null,
+            '',
+            // Las de CU-15.
+            '9b1d2c3e-0f4a-4b5c-8d6e-7f8091a2b3c4_Sena',
+            '9b1d2c3e-0f4a-4b5c-8d6e-7f8091a2b3c4_Total',
+            // Números sin el formato de seis cifras, guion y una cifra.
+            '00125-9_Saldo',
+            '0000125-9_Saldo',
+            '000125-12_Saldo',
+            '000125_Saldo',
+            'abcdef-9_Saldo',
+            // Otro tipo después del guion bajo, o algo de más.
+            '000125-9_Sena',
+            '000125-9_Total',
+            '000125-9_saldo',
+            '000125-9_Saldo_Saldo',
+            'x000125-9_Saldo',
+            '000125-9_Saldo ',
+            "000125-9_Saldo\n",
+        ] as $referencia) {
+            $this->assertNull(Pago::leerReferenciaSaldo($referencia), var_export($referencia, true));
+        }
+    }
+
+    public function test_la_referencia_del_saldo_no_registra_una_reserva_nueva(): void
+    {
+        $this->assertNull(Pago::leerReferencia('000125-9_Saldo'));
+    }
+
     private function datosPago(): array
     {
         return [
