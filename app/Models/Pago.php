@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoReserva;
+use App\Enums\EstadoSaldo;
 use App\Enums\TipoPago;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -45,6 +48,10 @@ class Pago extends Model
     // La referencia es el identificador de la retención, este separador y el tipo de pago: «<uuid>_Sena» o
     // «<uuid>_Total». El uuid no tiene guiones bajos, así que el último separa las dos partes.
     private const SEPARADOR_REFERENCIA = '_';
+
+    // La referencia del saldo (CU-16): el número de reserva (seis cifras, guion y una cifra), el separador y «Saldo».
+    // \z es el final del texto: con $ también pasaría con un salto de línea al final.
+    private const FORMATO_REFERENCIA_SALDO = '/^([0-9]{6}-[0-9])_Saldo\z/';
 
     protected $table = 'pago';
 
@@ -233,5 +240,57 @@ class Pago extends Model
         }
 
         return $excepcion->getMessage().' (HTTP '.$excepcion->getStatusCode().'): '.$respuesta;
+    }
+
+    /* --------------------------- CU-16 Pagar saldo ---------------------------- */
+
+    // La referencia del saldo es el número de reserva, el separador y «Saldo»: 000125-9_Saldo. A la vuelta dice qué
+    // reserva se pagó sin depender de la sesión. leerReferencia() de CU-15 la rechaza, y leerReferenciaSaldo() rechaza
+    // las de CU-15: un pago de saldo nunca registra una reserva nueva, ni al revés.
+    public static function armarReferenciaSaldo(string $numeroReserva): string
+    {
+        return $numeroReserva.self::SEPARADOR_REFERENCIA.TipoPago::Saldo->name;
+    }
+
+    // Devuelve el número de reserva, o null si la referencia no es exactamente la de armarReferenciaSaldo().
+    public static function leerReferenciaSaldo(?string $referencia): ?string
+    {
+        if ($referencia === null || ! preg_match(self::FORMATO_REFERENCIA_SALDO, $referencia, $partes)) {
+            return null;
+        }
+
+        return $partes[1];
+    }
+
+    // Pasos 9 y 10 con el pago aprobado. No está en el DS-16: es la transacción que hace que dos vueltas a la vez (dos
+    // pestañas, doble clic) registren un solo pago. Lee de nuevo la reserva con su fila bloqueada hasta terminar: la
+    // segunda vuelta espera y, cuando sigue, ya la encuentra «Abonado». Por eso se vuelve a comprobar todo adentro. No
+    // hace falta el candado de generarReserva(), que era para el número de reserva. La fecha límite no se mira: Mercado
+    // Pago ya no acepta el pago después de ella (vence el pedido de cobro) y si el cliente pagó a tiempo, se registra.
+    // Devuelve null, sin registrar nada, si la reserva ya no tiene saldo para pagar.
+    public static function registrarPagoSaldo(Reserva $reserva, string $medioPago): ?self
+    {
+        return DB::transaction(function () use ($reserva, $medioPago) {
+            $reservaBloqueada = Reserva::lockForUpdate()->find($reserva->id_reserva);
+
+            if ($reservaBloqueada === null
+                || $reservaBloqueada->estado !== EstadoReserva::Confirmada
+                || $reservaBloqueada->estado_saldo !== EstadoSaldo::Adeudado) {
+                return null;
+            }
+
+            // El monto es el saldo de este momento, calculado acá: el navegador no manda montos y lo cobrado viene en pesos.
+            $saldoPendiente = round($reservaBloqueada->calcularSaldoPendiente(), 2);
+
+            if ($saldoPendiente <= 0) {
+                return null;
+            }
+
+            // El pago guarda el día y el comprobante, la hora: los dos, la del registro.
+            $pago = self::registrarPago($reservaBloqueada, $saldoPendiente, now(), $medioPago, TipoPago::Saldo);
+            $reservaBloqueada->actualizarReserva($pago);
+
+            return $pago;
+        });
     }
 }

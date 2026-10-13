@@ -9,6 +9,7 @@ use App\Enums\MotivoDevolucion;
 use App\Enums\TipoPago;
 use App\Enums\TipoServicio;
 use App\Jobs\LiberarCupoRetenido;
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -298,6 +299,52 @@ class Reserva extends Model
             EstadoReserva::Finalizada => $tieneValoracion ? [] : [self::OPCION_VALORAR],
             default => [], // Cancelada
         };
+    }
+
+    /* --------------------------- CU-16 Pagar saldo ---------------------------- */
+
+    // Pasos 2 a 4 (iniciarPagoSaldo del DS-16): devuelve el saldo pendiente y la fecha límite para pagarlo. Si el saldo no
+    // se puede pagar, lanza DomainException con el aviso para el cliente, como iniciarModificacion() de CU-20. El saldo
+    // se redondea a dos decimales: es lo que se le pide a Mercado Pago.
+    public function iniciarPagoSaldo(): array
+    {
+        $saldoPendiente = round($this->calcularSaldoPendiente(), 2);
+
+        // A2. El saldo se mira además de estado_saldo: una reserva «Adeudado» sin nada que pagar no va a Mercado Pago.
+        if (! $this->validarEstado([EstadoReserva::Confirmada])
+            || $this->estado_saldo !== EstadoSaldo::Adeudado
+            || $saldoPendiente <= 0) {
+            throw new DomainException('Esta reserva no tiene saldo pendiente.');
+        }
+
+        // A3. Sólo se informa: la cancelación por falta de pago es de CU-22. Una reserva con saldo adeudado siempre tiene
+        // fecha límite; si faltara, el aviso sale sin la fecha.
+        if (! $this->verificarFechaLimiteSaldo()) {
+            $fechaLimite = $this->fecha_limite_saldo === null ? '' : ' el '.$this->fecha_limite_saldo->format('d/m/Y');
+
+            throw new DomainException('El plazo para pagar el saldo venció'.$fechaLimite.' y la reserva se cancela por falta de pago.');
+        }
+
+        return [
+            'saldo_pendiente' => $saldoPendiente,
+            'fecha_limite_saldo' => $this->fecha_limite_saldo,
+        ];
+    }
+
+    // Pública porque también la va a necesitar la cancelación por falta de pago (CU-22). La fecha límite vence a las
+    // 23:59:59 de ese día, como la guardan los seeders y fijarFechasLimite(): hasta ese segundo, todavía se puede pagar.
+    public function verificarFechaLimiteSaldo(): bool
+    {
+        return $this->fecha_limite_saldo !== null && now()->lessThanOrEqualTo($this->fecha_limite_saldo);
+    }
+
+    // Paso 10 (actualizarReserva del DS-16): el saldo pasa a «Abonado». setEstadoSaldo del DS-16 es esta asignación. El
+    // pago se recibe como en el diagrama, aunque para esto no hace falta. fecha_limite_saldo no se borra: queda como
+    // dato, así que CU-22 tiene que buscar las reservas por estado_saldo y no sólo por la fecha.
+    public function actualizarReserva(Pago $pago): void
+    {
+        $this->estado_saldo = EstadoSaldo::Abonado;
+        $this->save();
     }
 
     /* ----------------------------- CU-21 Cancelar ----------------------------- */
