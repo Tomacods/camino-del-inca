@@ -16,6 +16,20 @@ class PortalInicioTest extends TestCase
         $respuesta->assertSee('href="/mi-reserva"', false);
     }
 
+    public function test_la_portada_muestra_los_minutos_de_la_retencion_de_la_configuracion(): void
+    {
+        config(['reserva.minutos_retencion' => 7]);
+
+        $this->get('/')->assertOk()->assertSee('guardado 7 minutos');
+    }
+
+    public function test_con_un_minuto_de_retencion_la_portada_lo_escribe_en_singular(): void
+    {
+        config(['reserva.minutos_retencion' => 1]);
+
+        $this->get('/')->assertOk()->assertSee('guardado 1 minuto mientras');
+    }
+
     public function test_el_chip_de_estado_escribe_el_estado(): void
     {
         $html = $this->blade('<x-chip-estado :estado="$estado" />', ['estado' => EstadoReserva::SinPermiso]);

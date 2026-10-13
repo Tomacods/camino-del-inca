@@ -127,7 +127,7 @@ abierta y se corta con `Ctrl+C`. En <http://127.0.0.1:4040> se ven los pedidos q
 
 Para usarlo:
 
-- **Entrar siempre por la dirección del túnel**, no por `localhost:8000`: la reserva en curso queda en la sesión, que es
+- **Entrar siempre por la dirección del túnel**, no por `127.0.0.1:8000`: la reserva en curso queda en la sesión, que es
   de una sola dirección, y Mercado Pago devuelve al cliente a la del túnel.
 - **La primera visita** desde un navegador muestra una página de aviso de ngrok: se pasa con *Visit Site*. En una ventana
   de incógnito aparece cada vez que se abre una nueva.
