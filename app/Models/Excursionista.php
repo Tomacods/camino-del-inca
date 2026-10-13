@@ -35,4 +35,22 @@ class Excursionista extends Model
     {
         return $this->belongsTo(Reserva::class, 'id_reserva', 'id_reserva');
     }
+
+    /* ------------------------- CU-04 Validar permisos ------------------------- */
+
+    // Paso 2: lo que el administrador ve de cada integrante para registrar su permiso.
+    public function consultarDatosExcursionistas(): array
+    {
+        return [
+            'nombre' => $this->nombre,
+            'apellido' => $this->apellido,
+            'documento_pasaporte' => $this->documento_pasaporte,
+        ];
+    }
+
+    public function actualizarPermiso(EstadoPermiso $estadoPermiso): void
+    {
+        $this->estado_permiso = $estadoPermiso;
+        $this->save();
+    }
 }
