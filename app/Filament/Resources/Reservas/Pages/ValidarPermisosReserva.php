@@ -21,6 +21,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -51,6 +52,14 @@ class ValidarPermisosReserva extends Page
     // Lo que muestran los botones de cada integrante. Cada cambio pasa por procesarRegistroPermiso().
     public array $marcas = [];
 
+    // Datos del encabezado que no cambian mientras la página está abierta. Se leen una vez al abrirla: Livewire vuelve a
+    // traer la reserva en cada clic, pero no sus relaciones, y así no se consultan la excursión y el paquete cada vez.
+    #[Locked]
+    public string $nombrePaquete = '';
+
+    #[Locked]
+    public string $fechaSalida = '';
+
     // Como canView() de ReservaResource: un guía no entra ni escribiendo la dirección a mano.
     public static function canAccess(array $parameters = []): bool
     {
@@ -63,7 +72,7 @@ class ValidarPermisosReserva extends Page
     {
         return Action::make('validarPermisos')
             ->label('Validar permisos')
-            ->icon('heroicon-o-identification')
+            ->icon(Heroicon::OutlinedIdentification)
             ->url(fn (Reserva $record) => ReservaResource::getUrl('permisos', ['record' => $record]))
             ->visible(fn (Reserva $record) => $record->estado === EstadoReserva::Pendiente);
     }
@@ -71,6 +80,10 @@ class ValidarPermisosReserva extends Page
     public function mount(int|string $record): void
     {
         $this->record = $this->resolveRecord($record);
+
+        $excursion = $this->record->excursion;
+        $this->nombrePaquete = $excursion->paquete->nombre;
+        $this->fechaSalida = $excursion->fecha_salida->format('Y-m-d');
 
         $this->seleccionarReservaAValidar($this->record->numero_reserva);
 
@@ -136,7 +149,22 @@ class ValidarPermisosReserva extends Page
                 return $reserva;
             });
         } catch (DomainException $excepcion) {
-            // No se guardó nada. La reserva ya no admite la validación: se muestra el aviso en lugar del formulario.
+            // No se guardó nada. Si la reserva ya tiene los permisos validados, la confirmación llegó dos veces (doble clic,
+            // otra pestaña u otro administrador): no es un error, se informa cómo quedó y se vuelve al detalle.
+            $reservaActual = $this->getRecord()->fresh();
+
+            if ($reservaActual?->tienePermisosValidados()) {
+                Notification::make()
+                    ->title('Los permisos de la reserva '.$reservaActual->numero_reserva.' ya se validaron: está en «'.$reservaActual->estado->value.'».')
+                    ->warning()
+                    ->send();
+
+                $this->redirect(ReservaResource::getUrl('view', ['record' => $reservaActual]));
+
+                return;
+            }
+
+            // La reserva ya no admite la validación: se muestra el aviso en lugar del formulario.
             $this->aviso = $excepcion->getMessage();
 
             Notification::make()
@@ -183,9 +211,9 @@ class ValidarPermisosReserva extends Page
                     TextEntry::make('estado')->label('Estado')->badge()
                         ->state($reserva->estado->value),
                     TextEntry::make('paquete')->label('Paquete')
-                        ->state($reserva->excursion->paquete->nombre),
+                        ->state($this->nombrePaquete),
                     TextEntry::make('fecha_salida')->label('Salida')
-                        ->state($reserva->excursion->fecha_salida)->date('d/m/Y'),
+                        ->state($this->fechaSalida)->date('d/m/Y'),
                     TextEntry::make('fecha_limite_confirmacion')->label('Límite de confirmación')
                         ->state($reserva->fecha_limite_confirmacion)->dateTime('d/m/Y H:i'),
                 ]),

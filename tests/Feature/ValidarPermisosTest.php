@@ -21,6 +21,7 @@ use App\Models\Usuario;
 use DomainException;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -345,6 +346,51 @@ class ValidarPermisosTest extends TestCase
 
         $this->assertSame(EstadoReserva::Cancelada, $this->reserva->fresh()->estado);
         $this->assertPermisos([EstadoPermiso::Pendiente, EstadoPermiso::Pendiente, EstadoPermiso::Pendiente]);
+    }
+
+    public function test_si_la_validacion_llega_dos_veces_la_segunda_no_avisa_un_error(): void
+    {
+        // Dos pestañas abiertas sobre la misma reserva, o un doble clic: la segunda confirmación llega con la reserva ya
+        // validada por la primera.
+        $primera = $this->abrirPagina();
+        $segunda = $this->abrirPagina();
+        $this->marcarTodos($primera, EstadoPermiso::Obtenido);
+        $this->marcarTodos($segunda, EstadoPermiso::NoObtenido);
+
+        $primera->call('confirmarValidacionPermisos');
+
+        $segunda->call('confirmarValidacionPermisos')
+            ->assertNotified('Los permisos de la reserva 000124-7 ya se validaron: está en «Confirmada».')
+            ->assertRedirect(ReservaResource::getUrl('view', ['record' => $this->reserva]));
+
+        // Queda lo que guardó la primera: la segunda no pisó nada.
+        $this->assertSame(EstadoReserva::Confirmada, $this->reserva->fresh()->estado);
+        $this->assertPermisos([EstadoPermiso::Obtenido, EstadoPermiso::Obtenido, EstadoPermiso::Obtenido]);
+    }
+
+    /* -------------------------- Resultado anticipado -------------------------- */
+
+    public function test_el_resultado_anticipado_usa_la_misma_regla_que_la_validacion(): void
+    {
+        $this->assertSame(EstadoReserva::Confirmada, Reserva::anticiparResultadoValidacion([EstadoPermiso::Obtenido, EstadoPermiso::Obtenido]));
+        $this->assertSame(EstadoReserva::SinPermiso, Reserva::anticiparResultadoValidacion([EstadoPermiso::Obtenido, EstadoPermiso::NoObtenido]));
+
+        // Como en todosLosPermisosObtenidos(), sólo «Obtenido» cuenta como permiso obtenido.
+        $this->assertSame(EstadoReserva::SinPermiso, Reserva::anticiparResultadoValidacion([EstadoPermiso::Obtenido, EstadoPermiso::Pendiente]));
+    }
+
+    public function test_marcar_un_integrante_no_vuelve_a_consultar_la_excursion_ni_el_paquete(): void
+    {
+        $pagina = $this->abrirPagina();
+
+        DB::enableQueryLog();
+        $pagina->set('marcas.AAG604118', EstadoPermiso::Obtenido->value)
+            ->assertSee('Camino Inca Clásico')
+            ->assertSee('18/01/2027');
+        $consultas = collect(DB::getQueryLog())->pluck('query');
+        DB::disableQueryLog();
+
+        $this->assertEmpty($consultas->filter(fn (string $consulta) => str_contains($consulta, '"excursion"') || str_contains($consulta, '"paquete"')));
     }
 
     /* --------------------------------- Acceso --------------------------------- */

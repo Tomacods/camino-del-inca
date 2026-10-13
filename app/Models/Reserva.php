@@ -418,15 +418,27 @@ class Reserva extends Model
 
     public function todosLosPermisosObtenidos(): bool
     {
-        return $this->getExcursionistas()
-            ->every(fn (Excursionista $excursionista) => $excursionista->estado_permiso === EstadoPermiso::Obtenido);
+        return self::sonTodosObtenidos($this->getExcursionistas()->pluck('estado_permiso')->all());
     }
 
     // Para la línea que adelanta el resultado en la pantalla, antes de confirmar: el estado en que quedaría la reserva con
-    // estos permisos. Es la misma regla que ejecutarValidacionPermisos(), sobre permisos que todavía no se guardaron.
+    // permisos que todavía no se guardaron. Usa la misma regla que todosLosPermisosObtenidos().
     public static function anticiparResultadoValidacion(array $estadosPermiso): EstadoReserva
     {
-        return in_array(EstadoPermiso::NoObtenido, $estadosPermiso, true) ? EstadoReserva::SinPermiso : EstadoReserva::Confirmada;
+        return self::sonTodosObtenidos($estadosPermiso) ? EstadoReserva::Confirmada : EstadoReserva::SinPermiso;
+    }
+
+    // Sólo CU-04 saca a una reserva de «Pendiente» hacia «Confirmada» o «Sin Permiso»: si está en uno de esos dos, sus
+    // permisos ya se validaron. La pantalla lo usa para no avisar un error cuando la misma validación llega dos veces.
+    public function tienePermisosValidados(): bool
+    {
+        return $this->validarEstado([EstadoReserva::Confirmada, EstadoReserva::SinPermiso]);
+    }
+
+    // La regla de la validación, en un solo lugar para los permisos guardados y los que todavía no se guardaron.
+    private static function sonTodosObtenidos(array $estadosPermiso): bool
+    {
+        return collect($estadosPermiso)->every(fn (EstadoPermiso $estadoPermiso) => $estadoPermiso === EstadoPermiso::Obtenido);
     }
 
     // A3 y plazo vencido. Lo controlan los tres pasos que escriben o muestran la validación, no sólo el primero: así una
