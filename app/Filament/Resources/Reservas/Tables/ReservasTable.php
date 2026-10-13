@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Reservas\Tables;
 
 use App\Enums\EstadoReserva;
 use App\Enums\TipoServicio;
+use App\Filament\Resources\Reservas\Pages\ValidarPermisosReserva;
 use App\Models\Guia;
 use App\Models\Paquete;
 use Filament\Actions\ViewAction;
@@ -76,6 +77,7 @@ class ReservasTable
             ])
             ->recordActions([
                 ViewAction::make()->label('Ver'),
+                ValidarPermisosReserva::accionValidarPermisos(),
             ]);
     }
 

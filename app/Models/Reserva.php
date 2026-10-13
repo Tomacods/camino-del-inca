@@ -11,6 +11,7 @@ use App\Enums\TipoServicio;
 use App\Jobs\LiberarCupoRetenido;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -345,6 +346,114 @@ class Reserva extends Model
     {
         $this->estado_saldo = EstadoSaldo::Abonado;
         $this->save();
+    }
+
+    /* ------------------------- CU-04 Validar permisos ------------------------- */
+
+    public static function buscarReserva(string $numeroReserva): ?self
+    {
+        return self::firstWhere('numero_reserva', $numeroReserva);
+    }
+
+    // Paso 2 y A3: devuelve los datos de los integrantes si la reserva todavía admite la validación. Si no, lanza
+    // DomainException con el aviso para el administrador, como iniciarPagoSaldo() de CU-16. Además de A3, se controla la
+    // fecha límite de confirmación: la regla de negocio no admite validar una reserva con el plazo vencido.
+    public function iniciarValidacionPermisos(): array
+    {
+        $this->verificarAdmiteValidacionPermisos();
+
+        return $this->getExcursionistas()
+            ->map(fn (Excursionista $excursionista) => $excursionista->consultarDatosExcursionistas())
+            ->all();
+    }
+
+    // Devuelve la relación ya cargada: registrarPermiso() y todosLosPermisosObtenidos() trabajan sobre los mismos
+    // integrantes, así el resultado ve los permisos recién registrados sin volver a leerlos.
+    public function getExcursionistas(): Collection
+    {
+        return $this->excursionistas;
+    }
+
+    // Pública porque también la va a necesitar la cancelación por falta de confirmación (CU-26). Vence a las 23:59:59 de
+    // ese día, como fecha_limite_saldo: hasta ese segundo, todavía se puede validar.
+    public function verificarFechaLimiteConfirmacion(): bool
+    {
+        return now()->lessThanOrEqualTo($this->fecha_limite_confirmacion);
+    }
+
+    // Paso 3, para un integrante. Sólo asigna y guarda el permiso: la reserva cambia de estado en
+    // ejecutarValidacionPermisos(). «Pendiente» no es un resultado de la validación.
+    public function registrarPermiso(string $documentoPasaporte, EstadoPermiso $estadoPermiso): void
+    {
+        $this->verificarAdmiteValidacionPermisos();
+
+        if ($estadoPermiso === EstadoPermiso::Pendiente) {
+            throw new DomainException('El permiso sólo se puede registrar como «'.EstadoPermiso::Obtenido->value.'» o «'.EstadoPermiso::NoObtenido->value.'».');
+        }
+
+        // Comparación estricta: con == PHP toma «012345» y «12345» como el mismo número.
+        $excursionista = $this->getExcursionistas()
+            ->first(fn (Excursionista $integrante) => $integrante->documento_pasaporte === $documentoPasaporte);
+
+        if ($excursionista === null) {
+            throw new DomainException('El documento '.$documentoPasaporte.' no es de un integrante de la reserva '.$this->numero_reserva.'.');
+        }
+
+        $excursionista->actualizarPermiso($estadoPermiso);
+    }
+
+    // Pasos 4 y 5 y A1. No hay confirmaciones parciales: si a algún integrante todavía no se le registró el permiso, no
+    // cambia nada. El cupo no se toca: «Sin Permiso» sigue ocupando lugar en la excursión.
+    public function ejecutarValidacionPermisos(): void
+    {
+        $this->verificarAdmiteValidacionPermisos();
+
+        if ($this->getExcursionistas()->contains(fn (Excursionista $excursionista) => $excursionista->estado_permiso === EstadoPermiso::Pendiente)) {
+            throw new DomainException('Falta registrar el permiso de algún integrante de la reserva '.$this->numero_reserva.'.');
+        }
+
+        $this->estado = $this->todosLosPermisosObtenidos() ? EstadoReserva::Confirmada : EstadoReserva::SinPermiso;
+        $this->save();
+    }
+
+    public function todosLosPermisosObtenidos(): bool
+    {
+        return self::sonTodosObtenidos($this->getExcursionistas()->pluck('estado_permiso')->all());
+    }
+
+    // Para la línea que adelanta el resultado en la pantalla, antes de confirmar: el estado en que quedaría la reserva con
+    // permisos que todavía no se guardaron. Usa la misma regla que todosLosPermisosObtenidos().
+    public static function anticiparResultadoValidacion(array $estadosPermiso): EstadoReserva
+    {
+        return self::sonTodosObtenidos($estadosPermiso) ? EstadoReserva::Confirmada : EstadoReserva::SinPermiso;
+    }
+
+    // Sólo CU-04 saca a una reserva de «Pendiente» hacia «Confirmada» o «Sin Permiso»: si está en uno de esos dos, sus
+    // permisos ya se validaron. La pantalla lo usa para no avisar un error cuando la misma validación llega dos veces.
+    public function tienePermisosValidados(): bool
+    {
+        return $this->validarEstado([EstadoReserva::Confirmada, EstadoReserva::SinPermiso]);
+    }
+
+    // La regla de la validación, en un solo lugar para los permisos guardados y los que todavía no se guardaron.
+    private static function sonTodosObtenidos(array $estadosPermiso): bool
+    {
+        return collect($estadosPermiso)->every(fn (EstadoPermiso $estadoPermiso) => $estadoPermiso === EstadoPermiso::Obtenido);
+    }
+
+    // A3 y plazo vencido. Lo controlan los tres pasos que escriben o muestran la validación, no sólo el primero: así una
+    // reserva «Cancelada» no puede volver a «Confirmada» aunque alguien llame a registrarPermiso() o a
+    // ejecutarValidacionPermisos() sin pasar antes por iniciarValidacionPermisos().
+    private function verificarAdmiteValidacionPermisos(): void
+    {
+        if (! $this->validarEstado([EstadoReserva::Pendiente])) {
+            throw new DomainException('La reserva '.$this->numero_reserva.' está en «'.$this->estado->value.'» y ya no admite validación de permisos.');
+        }
+
+        if (! $this->verificarFechaLimiteConfirmacion()) {
+            throw new DomainException('El plazo para confirmar los permisos de la reserva '.$this->numero_reserva.' venció el '
+                .$this->fecha_limite_confirmacion->format('d/m/Y').': ya no admite validación de permisos.');
+        }
     }
 
     /* ----------------------------- CU-21 Cancelar ----------------------------- */
