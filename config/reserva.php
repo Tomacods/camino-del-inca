@@ -79,7 +79,7 @@ return [
     |
     */
 
-    'minutos_vigencia_pago_saldo' => 30,
+    'minutos_vigencia_pago_saldo' => 5,
 
     /*
     |--------------------------------------------------------------------------

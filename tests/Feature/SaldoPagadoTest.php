@@ -270,7 +270,7 @@ class SaldoPagadoTest extends TestCase
 
     public function test_si_el_cliente_pago_a_tiempo_se_registra_aunque_vuelva_despues_de_la_fecha_limite(): void
     {
-        // Confirmó el 01/01/2027 a las 23:50 (el pedido de cobro vence a las 23:59:59), pagó a las 23:58 y volvió después
+        // Confirmó el 01/01/2027 a las 23:57 (el pedido de cobro vence a las 23:59:59), pagó a las 23:59 y volvió después
         // de la medianoche: Mercado Pago aprobó, así que pagó a tiempo.
         $this->darAcceso();
         $this->travelTo(Carbon::parse('2027-01-02 00:00:30'));

@@ -43,7 +43,7 @@ class PagarSaldoTest extends TestCase
 
         config(['services.mercadopago.access_token' => 'TOKEN-DE-PRUEBA']);
         // Un plazo fijo para la prueba, así no depende de un cambio en la configuración.
-        config(['reserva.minutos_vigencia_pago_saldo' => 30]);
+        config(['reserva.minutos_vigencia_pago_saldo' => 5]);
 
         $this->reserva = $this->crearReservaConfirmada();
         $this->mercadoPago = MercadoPagoDePrueba::instalar();
@@ -168,9 +168,9 @@ class PagarSaldoTest extends TestCase
             'failure' => url('/mi-reserva/000125-9/saldo-pagado'),
             'pending' => url('/mi-reserva/000125-9/saldo-pagado'),
         ], $datos['back_urls']);
-        // Vence a los 30 minutos.
+        // Vence a los 5 minutos.
         $this->assertTrue($datos['expires']);
-        $this->assertSame('2026-10-13T10:30:00.000-03:00', $datos['expiration_date_to']);
+        $this->assertSame('2026-10-13T10:05:00.000-03:00', $datos['expiration_date_to']);
 
         // Derivar no registra nada: el pago se registra a la vuelta, si Mercado Pago lo aprueba.
         $this->assertSame(1, Pago::count());
@@ -194,7 +194,7 @@ class PagarSaldoTest extends TestCase
 
     public function test_con_la_fecha_limite_mas_cerca_el_pedido_vence_en_ella(): void
     {
-        $this->travelTo(Carbon::parse('2027-01-01 23:45:00'));
+        $this->travelTo(Carbon::parse('2027-01-01 23:57:00'));
         $this->darAcceso();
         $this->mercadoPago->responder(['id' => '123-abc', 'init_point' => self::DIRECCION_MERCADO_PAGO]);
 
