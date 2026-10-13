@@ -68,11 +68,18 @@ class ConsultarReservaTest extends TestCase
 
     public function test_las_opciones_sin_pantalla_se_muestran_deshabilitadas(): void
     {
-        $this->consultarReserva('000125-9')
-            ->assertSee('Pagar saldo')
-            ->assertSee('Modificar reserva')
-            ->assertSee('Disponible próximamente')
+        $componente = $this->consultarReserva('000125-9')
+            ->assertSeeHtmlInOrder(['disabled="disabled"', 'Modificar reserva', 'Disponible próximamente'])
             ->assertSeeHtml('href="/mi-reserva/000125-9/cancelar"');
+
+        // Sólo Modificar reserva: Pagar saldo ya tiene pantalla.
+        $this->assertSame(1, substr_count($componente->html(), 'Disponible próximamente'));
+    }
+
+    public function test_pagar_saldo_lleva_a_su_pantalla(): void
+    {
+        $this->consultarReserva('000125-9')
+            ->assertSeeHtmlInOrder(['<a href="/mi-reserva/000125-9/pagar-saldo"', 'Pagar saldo', '</a>']);
     }
 
     public function test_encuentra_la_reserva_aunque_el_correo_tenga_otras_mayusculas(): void
