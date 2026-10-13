@@ -1,4 +1,9 @@
 {{-- Muestrario de los componentes del portal. Sólo existe en el entorno local (ver routes/web.php). --}}
+@php
+    $minutosRetencion = config('reserva.minutos_retencion');
+    $plazoRetencion = $minutosRetencion === 1 ? '1 minuto' : $minutosRetencion.' minutos';
+@endphp
+
 <x-layouts::app title="Guía visual">
     <h1 class="text-4xl font-bold tracking-tight">Guía visual del portal</h1>
     <p class="mt-3 max-w-[65ch] text-texto-secundario">
@@ -31,7 +36,7 @@
         <section>
             <h2 class="mb-4 text-2xl font-semibold">Avisos</h2>
             <div class="grid max-w-xl gap-4">
-                <x-aviso titulo="Tu lugar está reservado">Tenés 5 minutos para completar el pago.</x-aviso>
+                <x-aviso titulo="Tu lugar está reservado">Tenés {{ $plazoRetencion }} para completar el pago.</x-aviso>
                 <x-aviso>Te enviamos el número de reserva por correo.</x-aviso>
                 <x-aviso tipo="error" titulo="No pudimos registrar el pago">Probá de nuevo en unos minutos.</x-aviso>
             </div>
