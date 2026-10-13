@@ -59,9 +59,9 @@ class ValidarPermisosTest extends TestCase
         $this->abrirPagina()
             ->assertSee('Lucía Fernández')
             ->assertSee('AAG611025')
-            ->set('marcas.AAG604118', EstadoPermiso::Obtenido->value)
-            ->set('marcas.AAG604119', EstadoPermiso::Obtenido->value)
-            ->set('marcas.AAG611025', EstadoPermiso::Obtenido->value)
+            ->set('marcas.0', EstadoPermiso::Obtenido->value)
+            ->set('marcas.1', EstadoPermiso::Obtenido->value)
+            ->set('marcas.2', EstadoPermiso::Obtenido->value)
             ->assertSee('todos los integrantes obtuvieron el permiso')
             ->callAction($this->accionConfirmar())
             ->assertHasNoErrors()
@@ -77,9 +77,9 @@ class ValidarPermisosTest extends TestCase
     public function test_si_uno_no_obtuvo_el_permiso_la_reserva_completa_queda_sin_permiso(): void
     {
         $this->abrirPagina()
-            ->set('marcas.AAG604118', EstadoPermiso::Obtenido->value)
-            ->set('marcas.AAG604119', EstadoPermiso::NoObtenido->value)
-            ->set('marcas.AAG611025', EstadoPermiso::Obtenido->value)
+            ->set('marcas.0', EstadoPermiso::Obtenido->value)
+            ->set('marcas.1', EstadoPermiso::NoObtenido->value)
+            ->set('marcas.2', EstadoPermiso::Obtenido->value)
             ->assertSee('Resultado: 1 integrante(s) sin permiso. Al confirmar, la reserva completa pasa a «Sin Permiso».')
             ->callAction($this->accionConfirmar())
             ->assertNotified('Reserva 000124-7 en «Sin Permiso».')
@@ -94,9 +94,9 @@ class ValidarPermisosTest extends TestCase
     public function test_cancelar_no_guarda_nada(): void
     {
         $this->abrirPagina()
-            ->set('marcas.AAG604118', EstadoPermiso::Obtenido->value)
-            ->set('marcas.AAG604119', EstadoPermiso::NoObtenido->value)
-            ->set('marcas.AAG611025', EstadoPermiso::Obtenido->value)
+            ->set('marcas.0', EstadoPermiso::Obtenido->value)
+            ->set('marcas.1', EstadoPermiso::NoObtenido->value)
+            ->set('marcas.2', EstadoPermiso::Obtenido->value)
             ->assertActionHasUrl($this->accion('cancelar'), ReservaResource::getUrl('view', ['record' => $this->reserva]));
 
         // Marcar no escribe en la base: sin confirmar, todo sigue como estaba.
@@ -233,8 +233,8 @@ class ValidarPermisosTest extends TestCase
     public function test_no_se_puede_confirmar_si_falta_marcar_a_un_integrante(): void
     {
         $this->abrirPagina()
-            ->set('marcas.AAG604118', EstadoPermiso::Obtenido->value)
-            ->set('marcas.AAG604119', EstadoPermiso::Obtenido->value)
+            ->set('marcas.0', EstadoPermiso::Obtenido->value)
+            ->set('marcas.1', EstadoPermiso::Obtenido->value)
             ->assertSee('Resultado: falta registrar el permiso de 1 integrante(s).')
             ->call('confirmarValidacionPermisos')
             ->assertNotified('Falta registrar el permiso de 1 integrante(s).')
@@ -262,7 +262,7 @@ class ValidarPermisosTest extends TestCase
     {
         $this->abrirPagina()
             ->call('procesarRegistroPermiso', 'AAZ000001', EstadoPermiso::Obtenido->value)
-            ->assertHasErrors(['marcas.AAZ000001'])
+            ->assertHasErrors(['marcas'])
             ->assertSet('permisos', []);
     }
 
@@ -282,8 +282,9 @@ class ValidarPermisosTest extends TestCase
         $this->actingAs($this->administrador);
 
         Livewire::test(ValidarPermisosReserva::class, ['record' => $reserva->getRouteKey()])
-            ->set('marcas.012345', EstadoPermiso::NoObtenido->value)
-            ->set('marcas.12345', EstadoPermiso::Obtenido->value)
+            ->assertSet('integrantes.0.documento_pasaporte', '012345')
+            ->set('marcas.0', EstadoPermiso::NoObtenido->value)
+            ->set('marcas.1', EstadoPermiso::Obtenido->value)
             ->assertHasNoErrors()
             ->call('confirmarValidacionPermisos')
             ->assertNotified('Reserva 000126-0 en «Sin Permiso».');
@@ -291,6 +292,23 @@ class ValidarPermisosTest extends TestCase
         $guardados = Excursionista::where('id_reserva', $reserva->id_reserva)->pluck('estado_permiso', 'documento_pasaporte');
         $this->assertSame(EstadoPermiso::NoObtenido, $guardados['012345']);
         $this->assertSame(EstadoPermiso::Obtenido, $guardados['12345']);
+    }
+
+    // CU-14 no deja cargar puntos, pero la página no depende de eso: el campo se llama con la posición del integrante.
+    public function test_un_documento_con_punto_no_rompe_la_pantalla(): void
+    {
+        $reserva = $this->crearReserva('000126-0', EstadoReserva::Pendiente, ['AB.123'], [['Ana', 'Paz']]);
+
+        $this->actingAs($this->administrador);
+
+        Livewire::test(ValidarPermisosReserva::class, ['record' => $reserva->getRouteKey()])
+            ->set('marcas.0', EstadoPermiso::Obtenido->value)
+            ->assertHasNoErrors()
+            ->assertSet('permisos', ['AB.123' => EstadoPermiso::Obtenido->value])
+            ->call('confirmarValidacionPermisos')
+            ->assertNotified('Reserva 000126-0 en «Confirmada».');
+
+        $this->assertSame(EstadoPermiso::Obtenido, Excursionista::where('id_reserva', $reserva->id_reserva)->value('estado_permiso'));
     }
 
     public function test_el_modelo_rechaza_un_documento_que_solo_es_igual_como_numero(): void
@@ -306,12 +324,12 @@ class ValidarPermisosTest extends TestCase
     public function test_el_valor_pendiente_se_rechaza(): void
     {
         $this->abrirPagina()
-            ->set('marcas.AAG604118', EstadoPermiso::Pendiente->value)
-            ->assertHasErrors(['marcas.AAG604118'])
+            ->set('marcas.0', EstadoPermiso::Pendiente->value)
+            ->assertHasErrors(['marcas.0'])
             ->call('procesarRegistroPermiso', 'AAG604119', EstadoPermiso::Pendiente->value)
-            ->assertHasErrors(['marcas.AAG604119'])
+            ->assertHasErrors(['marcas.1'])
             ->call('procesarRegistroPermiso', 'AAG611025', 'Aprobado')
-            ->assertHasErrors(['marcas.AAG611025'])
+            ->assertHasErrors(['marcas.2'])
             ->assertSet('permisos', []);
     }
 
@@ -384,7 +402,7 @@ class ValidarPermisosTest extends TestCase
         $pagina = $this->abrirPagina();
 
         DB::enableQueryLog();
-        $pagina->set('marcas.AAG604118', EstadoPermiso::Obtenido->value)
+        $pagina->set('marcas.0', EstadoPermiso::Obtenido->value)
             ->assertSee('Camino Inca Clásico')
             ->assertSee('18/01/2027');
         $consultas = collect(DB::getQueryLog())->pluck('query');
@@ -448,13 +466,21 @@ class ValidarPermisosTest extends TestCase
     {
         $this->actingAs($this->administrador);
 
-        return Livewire::test(ValidarPermisosReserva::class, ['record' => $this->reserva->getRouteKey()]);
+        $pagina = Livewire::test(ValidarPermisosReserva::class, ['record' => $this->reserva->getRouteKey()]);
+
+        // Cada campo se llama con la posición del integrante: marcas.0 es el primero de self::DOCUMENTOS, y así. Con el
+        // aviso de A3 no hay integrantes.
+        if ($pagina->get('aviso') === null) {
+            $this->assertSame(self::DOCUMENTOS, array_column($pagina->get('integrantes'), 'documento_pasaporte'));
+        }
+
+        return $pagina;
     }
 
     private function marcarTodos($pagina, EstadoPermiso $estadoPermiso): void
     {
-        foreach (self::DOCUMENTOS as $documento) {
-            $pagina->set('marcas.'.$documento, $estadoPermiso->value);
+        foreach (array_keys(self::DOCUMENTOS) as $posicion) {
+            $pagina->set('marcas.'.$posicion, $estadoPermiso->value);
         }
     }
 

@@ -105,17 +105,20 @@ class ValidarPermisosReserva extends Page
     // Paso 3, por cada integrante. Sólo valida el formato y lo anota en la página: no escribe en la base (A2).
     public function procesarRegistroPermiso(string $documentoPasaporte, ?string $estadoPermiso): void
     {
+        // El campo de cada integrante es su posición en $integrantes: el error se muestra debajo de sus botones.
+        $posicion = array_search($documentoPasaporte, array_column($this->integrantes, 'documento_pasaporte'), true);
+
+        if ($posicion === false) {
+            throw ValidationException::withMessages([
+                'marcas' => 'Ese documento no es de un integrante de esta reserva.',
+            ]);
+        }
+
         $estado = EstadoPermiso::tryFrom((string) $estadoPermiso);
 
         if (! in_array($estado, [EstadoPermiso::Obtenido, EstadoPermiso::NoObtenido], true)) {
             throw ValidationException::withMessages([
-                'marcas.'.$documentoPasaporte => 'Elegí «Obtenido» o «No obtenido».',
-            ]);
-        }
-
-        if (! in_array($documentoPasaporte, array_column($this->integrantes, 'documento_pasaporte'), true)) {
-            throw ValidationException::withMessages([
-                'marcas.'.$documentoPasaporte => 'Ese documento no es de un integrante de esta reserva.',
+                'marcas.'.$posicion => 'Elegí «Obtenido» o «No obtenido».',
             ]);
         }
 
@@ -176,11 +179,8 @@ class ValidarPermisosReserva extends Page
             return;
         }
 
-        if ($reserva->estado === EstadoReserva::Confirmada) {
-            // Paso 6: acá se invoca Notificar Cliente (CU-13) con el tipo «Permisos Obtenidos», cuando exista.
-        } else {
-            // A1: acá se invoca Notificar Cliente (CU-13) con el tipo «Permisos Rechazados», cuando exista.
-        }
+        // Paso 6 y A1: acá se invoca Notificar Cliente (CU-13) con el tipo «Permisos Obtenidos» o «Permisos Rechazados»,
+        // según el estado final de la reserva, cuando exista.
 
         Notification::make()
             ->title('Reserva '.$reserva->numero_reserva.' en «'.$reserva->estado->value.'».')
@@ -248,15 +248,17 @@ class ValidarPermisosReserva extends Page
         ]);
     }
 
-    // Una fila por integrante, con los botones «Obtenido» y «No obtenido».
+    // Una fila por integrante, con los botones «Obtenido» y «No obtenido». Cada campo se llama con la posición del
+    // integrante (marcas.0, marcas.1, ...) y no con su documento: el nombre arma la ruta del dato, y un documento con
+    // un punto se tomaría como un nivel más.
     public function form(Schema $schema): Schema
     {
         return $schema
             ->statePath('marcas')
-            ->components(array_map(fn (array $integrante) => Grid::make(['default' => 1, 'md' => 3])->schema([
+            ->components(array_map(fn (array $integrante, int $posicion) => Grid::make(['default' => 1, 'md' => 3])->schema([
                 Text::make($integrante['nombre'].' '.$integrante['apellido'])->weight(FontWeight::SemiBold),
                 Text::make('Documento '.$integrante['documento_pasaporte']),
-                ToggleButtons::make($integrante['documento_pasaporte'])
+                ToggleButtons::make((string) $posicion)
                     ->label('Permiso de '.$integrante['nombre'].' '.$integrante['apellido'])
                     ->hiddenLabel()
                     ->inline()
@@ -270,7 +272,7 @@ class ValidarPermisosReserva extends Page
                     ])
                     ->live()
                     ->afterStateUpdated(fn (?string $state) => $this->procesarRegistroPermiso($integrante['documento_pasaporte'], $state)),
-            ]), $this->integrantes));
+            ]), $this->integrantes, array_keys($this->integrantes)));
     }
 
     private function contarSinRegistrar(): int
