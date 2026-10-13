@@ -140,6 +140,39 @@ class ValidarPermisosTest extends TestCase
         $this->reserva->fresh()->iniciarValidacionPermisos();
     }
 
+    #[DataProvider('estadosQueNoAdmitenValidacion')]
+    public function test_el_modelo_no_registra_permisos_si_la_reserva_no_esta_pendiente(EstadoReserva $estado): void
+    {
+        $this->reserva->update(['estado' => $estado]);
+        $reserva = $this->reserva->fresh();
+
+        try {
+            $reserva->registrarPermiso('AAG604118', EstadoPermiso::Obtenido);
+            $this->fail('Se registró un permiso en una reserva «'.$estado->value.'».');
+        } catch (DomainException $excepcion) {
+            $this->assertStringContainsString('ya no admite validación de permisos', $excepcion->getMessage());
+        }
+
+        $this->assertPermisos([EstadoPermiso::Pendiente, EstadoPermiso::Pendiente, EstadoPermiso::Pendiente]);
+    }
+
+    #[DataProvider('estadosQueNoAdmitenValidacion')]
+    public function test_el_modelo_no_cambia_el_estado_si_la_reserva_no_esta_pendiente(EstadoReserva $estado): void
+    {
+        // Todos los permisos ya registrados: lo único que frena el cambio de estado es el estado de la reserva.
+        Excursionista::where('id_reserva', $this->reserva->id_reserva)->update(['estado_permiso' => EstadoPermiso::Obtenido]);
+        $this->reserva->update(['estado' => $estado]);
+
+        try {
+            $this->reserva->fresh()->ejecutarValidacionPermisos();
+            $this->fail('Una reserva «'.$estado->value.'» cambió de estado.');
+        } catch (DomainException $excepcion) {
+            $this->assertStringContainsString('ya no admite validación de permisos', $excepcion->getMessage());
+        }
+
+        $this->assertSame($estado, $this->reserva->fresh()->estado);
+    }
+
     /* ---------------------- Fecha límite de confirmación ---------------------- */
 
     public function test_con_el_plazo_de_confirmacion_vencido_no_se_valida(): void
@@ -159,6 +192,26 @@ class ValidarPermisosTest extends TestCase
         $this->travelTo('2026-12-18 23:59:59');
 
         $this->assertCount(3, $this->reserva->iniciarValidacionPermisos());
+    }
+
+    public function test_el_modelo_no_registra_ni_confirma_con_el_plazo_vencido(): void
+    {
+        $this->travelTo('2026-12-19 00:00:00');
+
+        foreach ([
+            fn () => $this->reserva->registrarPermiso('AAG604118', EstadoPermiso::Obtenido),
+            fn () => $this->reserva->ejecutarValidacionPermisos(),
+        ] as $paso) {
+            try {
+                $paso();
+                $this->fail('Se validó una reserva con el plazo vencido.');
+            } catch (DomainException $excepcion) {
+                $this->assertStringContainsString('venció el 18/12/2026', $excepcion->getMessage());
+            }
+        }
+
+        $this->assertSame(EstadoReserva::Pendiente, $this->reserva->fresh()->estado);
+        $this->assertPermisos([EstadoPermiso::Pendiente, EstadoPermiso::Pendiente, EstadoPermiso::Pendiente]);
     }
 
     public function test_si_el_plazo_vence_con_la_pagina_abierta_no_se_valida(): void
@@ -218,6 +271,35 @@ class ValidarPermisosTest extends TestCase
         $this->expectExceptionMessage('El documento AAZ000001 no es de un integrante de la reserva 000124-7.');
 
         $this->reserva->registrarPermiso('AAZ000001', EstadoPermiso::Obtenido);
+    }
+
+    // Documentos que PHP, comparando con ==, toma por el mismo número. CU-14 los admite: sólo pide letras y números.
+    public function test_documentos_numericos_parecidos_no_se_confunden(): void
+    {
+        $reserva = $this->crearReserva('000126-0', EstadoReserva::Pendiente, ['012345', '12345'], [['Ana', 'Paz'], ['Luis', 'Paz']]);
+
+        $this->actingAs($this->administrador);
+
+        Livewire::test(ValidarPermisosReserva::class, ['record' => $reserva->getRouteKey()])
+            ->set('marcas.012345', EstadoPermiso::NoObtenido->value)
+            ->set('marcas.12345', EstadoPermiso::Obtenido->value)
+            ->assertHasNoErrors()
+            ->call('confirmarValidacionPermisos')
+            ->assertNotified('Reserva 000126-0 en «Sin Permiso».');
+
+        $guardados = Excursionista::where('id_reserva', $reserva->id_reserva)->pluck('estado_permiso', 'documento_pasaporte');
+        $this->assertSame(EstadoPermiso::NoObtenido, $guardados['012345']);
+        $this->assertSame(EstadoPermiso::Obtenido, $guardados['12345']);
+    }
+
+    public function test_el_modelo_rechaza_un_documento_que_solo_es_igual_como_numero(): void
+    {
+        $reserva = $this->crearReserva('000126-0', EstadoReserva::Pendiente, ['012345']);
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('El documento 12345 no es de un integrante de la reserva 000126-0.');
+
+        $reserva->registrarPermiso('12345', EstadoPermiso::Obtenido);
     }
 
     public function test_el_valor_pendiente_se_rechaza(): void

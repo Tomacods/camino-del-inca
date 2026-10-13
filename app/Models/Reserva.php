@@ -360,14 +360,7 @@ class Reserva extends Model
     // fecha límite de confirmación: la regla de negocio no admite validar una reserva con el plazo vencido.
     public function iniciarValidacionPermisos(): array
     {
-        if (! $this->validarEstado([EstadoReserva::Pendiente])) {
-            throw new DomainException('La reserva '.$this->numero_reserva.' está en «'.$this->estado->value.'» y ya no admite validación de permisos.');
-        }
-
-        if (! $this->verificarFechaLimiteConfirmacion()) {
-            throw new DomainException('El plazo para confirmar los permisos de la reserva '.$this->numero_reserva.' venció el '
-                .$this->fecha_limite_confirmacion->format('d/m/Y').': ya no admite validación de permisos.');
-        }
+        $this->verificarAdmiteValidacionPermisos();
 
         return $this->getExcursionistas()
             ->map(fn (Excursionista $excursionista) => $excursionista->consultarDatosExcursionistas())
@@ -392,11 +385,15 @@ class Reserva extends Model
     // ejecutarValidacionPermisos(). «Pendiente» no es un resultado de la validación.
     public function registrarPermiso(string $documentoPasaporte, EstadoPermiso $estadoPermiso): void
     {
+        $this->verificarAdmiteValidacionPermisos();
+
         if ($estadoPermiso === EstadoPermiso::Pendiente) {
             throw new DomainException('El permiso sólo se puede registrar como «'.EstadoPermiso::Obtenido->value.'» o «'.EstadoPermiso::NoObtenido->value.'».');
         }
 
-        $excursionista = $this->getExcursionistas()->firstWhere('documento_pasaporte', $documentoPasaporte);
+        // Comparación estricta: con == PHP toma «012345» y «12345» como el mismo número.
+        $excursionista = $this->getExcursionistas()
+            ->first(fn (Excursionista $integrante) => $integrante->documento_pasaporte === $documentoPasaporte);
 
         if ($excursionista === null) {
             throw new DomainException('El documento '.$documentoPasaporte.' no es de un integrante de la reserva '.$this->numero_reserva.'.');
@@ -409,6 +406,8 @@ class Reserva extends Model
     // cambia nada. El cupo no se toca: «Sin Permiso» sigue ocupando lugar en la excursión.
     public function ejecutarValidacionPermisos(): void
     {
+        $this->verificarAdmiteValidacionPermisos();
+
         if ($this->getExcursionistas()->contains(fn (Excursionista $excursionista) => $excursionista->estado_permiso === EstadoPermiso::Pendiente)) {
             throw new DomainException('Falta registrar el permiso de algún integrante de la reserva '.$this->numero_reserva.'.');
         }
@@ -428,6 +427,21 @@ class Reserva extends Model
     public static function anticiparResultadoValidacion(array $estadosPermiso): EstadoReserva
     {
         return in_array(EstadoPermiso::NoObtenido, $estadosPermiso, true) ? EstadoReserva::SinPermiso : EstadoReserva::Confirmada;
+    }
+
+    // A3 y plazo vencido. Lo controlan los tres pasos que escriben o muestran la validación, no sólo el primero: así una
+    // reserva «Cancelada» no puede volver a «Confirmada» aunque alguien llame a registrarPermiso() o a
+    // ejecutarValidacionPermisos() sin pasar antes por iniciarValidacionPermisos().
+    private function verificarAdmiteValidacionPermisos(): void
+    {
+        if (! $this->validarEstado([EstadoReserva::Pendiente])) {
+            throw new DomainException('La reserva '.$this->numero_reserva.' está en «'.$this->estado->value.'» y ya no admite validación de permisos.');
+        }
+
+        if (! $this->verificarFechaLimiteConfirmacion()) {
+            throw new DomainException('El plazo para confirmar los permisos de la reserva '.$this->numero_reserva.' venció el '
+                .$this->fecha_limite_confirmacion->format('d/m/Y').': ya no admite validación de permisos.');
+        }
     }
 
     /* ----------------------------- CU-21 Cancelar ----------------------------- */
