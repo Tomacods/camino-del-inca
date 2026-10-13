@@ -1,0 +1,441 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\EstadoPaquete;
+use App\Enums\EstadoPermiso;
+use App\Enums\EstadoReserva;
+use App\Enums\EstadoSaldo;
+use App\Enums\Rol;
+use App\Enums\TipoPago;
+use App\Models\Excursion;
+use App\Models\Guia;
+use App\Models\Pago;
+use App\Models\Paquete;
+use App\Models\Recorrido;
+use App\Models\Reserva;
+use App\Models\Usuario;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Livewire\Livewire;
+use Tests\MercadoPagoDePrueba;
+use Tests\TestCase;
+
+// La vuelta de Mercado Pago del saldo y la pantalla del comprobante (CU-16, pasos 7 a 10 y curso A4), con la reserva
+// 000125-9 de los seeders: Confirmada, total de USD 1.500, la seña de 750 pagada y el saldo que vence el 01/01/2027.
+class SaldoPagadoTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private const NUMERO_OPERACION = '183193192230';
+
+    private const DIRECCION = '/mi-reserva/000125-9/saldo-pagado';
+
+    private Excursion $excursion;
+
+    private Reserva $reserva;
+
+    private MercadoPagoDePrueba $mercadoPago;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->travelTo(Carbon::parse('2026-10-13 10:00:00'));
+
+        config(['services.mercadopago.access_token' => 'TOKEN-DE-PRUEBA']);
+
+        $this->reserva = $this->crearReservaConfirmada();
+        $this->mercadoPago = MercadoPagoDePrueba::instalar();
+    }
+
+    protected function tearDown(): void
+    {
+        MercadoPagoDePrueba::desinstalar();
+
+        parent::tearDown();
+    }
+
+    public function test_con_el_pago_aprobado_registra_el_saldo_y_vuelve_sin_parametros(): void
+    {
+        Log::spy();
+        $this->darAcceso();
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago()->assertRedirect(self::DIRECCION);
+
+        $pago = $this->pagoSaldo();
+        $this->assertSame('750.00', $pago->monto);
+        $this->assertSame('Tarjeta de crédito', $pago->medio_pago);
+        $this->assertSame('2026-10-13', $pago->fecha->toDateString());
+        $this->assertNotNull($pago->comprobante);
+
+        $reserva = $this->reserva->fresh();
+        $this->assertSame(EstadoSaldo::Abonado, $reserva->estado_saldo);
+        $this->assertSame(EstadoReserva::Confirmada, $reserva->estado);
+        $this->assertSame(0.0, $reserva->calcularSaldoPendiente());
+        $this->assertSame('2027-01-01 23:59:59', $reserva->fecha_limite_saldo->format('Y-m-d H:i:s'));
+
+        $this->assertSame(['numero_reserva' => '000125-9', 'numero_operacion' => self::NUMERO_OPERACION], session('saldo_pagado'));
+        Log::shouldHaveReceived('info')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, '000125-9')
+            && str_contains($mensaje, self::NUMERO_OPERACION));
+    }
+
+    public function test_la_pantalla_muestra_el_comprobante_del_saldo(): void
+    {
+        $this->darAcceso();
+        $this->pagarSaldo();
+
+        $comprobante = $this->pagoSaldo()->comprobante;
+
+        $this->get(self::DIRECCION)
+            ->assertOk()
+            ->assertSee('Saldo pagado.')
+            ->assertSeeInOrder(['Reserva', '000125-9'])
+            ->assertSee(EstadoReserva::Confirmada->value)
+            ->assertSee('El saldo quedó «Abonado»: no queda nada por pagar.')
+            ->assertSeeInOrder(['Comprobante', $comprobante->numero_comprobante, '13/10/2026 10:00', TipoPago::Saldo->value, 'Tarjeta de crédito', 'USD 750,00'])
+            ->assertSee('href="/mi-reserva"', false);
+    }
+
+    public function test_el_medio_de_pago_es_el_que_informa_mercado_pago(): void
+    {
+        $this->darAcceso();
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo', 'account_money'));
+
+        $this->volverDeMercadoPago()->assertRedirect(self::DIRECCION);
+
+        $this->assertSame('Dinero en cuenta de Mercado Pago', $this->pagoSaldo()->medio_pago);
+        $this->get(self::DIRECCION)->assertSeeInOrder(['Medio de pago', 'Dinero en cuenta de Mercado Pago']);
+    }
+
+    public function test_despues_de_pagar_mi_reserva_muestra_el_saldo_abonado_y_no_ofrece_pagarlo(): void
+    {
+        $this->darAcceso();
+        $this->pagarSaldo();
+
+        Livewire::test('consultar-reserva')
+            ->assertSee('Abonado · USD 0')
+            ->assertSee(TipoPago::Saldo->value)
+            ->assertDontSee('Pagar saldo')
+            ->assertDontSeeHtml('/pagar-saldo');
+    }
+
+    public function test_con_el_pago_rechazado_no_registra_nada_y_vuelve_al_pago_con_el_aviso(): void
+    {
+        $this->darAcceso();
+        $this->mercadoPago->responder($this->pago('rejected', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago(['status' => 'rejected'])->assertRedirect('/mi-reserva/000125-9/pagar-saldo');
+
+        $this->assertNoSeRegistroElSaldo();
+
+        Livewire::test('pagar-saldo', ['numeroReserva' => '000125-9'])
+            ->assertSee('El pago fue rechazado')
+            ->assertSee('Pagar el saldo con Mercado Pago');
+    }
+
+    public function test_no_se_le_cree_a_la_direccion_si_mercado_pago_dice_que_se_rechazo(): void
+    {
+        $this->darAcceso();
+        $this->mercadoPago->responder($this->pago('rejected', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago(['status' => 'approved', 'collection_status' => 'approved'])
+            ->assertRedirect('/mi-reserva/000125-9/pagar-saldo');
+
+        $this->assertNoSeRegistroElSaldo();
+    }
+
+    public function test_un_pago_del_saldo_de_otra_reserva_no_registra_nada(): void
+    {
+        $this->darAcceso();
+        $otra = $this->crearOtraReserva('000122-3', 'valentina.diaz@mail.com');
+        $this->mercadoPago->responder($this->pago('approved', '000122-3_Saldo'));
+
+        $this->volverDeMercadoPago()
+            ->assertOk()
+            // El número tiene que estar en el aviso: también figura en los datos internos de Livewire, al principio.
+            ->assertSeeInOrder(['No pudimos registrar el pago', 'no corresponde al saldo de la reserva', self::NUMERO_OPERACION]);
+
+        $this->assertNoSeRegistroElSaldo();
+        $this->assertSame(EstadoSaldo::Adeudado, $otra->fresh()->estado_saldo);
+        $this->assertSame(0, $otra->pagos()->count());
+    }
+
+    public function test_un_pago_de_una_reserva_nueva_no_registra_el_saldo(): void
+    {
+        $this->darAcceso();
+
+        // Con la referencia de CU-15, o sin referencia.
+        foreach ([Str::uuid().'_Sena', Str::uuid().'_Total', null] as $referencia) {
+            $this->mercadoPago->responder($this->pago('approved', $referencia));
+
+            $this->volverDeMercadoPago()
+                ->assertOk()
+                ->assertSeeInOrder(['No pudimos registrar el pago', 'Comunicate con la agencia', self::NUMERO_OPERACION]);
+        }
+
+        $this->assertNoSeRegistroElSaldo();
+    }
+
+    public function test_el_saldo_de_esta_reserva_no_se_registra_desde_la_direccion_de_otra(): void
+    {
+        $otra = $this->crearOtraReserva('000122-3', 'valentina.diaz@mail.com');
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago([], '000122-3')
+            ->assertOk()
+            ->assertSee('No pudimos registrar el pago');
+
+        $this->assertNoSeRegistroElSaldo();
+        $this->assertSame(0, $otra->pagos()->count());
+    }
+
+    public function test_con_el_saldo_ya_pagado_un_segundo_pago_no_se_registra_y_muestra_su_numero_de_operacion(): void
+    {
+        $this->darAcceso();
+        $this->pagarSaldo();
+
+        // El cliente también pagó desde otra pestaña: otro pago aprobado, con otro número de operación.
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago(['payment_id' => '183193192231'])
+            ->assertOk()
+            ->assertSeeInOrder(['No pudimos registrar el pago', 'la reserva ya no tenía saldo pendiente', 'La devolución del dinero se gestiona con la agencia', '183193192231']);
+
+        $this->assertSame(1, $this->reserva->pagos()->where('tipo_pago', TipoPago::Saldo)->count());
+    }
+
+    public function test_con_la_reserva_cancelada_mientras_pagaba_no_registra_el_saldo(): void
+    {
+        $this->darAcceso();
+        $this->reserva->update(['estado' => EstadoReserva::Cancelada]);
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago()
+            ->assertOk()
+            ->assertSeeInOrder(['No pudimos registrar el pago', 'La devolución del dinero se gestiona con la agencia', self::NUMERO_OPERACION]);
+
+        $this->assertNoSeRegistroElSaldo();
+    }
+
+    public function test_la_misma_vuelta_dos_veces_registra_un_solo_pago_y_muestra_el_comprobante(): void
+    {
+        $this->darAcceso();
+        $this->pagarSaldo();
+
+        // Atrás y adelante en el navegador: la misma dirección, con el mismo número de operación.
+        $this->volverDeMercadoPago()->assertRedirect(self::DIRECCION);
+
+        $this->get(self::DIRECCION)->assertOk()->assertSee('Saldo pagado.');
+        $this->assertSame(1, $this->reserva->pagos()->where('tipo_pago', TipoPago::Saldo)->count());
+        // Mercado Pago se consultó una sola vez.
+        $this->assertCount(1, $this->mercadoPago->pedidos);
+    }
+
+    public function test_si_mercado_pago_no_responde_ofrece_reintentar_y_al_reintentar_registra(): void
+    {
+        $this->darAcceso();
+        $this->mercadoPago->noResponder();
+
+        $this->volverDeMercadoPago()
+            ->assertOk()
+            ->assertSeeInOrder(['No pudimos confirmar el pago', 'número de operación '.self::NUMERO_OPERACION])
+            ->assertSee('href="'.self::DIRECCION.'?payment_id='.self::NUMERO_OPERACION.'"', false);
+
+        $this->assertNoSeRegistroElSaldo();
+
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+
+        $this->get(self::DIRECCION.'?payment_id='.self::NUMERO_OPERACION)->assertRedirect(self::DIRECCION);
+
+        $this->assertSame(EstadoSaldo::Abonado, $this->reserva->fresh()->estado_saldo);
+    }
+
+    public function test_sin_acceso_en_la_sesion_registra_el_pago_y_no_muestra_los_datos_de_la_reserva(): void
+    {
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago()->assertRedirect(self::DIRECCION);
+
+        $this->assertSame(EstadoSaldo::Abonado, $this->reserva->fresh()->estado_saldo);
+
+        $this->get(self::DIRECCION)
+            ->assertOk()
+            ->assertSee('Registramos tu pago')
+            ->assertSeeInOrder(['El pago del saldo de la reserva N.º', '000125-9', 'quedó registrado'])
+            ->assertSee('href="/mi-reserva"', false)
+            ->assertDontSee('Comprobante')
+            ->assertDontSee('Tarjeta de crédito')
+            ->assertDontSee($this->pagoSaldo()->comprobante->numero_comprobante);
+    }
+
+    public function test_con_el_acceso_de_otra_reserva_no_muestra_los_datos_de_esta(): void
+    {
+        $this->crearOtraReserva('000122-3', 'valentina.diaz@mail.com');
+        $this->darAcceso('valentina.diaz@mail.com', '000122-3');
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago()->assertRedirect(self::DIRECCION);
+
+        $this->get(self::DIRECCION)
+            ->assertSee('Registramos tu pago')
+            ->assertDontSee('Comprobante');
+    }
+
+    public function test_sin_numero_de_operacion_no_consulta_a_mercado_pago_y_vuelve_al_pago_del_saldo(): void
+    {
+        $this->darAcceso();
+
+        // Sin payment_id, con el «null» que manda Mercado Pago cuando el cliente vuelve sin pagar y con uno que no es un
+        // número.
+        foreach ([self::DIRECCION, self::DIRECCION.'?payment_id=null&status=null', self::DIRECCION.'?payment_id=12abc'] as $direccion) {
+            $this->get($direccion)->assertRedirect('/mi-reserva/000125-9/pagar-saldo');
+        }
+
+        $this->assertSame([], $this->mercadoPago->pedidos);
+        $this->assertNoSeRegistroElSaldo();
+    }
+
+    public function test_despues_de_pagar_volver_sin_numero_de_operacion_sigue_mostrando_el_comprobante(): void
+    {
+        $this->darAcceso();
+        $this->pagarSaldo();
+
+        foreach ([self::DIRECCION, self::DIRECCION.'?payment_id=null&status=null'] as $direccion) {
+            $this->get($direccion)
+                ->assertOk()
+                ->assertSee('Saldo pagado.')
+                ->assertSee('Comprobante');
+        }
+
+        $this->assertCount(1, $this->mercadoPago->pedidos);
+    }
+
+    public function test_el_saldo_pagado_de_otra_reserva_no_se_muestra_aca(): void
+    {
+        $this->crearOtraReserva('000122-3', 'valentina.diaz@mail.com');
+        $this->darAcceso();
+        $this->pagarSaldo();
+
+        $this->get('/mi-reserva/000122-3/saldo-pagado')->assertRedirect('/mi-reserva/000122-3/pagar-saldo');
+    }
+
+    // Paga el saldo por el camino normal: pago aprobado y vuelta.
+    private function pagarSaldo(): void
+    {
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+        $this->volverDeMercadoPago()->assertRedirect(self::DIRECCION);
+    }
+
+    private function pagoSaldo(): Pago
+    {
+        return $this->reserva->pagos()->where('tipo_pago', TipoPago::Saldo)->sole();
+    }
+
+    private function assertNoSeRegistroElSaldo(): void
+    {
+        $this->assertSame(0, Pago::where('tipo_pago', TipoPago::Saldo)->count());
+        $this->assertSame(EstadoSaldo::Adeudado, $this->reserva->fresh()->estado_saldo);
+    }
+
+    // Como vuelve Mercado Pago: con el número de operación y lo que dice del pago, que no se cree.
+    private function volverDeMercadoPago(array $parametros = [], string $numeroReserva = '000125-9')
+    {
+        return $this->get('/mi-reserva/'.$numeroReserva.'/saldo-pagado?'
+            .http_build_query($parametros + ['payment_id' => self::NUMERO_OPERACION, 'status' => 'approved']));
+    }
+
+    // Lo que contesta Mercado Pago al consultar el pago.
+    private function pago(string $estado, ?string $referencia, string $tipoPago = 'credit_card'): array
+    {
+        return [
+            'id' => (int) self::NUMERO_OPERACION,
+            'status' => $estado,
+            'external_reference' => $referencia,
+            'payment_type_id' => $tipoPago,
+            'currency_id' => 'ARS',
+            'transaction_amount' => 1095000,
+        ];
+    }
+
+    // Como queda la sesión cuando el cliente consulta su reserva en Mi reserva.
+    private function darAcceso(string $correo = 'federico.rios@mail.com', string $numeroReserva = '000125-9'): void
+    {
+        session(['acceso_reserva' => ['correo' => $correo, 'numeroReserva' => $numeroReserva]]);
+    }
+
+    // La reserva 000125-9 de los seeders.
+    private function crearReservaConfirmada(): Reserva
+    {
+        $recorrido = Recorrido::create(['nombre' => 'Camino Inca de 4 días', 'duracion_dias' => 4, 'cantidad_campings' => 3]);
+
+        $paquete = Paquete::create([
+            'id_recorrido' => $recorrido->id_recorrido,
+            'nombre' => 'Camino Inca Clásico',
+            'precio_base' => 750,
+            'costo_noche_extra_cusco' => 60,
+            'costo_equipo_camping' => 45,
+            'cantidad_porteadores' => 6,
+            'estado' => EstadoPaquete::Activo,
+            'fecha_creacion' => '2026-01-05',
+        ]);
+
+        $usuario = Usuario::create(['correo' => 'guia@caminodelinca.test', 'password' => 'guia1234', 'rol' => Rol::Guia]);
+        Guia::create(['id_usuario' => $usuario->id_usuario, 'nombre' => 'Rosa', 'apellido' => 'Quispe']);
+
+        $this->excursion = Excursion::create([
+            'id_paquete' => $paquete->id_paquete,
+            'id_guia' => $usuario->id_usuario,
+            'fecha_salida' => '2027-02-01',
+            'cupo' => 12,
+            'plazas_retenidas' => 0,
+        ]);
+
+        $reserva = Reserva::create([
+            'id_excursion' => $this->excursion->id_excursion,
+            'numero_reserva' => '000125-9',
+            'correo_electronico' => 'federico.rios@mail.com',
+            'fecha_reserva' => '2026-10-01 18:20:00',
+            'estado' => EstadoReserva::Confirmada,
+            'estado_saldo' => EstadoSaldo::Adeudado,
+            'noches_extra_antes' => 0,
+            'noches_extra_despues' => 0,
+            'fecha_limite_saldo' => '2027-01-01 23:59:59',
+            'fecha_limite_confirmacion' => '2027-01-01 23:59:59',
+        ]);
+
+        foreach ([['Federico', 'AAH715300'], ['Lorena', 'AAH715301']] as [$nombre, $documento]) {
+            $reserva->excursionistas()->create([
+                'nombre' => $nombre,
+                'apellido' => 'Ríos',
+                'documento_pasaporte' => $documento,
+                'equipo_camping' => false,
+                'estado_permiso' => EstadoPermiso::Obtenido,
+            ]);
+        }
+
+        Pago::registrarPago($reserva, 750, '2026-10-01 18:20:00', 'Tarjeta de crédito', TipoPago::Sena);
+
+        return $reserva;
+    }
+
+    // Otra reserva confirmada con el saldo adeudado, de otro cliente, en la misma salida.
+    private function crearOtraReserva(string $numeroReserva, string $correo): Reserva
+    {
+        return Reserva::create([
+            'id_excursion' => $this->excursion->id_excursion,
+            'numero_reserva' => $numeroReserva,
+            'correo_electronico' => $correo,
+            'fecha_reserva' => '2026-09-10 16:45:00',
+            'estado' => EstadoReserva::Confirmada,
+            'estado_saldo' => EstadoSaldo::Adeudado,
+            'noches_extra_antes' => 0,
+            'noches_extra_despues' => 0,
+            'fecha_limite_saldo' => '2027-01-01 23:59:59',
+            'fecha_limite_confirmacion' => '2027-01-01 23:59:59',
+        ]);
+    }
+}
