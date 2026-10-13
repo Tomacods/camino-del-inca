@@ -227,6 +227,47 @@ class SaldoPagadoTest extends TestCase
         $this->assertSame(1, $this->reserva->pagos()->where('tipo_pago', TipoPago::Saldo)->count());
     }
 
+    public function test_si_otra_pestana_registra_el_saldo_mientras_tanto_avisa_que_ya_estaba_pagado(): void
+    {
+        $this->darAcceso();
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+
+        // La otra pestaña registra su pago justo después de que esta vuelta buscó la reserva, que todavía decía «Adeudado».
+        // retrieved se dispara cada vez que se lee una reserva de la base: la primera es la búsqueda de esta vuelta.
+        $otraPestanaPago = false;
+        Reserva::retrieved(function (Reserva $reserva) use (&$otraPestanaPago) {
+            if (! $otraPestanaPago && $reserva->numero_reserva === '000125-9') {
+                $otraPestanaPago = true;
+                Pago::registrarPagoSaldo($reserva, 'Tarjeta de débito');
+            }
+        });
+
+        $this->volverDeMercadoPago()
+            ->assertOk()
+            ->assertSee('El saldo ya estaba pagado')
+            ->assertDontSee('No pudimos registrar el pago');
+
+        $this->assertTrue($otraPestanaPago);
+        $this->assertSame(1, $this->reserva->pagos()->where('tipo_pago', TipoPago::Saldo)->count());
+    }
+
+    public function test_el_numero_de_operacion_ya_registrado_no_sirve_en_la_direccion_de_otra_reserva(): void
+    {
+        $this->crearOtraReserva('000122-3', 'valentina.diaz@mail.com');
+        $this->darAcceso();
+        $this->pagarSaldo();
+
+        // El mismo payment_id, pegado a mano en la dirección de otra reserva: no es la misma vuelta, se consulta y no
+        // corresponde.
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago([], '000122-3')
+            ->assertOk()
+            ->assertSeeInOrder(['no corresponde al saldo de la reserva', '000122-3', self::NUMERO_OPERACION]);
+
+        $this->assertCount(2, $this->mercadoPago->pedidos);
+    }
+
     public function test_si_el_cliente_pago_a_tiempo_se_registra_aunque_vuelva_despues_de_la_fecha_limite(): void
     {
         // Confirmó el 01/01/2027 a las 23:50 (el pedido de cobro vence a las 23:59:59), pagó a las 23:58 y volvió después
@@ -321,9 +362,14 @@ class SaldoPagadoTest extends TestCase
     {
         $this->darAcceso();
 
-        // Sin payment_id, con el «null» que manda Mercado Pago cuando el cliente vuelve sin pagar y con uno que no es un
-        // número.
-        foreach ([self::DIRECCION, self::DIRECCION.'?payment_id=null&status=null', self::DIRECCION.'?payment_id=12abc'] as $direccion) {
+        // Sin payment_id, con el «null» que manda Mercado Pago cuando el cliente vuelve sin pagar, con uno que no es un
+        // número y con uno de 19 cifras, que no entra en un entero.
+        foreach ([
+            self::DIRECCION,
+            self::DIRECCION.'?payment_id=null&status=null',
+            self::DIRECCION.'?payment_id=12abc',
+            self::DIRECCION.'?payment_id=9999999999999999999',
+        ] as $direccion) {
             $this->get($direccion)->assertRedirect('/mi-reserva/000125-9/pagar-saldo');
         }
 

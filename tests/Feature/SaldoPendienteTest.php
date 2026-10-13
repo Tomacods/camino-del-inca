@@ -47,12 +47,12 @@ class SaldoPendienteTest extends TestCase
         $this->assertSame('2027-01-01 23:59:59', $saldo['fecha_limite_saldo']->format('Y-m-d H:i:s'));
     }
 
-    public function test_el_saldo_conserva_los_centavos(): void
+    public function test_el_saldo_conserva_los_centavos_y_se_redondea_a_dos_decimales(): void
     {
-        // Como si la seña hubiera sido de 749,50: el saldo es 750,50.
-        $this->reserva->pagos()->update(['monto' => 749.5]);
+        // Como si la seña hubiera sido de 128,11: el saldo es 1.371,89. Sin redondear, la resta da 1371.8899999999999.
+        $this->reserva->pagos()->update(['monto' => 128.11]);
 
-        $this->assertSame(750.5, $this->reserva->fresh()->iniciarPagoSaldo()['saldo_pendiente']);
+        $this->assertSame(1371.89, $this->reserva->fresh()->iniciarPagoSaldo()['saldo_pendiente']);
     }
 
     public function test_con_el_saldo_abonado_no_hay_saldo_pendiente(): void
@@ -196,6 +196,17 @@ class SaldoPendienteTest extends TestCase
         $this->assertNull(Pago::registrarPagoSaldo($leidaAntes, 'Tarjeta de crédito'));
 
         $this->assertSame(1, $this->reserva->pagos()->where('tipo_pago', TipoPago::Saldo)->count());
+    }
+
+    public function test_registrar_pago_saldo_con_el_saldo_abonado_no_registra_nada_aunque_quede_saldo(): void
+    {
+        // El monto total sale de los precios actuales del paquete: si cambiaran después de pagar, la cuenta podría dar
+        // saldo con la reserva ya «Abonado». Lo que manda es estado_saldo.
+        $this->reserva->update(['estado_saldo' => EstadoSaldo::Abonado]);
+
+        $this->assertNull(Pago::registrarPagoSaldo($this->reserva, 'Tarjeta de crédito'));
+
+        $this->assertSame(0, Pago::where('tipo_pago', TipoPago::Saldo)->count());
     }
 
     public function test_registrar_pago_saldo_sin_nada_por_pagar_no_registra_nada(): void

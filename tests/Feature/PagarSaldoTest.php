@@ -177,6 +177,21 @@ class PagarSaldoTest extends TestCase
         $this->assertSame(EstadoSaldo::Adeudado, $this->reserva->fresh()->estado_saldo);
     }
 
+    public function test_a_mercado_pago_se_le_pide_el_saldo_con_dos_decimales(): void
+    {
+        // Seña de 128,11: el saldo es 1.371,89 y no 1371.8899999999999.
+        $this->reserva->pagos()->update(['monto' => 128.11]);
+        $this->darAcceso();
+        $this->mercadoPago->responder(['id' => '123-abc', 'init_point' => self::DIRECCION_MERCADO_PAGO]);
+
+        $this->abrirPantalla()
+            ->assertSeeInOrder(['Saldo pendiente', 'USD 1.371,89'])
+            ->call('confirmarPago')
+            ->assertRedirect(self::DIRECCION_MERCADO_PAGO);
+
+        $this->assertSame(1371.89, $this->mercadoPago->datosDelPedido()['items'][0]['unit_price']);
+    }
+
     public function test_con_la_fecha_limite_mas_cerca_el_pedido_vence_en_ella(): void
     {
         $this->travelTo(Carbon::parse('2027-01-01 23:45:00'));
