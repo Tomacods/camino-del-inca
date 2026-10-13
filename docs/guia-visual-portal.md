@@ -6,7 +6,7 @@ tarjetas blancas con sombra suave, botones azules en forma de pastilla y título
 vigente desde el 06/10/2026; la paleta oscura del prototipo quedó reservada (ver
 [Paleta reservada para un posible modo oscuro](#paleta-reservada-para-un-posible-modo-oscuro)).
 
-Para ver todos los componentes juntos, con el servidor local levantado: <http://localhost:8000/guia-visual>. Esa
+Para ver todos los componentes juntos, con el servidor local levantado: <http://127.0.0.1:8000/guia-visual>. Esa
 página sólo existe con `APP_ENV=local`.
 
 ## Paleta
