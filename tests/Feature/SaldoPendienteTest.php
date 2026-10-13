@@ -102,6 +102,28 @@ class SaldoPendienteTest extends TestCase
         $this->reserva->iniciarPagoSaldo();
     }
 
+    // A2 se comprueba antes que A3: una reserva ya pagada nunca recibe el aviso de la cancelación por falta de pago.
+    public function test_con_el_total_pagado_y_sin_fecha_limite_no_hay_saldo_pendiente(): void
+    {
+        // Como 000122-3 de los seeders: pagó el total y no tiene fecha límite de saldo.
+        $this->reserva->update(['estado_saldo' => EstadoSaldo::Abonado, 'fecha_limite_saldo' => null]);
+
+        $this->expectExceptionObject(new DomainException(self::AVISO_SIN_SALDO));
+
+        $this->reserva->iniciarPagoSaldo();
+    }
+
+    public function test_con_el_saldo_pagado_y_la_fecha_limite_pasada_no_hay_saldo_pendiente(): void
+    {
+        // La fecha límite queda como dato al pagar el saldo: pasado ese día, el aviso sigue siendo el de A2.
+        $this->reserva->update(['estado_saldo' => EstadoSaldo::Abonado]);
+        $this->travelTo(Carbon::parse('2027-01-02 00:00:00'));
+
+        $this->expectExceptionObject(new DomainException(self::AVISO_SIN_SALDO));
+
+        $this->reserva->iniciarPagoSaldo();
+    }
+
     public function test_con_el_plazo_vencido_la_reserva_no_se_cancela_aca(): void
     {
         $this->travelTo(Carbon::parse('2027-01-02 00:00:00'));
@@ -164,13 +186,26 @@ class SaldoPendienteTest extends TestCase
 
     public function test_registrar_pago_saldo_dos_veces_registra_un_solo_pago(): void
     {
+        // Como dos vueltas a la vez: la segunda leyó la reserva, con sus pagos, antes de que la primera registrara.
+        $leidaAntes = Reserva::find($this->reserva->id_reserva)->load('pagos');
+
         $this->assertNotNull(Pago::registrarPagoSaldo($this->reserva, 'Tarjeta de crédito'));
 
-        // La segunda llamada recibe la reserva como estaba antes del primer pago: igual la lee de nuevo y la encuentra
-        // «Abonado».
-        $this->assertNull(Pago::registrarPagoSaldo($this->reserva, 'Tarjeta de crédito'));
+        // Recibe la reserva todavía «Adeudado», pero la lee de nuevo con la fila bloqueada y la encuentra «Abonado».
+        $this->assertSame(EstadoSaldo::Adeudado, $leidaAntes->estado_saldo);
+        $this->assertNull(Pago::registrarPagoSaldo($leidaAntes, 'Tarjeta de crédito'));
 
         $this->assertSame(1, $this->reserva->pagos()->where('tipo_pago', TipoPago::Saldo)->count());
+    }
+
+    public function test_registrar_pago_saldo_sin_nada_por_pagar_no_registra_nada(): void
+    {
+        $this->reserva->pagos()->update(['monto' => 1500]);
+
+        $this->assertNull(Pago::registrarPagoSaldo($this->reserva->fresh(), 'Tarjeta de crédito'));
+
+        $this->assertSame(0, Pago::where('tipo_pago', TipoPago::Saldo)->count());
+        $this->assertSame(EstadoSaldo::Adeudado, $this->reserva->fresh()->estado_saldo);
     }
 
     public function test_registrar_pago_saldo_con_la_reserva_cancelada_no_registra_nada(): void

@@ -123,6 +123,18 @@ class PagarSaldoTest extends TestCase
             ->assertDontSee('Pagar el saldo con Mercado Pago');
     }
 
+    public function test_con_el_total_pagado_avisa_que_no_tiene_saldo_pendiente_y_no_el_vencimiento(): void
+    {
+        // Como 000122-3 de los seeders: pagó el total y no tiene fecha límite de saldo.
+        $this->reserva->update(['estado_saldo' => EstadoSaldo::Abonado, 'fecha_limite_saldo' => null]);
+        $this->darAcceso();
+
+        $this->abrirPantalla()
+            ->assertSee('Esta reserva no tiene saldo pendiente.')
+            ->assertDontSee('venció')
+            ->assertDontSee('Pagar el saldo con Mercado Pago');
+    }
+
     public function test_con_la_fecha_limite_vencida_avisa_el_vencimiento(): void
     {
         $this->travelTo(Carbon::parse('2027-01-02 10:00:00'));
@@ -362,10 +374,11 @@ class PagarSaldoTest extends TestCase
         return $reserva;
     }
 
-    // Otra reserva confirmada con el saldo adeudado, de otro cliente, en la misma salida.
+    // Otra reserva confirmada con el saldo adeudado, de otro cliente, en la misma salida: un integrante y la seña pagada,
+    // así tiene saldo de verdad (USD 375).
     private function crearOtraReserva(string $numeroReserva, string $correo): Reserva
     {
-        return Reserva::create([
+        $reserva = Reserva::create([
             'id_excursion' => $this->excursion->id_excursion,
             'numero_reserva' => $numeroReserva,
             'correo_electronico' => $correo,
@@ -377,5 +390,17 @@ class PagarSaldoTest extends TestCase
             'fecha_limite_saldo' => '2027-01-01 23:59:59',
             'fecha_limite_confirmacion' => '2027-01-01 23:59:59',
         ]);
+
+        $reserva->excursionistas()->create([
+            'nombre' => 'Valentina',
+            'apellido' => 'Díaz',
+            'documento_pasaporte' => 'AAE402215',
+            'equipo_camping' => false,
+            'estado_permiso' => EstadoPermiso::Obtenido,
+        ]);
+
+        Pago::registrarPago($reserva, 375, '2026-09-10 16:45:00', 'Tarjeta de débito', TipoPago::Sena);
+
+        return $reserva;
     }
 }
