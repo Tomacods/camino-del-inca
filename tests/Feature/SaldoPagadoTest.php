@@ -90,14 +90,15 @@ class SaldoPagadoTest extends TestCase
 
         $comprobante = $this->pagoSaldo()->comprobante;
 
-        $this->get(self::DIRECCION)
-            ->assertOk()
-            ->assertSee('Saldo pagado.')
-            ->assertSeeInOrder(['Reserva', '000125-9'])
-            ->assertSee(EstadoReserva::Confirmada->value)
+        $this->get(self::DIRECCION)->assertOk()->assertSee('Saldo pagado.');
+
+        // Lo que se ve, con Livewire::test: dibuja sólo el componente, sin el menú del layout (que también lleva a
+        // /mi-reserva) ni los datos internos de Livewire (que también tienen el número de reserva).
+        $this->abrirPantalla()
+            ->assertSeeInOrder(['Reserva', '000125-9', EstadoReserva::Confirmada->value])
             ->assertSee('El saldo quedó «Abonado»: no queda nada por pagar.')
             ->assertSeeInOrder(['Comprobante', $comprobante->numero_comprobante, '13/10/2026 10:00', TipoPago::Saldo->value, 'Tarjeta de crédito', 'USD 750,00'])
-            ->assertSee('href="/mi-reserva"', false);
+            ->assertSeeHtmlInOrder(['href="/mi-reserva"', 'Ir a Mi reserva']);
     }
 
     public function test_el_medio_de_pago_es_el_que_informa_mercado_pago(): void
@@ -116,9 +117,9 @@ class SaldoPagadoTest extends TestCase
         $this->darAcceso();
         $this->pagarSaldo();
 
+        // El pago nuevo, al final de la lista de pagos: después de la seña, con su fecha.
         Livewire::test('consultar-reserva')
-            ->assertSee('Abonado · USD 0')
-            ->assertSee(TipoPago::Saldo->value)
+            ->assertSeeInOrder(['Abonado · USD 0', TipoPago::Sena->value, '01/10/2026', TipoPago::Saldo->value, '13/10/2026', 'USD 750'])
             ->assertDontSee('Pagar saldo')
             ->assertDontSeeHtml('/pagar-saldo');
     }
@@ -161,7 +162,6 @@ class SaldoPagadoTest extends TestCase
 
         $this->assertNoSeRegistroElSaldo();
         $this->assertSame(EstadoSaldo::Adeudado, $otra->fresh()->estado_saldo);
-        $this->assertSame(0, $otra->pagos()->count());
     }
 
     public function test_un_pago_de_una_reserva_nueva_no_registra_el_saldo(): void
@@ -185,12 +185,13 @@ class SaldoPagadoTest extends TestCase
         $otra = $this->crearOtraReserva('000122-3', 'valentina.diaz@mail.com');
         $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
 
+        // 000122-3 también tiene saldo adeudado: si se registrara en la reserva de la dirección, se notaría.
         $this->volverDeMercadoPago([], '000122-3')
             ->assertOk()
-            ->assertSee('No pudimos registrar el pago');
+            ->assertSeeInOrder(['No pudimos registrar el pago', 'no corresponde al saldo de la reserva', '000122-3', self::NUMERO_OPERACION]);
 
         $this->assertNoSeRegistroElSaldo();
-        $this->assertSame(0, $otra->pagos()->count());
+        $this->assertSame(EstadoSaldo::Adeudado, $otra->fresh()->estado_saldo);
     }
 
     public function test_con_el_saldo_ya_pagado_un_segundo_pago_no_se_registra_y_muestra_su_numero_de_operacion(): void
@@ -203,9 +204,39 @@ class SaldoPagadoTest extends TestCase
 
         $this->volverDeMercadoPago(['payment_id' => '183193192231'])
             ->assertOk()
-            ->assertSeeInOrder(['No pudimos registrar el pago', 'la reserva ya no tenía saldo pendiente', 'La devolución del dinero se gestiona con la agencia', '183193192231']);
+            ->assertSeeInOrder(['El saldo ya estaba pagado', 'Si pagaste el saldo dos veces, la devolución se gestiona con la agencia', '183193192231']);
 
         $this->assertSame(1, $this->reserva->pagos()->where('tipo_pago', TipoPago::Saldo)->count());
+    }
+
+    public function test_la_misma_vuelta_desde_otra_sesion_no_dice_que_el_pago_quedo_sin_registrar(): void
+    {
+        $this->darAcceso();
+        $this->pagarSaldo();
+
+        // La misma vuelta, con la sesión vencida o desde otro navegador: no tiene 'saldo_pagado' y se le pregunta otra vez
+        // a Mercado Pago. No se puede distinguir de un segundo pago, así que el aviso cubre los dos casos.
+        $this->flushSession();
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago()
+            ->assertOk()
+            ->assertSeeInOrder(['El saldo ya estaba pagado', 'Si volviste de Mercado Pago más de una vez con el mismo pago, no tenés que hacer', self::NUMERO_OPERACION])
+            ->assertDontSee('No pudimos registrar el pago');
+
+        $this->assertSame(1, $this->reserva->pagos()->where('tipo_pago', TipoPago::Saldo)->count());
+    }
+
+    public function test_si_el_cliente_pago_a_tiempo_se_registra_aunque_vuelva_despues_de_la_fecha_limite(): void
+    {
+        // Confirmó el 01/01/2027 a las 23:50 (el pedido de cobro vence a las 23:59:59), pagó a las 23:58 y volvió después
+        // de la medianoche: Mercado Pago aprobó, así que pagó a tiempo.
+        $this->darAcceso();
+        $this->travelTo(Carbon::parse('2027-01-02 00:00:30'));
+
+        $this->pagarSaldo();
+
+        $this->assertSame(EstadoSaldo::Abonado, $this->reserva->fresh()->estado_saldo);
     }
 
     public function test_con_la_reserva_cancelada_mientras_pagaba_no_registra_el_saldo(): void
@@ -262,11 +293,11 @@ class SaldoPagadoTest extends TestCase
 
         $this->assertSame(EstadoSaldo::Abonado, $this->reserva->fresh()->estado_saldo);
 
-        $this->get(self::DIRECCION)
-            ->assertOk()
-            ->assertSee('Registramos tu pago')
+        $this->get(self::DIRECCION)->assertOk()->assertSee('Registramos tu pago');
+
+        $this->abrirPantalla()
             ->assertSeeInOrder(['El pago del saldo de la reserva N.º', '000125-9', 'quedó registrado'])
-            ->assertSee('href="/mi-reserva"', false)
+            ->assertSeeHtmlInOrder(['href="/mi-reserva"', 'Ir a Mi reserva'])
             ->assertDontSee('Comprobante')
             ->assertDontSee('Tarjeta de crédito')
             ->assertDontSee($this->pagoSaldo()->comprobante->numero_comprobante);
@@ -280,9 +311,10 @@ class SaldoPagadoTest extends TestCase
 
         $this->volverDeMercadoPago()->assertRedirect(self::DIRECCION);
 
-        $this->get(self::DIRECCION)
+        $this->abrirPantalla()
             ->assertSee('Registramos tu pago')
-            ->assertDontSee('Comprobante');
+            ->assertDontSee('Comprobante')
+            ->assertDontSee('Tarjeta de crédito');
     }
 
     public function test_sin_numero_de_operacion_no_consulta_a_mercado_pago_y_vuelve_al_pago_del_saldo(): void
@@ -321,6 +353,12 @@ class SaldoPagadoTest extends TestCase
         $this->pagarSaldo();
 
         $this->get('/mi-reserva/000122-3/saldo-pagado')->assertRedirect('/mi-reserva/000122-3/pagar-saldo');
+    }
+
+    // La pantalla después de la vuelta, sin parámetros: con 'saldo_pagado' en la sesión, muestra el pago registrado.
+    private function abrirPantalla()
+    {
+        return Livewire::test('saldo-pagado', ['numeroReserva' => '000125-9']);
     }
 
     // Paga el saldo por el camino normal: pago aprobado y vuelta.
@@ -422,10 +460,11 @@ class SaldoPagadoTest extends TestCase
         return $reserva;
     }
 
-    // Otra reserva confirmada con el saldo adeudado, de otro cliente, en la misma salida.
+    // Otra reserva confirmada con el saldo adeudado, de otro cliente, en la misma salida: un integrante y la seña pagada,
+    // así tiene saldo de verdad (USD 375).
     private function crearOtraReserva(string $numeroReserva, string $correo): Reserva
     {
-        return Reserva::create([
+        $reserva = Reserva::create([
             'id_excursion' => $this->excursion->id_excursion,
             'numero_reserva' => $numeroReserva,
             'correo_electronico' => $correo,
@@ -437,5 +476,17 @@ class SaldoPagadoTest extends TestCase
             'fecha_limite_saldo' => '2027-01-01 23:59:59',
             'fecha_limite_confirmacion' => '2027-01-01 23:59:59',
         ]);
+
+        $reserva->excursionistas()->create([
+            'nombre' => 'Valentina',
+            'apellido' => 'Díaz',
+            'documento_pasaporte' => 'AAE402215',
+            'equipo_camping' => false,
+            'estado_permiso' => EstadoPermiso::Obtenido,
+        ]);
+
+        Pago::registrarPago($reserva, 375, '2026-09-10 16:45:00', 'Tarjeta de débito', TipoPago::Sena);
+
+        return $reserva;
     }
 }

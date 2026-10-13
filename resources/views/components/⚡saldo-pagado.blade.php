@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\EstadoSaldo;
 use App\Enums\TipoPago;
 use App\Models\Pago;
 use App\Models\Reserva;
@@ -19,8 +20,9 @@ new #[Title('Pago del saldo')] class extends Component
     public string $numeroReserva = '';
 
     // Qué muestra: 'registrado' (el pago del saldo recién registrado), 'sin-confirmar' (Mercado Pago no respondió: se
-    // puede reintentar), 'no-corresponde' (el pago aprobado no es del saldo de esta reserva) o 'sin-registrar' (el pago
-    // se aprobó pero la reserva ya no tenía saldo para pagar). Vacío mientras manda al cliente a otra pantalla.
+    // puede reintentar), 'no-corresponde' (el pago aprobado no es del saldo de esta reserva), 'ya-abonado' (el pago se
+    // aprobó pero el saldo ya figuraba pagado) o 'sin-registrar' (el pago se aprobó pero la reserva ya no estaba
+    // confirmada con el saldo adeudado). Vacío mientras manda al cliente a otra pantalla.
     #[Locked]
     public string $estado = '';
 
@@ -84,11 +86,12 @@ new #[Title('Pago del saldo')] class extends Component
         // referencia; registrarPagoSaldo() registra el saldo que calcula en este momento.
         $pago = Pago::registrarPagoSaldo($reserva, $transaccion['medio_pago']);
 
-        // La reserva ya no tenía saldo para pagar: por ejemplo, el cliente lo pagó dos veces desde dos pestañas. El pago
-        // aprobado no se devuelve desde el sistema: las devoluciones son manuales, con la agencia (decisión del grupo
-        // del 13/09).
+        // La reserva ya no tenía saldo para pagar. El pago aprobado no se devuelve desde el sistema: las devoluciones son
+        // manuales, con la agencia (decisión del grupo del 13/09). Si el saldo ya figura «Abonado», puede ser un segundo
+        // pago (dos pestañas) o la misma vuelta repetida desde otra sesión: la base no guarda el número de operación y no
+        // se pueden distinguir, así que el aviso no afirma que el pago quedó sin registrar.
         if ($pago === null) {
-            $this->estado = 'sin-registrar';
+            $this->estado = $reserva->fresh()?->estado_saldo === EstadoSaldo::Abonado ? 'ya-abonado' : 'sin-registrar';
 
             return;
         }
@@ -218,13 +221,25 @@ new #[Title('Pago del saldo')] class extends Component
         </x-aviso>
 
         <x-boton href="/mi-reserva/{{ $numeroReserva }}/saldo-pagado?payment_id={{ $numeroOperacion }}" class="mt-6">Reintentar</x-boton>
+    @elseif ($estado === 'ya-abonado')
+        <h1 class="text-4xl font-semibold sm:text-5xl">Pago del saldo</h1>
+
+        <x-aviso titulo="El saldo ya estaba pagado" class="mt-8">
+            El saldo de la reserva N.º <span class="tabular-nums">{{ $numeroReserva }}</span> ya figura pagado, así que este
+            pago no se registró otra vez. Si volviste de Mercado Pago más de una vez con el mismo pago, no tenés que hacer
+            nada: lo ves en Mi reserva. Si pagaste el saldo dos veces, la devolución se gestiona con la agencia: comunicate
+            con nosotros e indicá el número de operación de Mercado Pago,
+            <span class="font-semibold tabular-nums">{{ $numeroOperacion }}</span>.
+        </x-aviso>
+
+        <x-boton href="/mi-reserva" class="mt-6">Ir a Mi reserva</x-boton>
     @elseif ($estado === 'sin-registrar')
         <h1 class="text-4xl font-semibold sm:text-5xl">Pago del saldo</h1>
 
         <x-aviso tipo="error" titulo="No pudimos registrar el pago" class="mt-8">
-            Mercado Pago aprobó el pago, pero la reserva ya no tenía saldo pendiente: ya estaba paga o se canceló.
-            La devolución del dinero se gestiona con la agencia: comunicate con nosotros e indicá el número de operación
-            de Mercado Pago, <span class="font-semibold tabular-nums">{{ $numeroOperacion }}</span>.
+            Mercado Pago aprobó el pago, pero la reserva ya no estaba confirmada con el saldo pendiente: por ejemplo, se
+            canceló mientras pagabas. La devolución del dinero se gestiona con la agencia: comunicate con nosotros e indicá
+            el número de operación de Mercado Pago, <span class="font-semibold tabular-nums">{{ $numeroOperacion }}</span>.
         </x-aviso>
 
         <x-boton href="/mi-reserva" class="mt-6">Ir a Mi reserva</x-boton>
