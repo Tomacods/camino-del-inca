@@ -6,9 +6,11 @@ use App\Enums\EstadoPermiso;
 use App\Enums\EstadoReserva;
 use App\Enums\EstadoSaldo;
 use App\Enums\MotivoDevolucion;
+use App\Enums\TipoNotificacion;
 use App\Enums\TipoPago;
 use App\Enums\TipoServicio;
 use App\Jobs\LiberarCupoRetenido;
+use App\Mail\NotificacionCliente;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -19,8 +21,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Throwable;
 
 class Reserva extends Model
 {
@@ -655,5 +660,123 @@ class Reserva extends Model
 
         // Quien la llamó (la pantalla) ve la reserva como quedó.
         $this->refresh();
+    }
+
+    /* ------------------------- CU-13 Notificar cliente ------------------------ */
+
+    // Paso 1: lo invoca otro caso de uso, después de guardar su cambio de estado. Devuelve si el correo quedó en manos
+    // del servicio de correo. Nunca lanza una excepción (A8): la notificación no revierte ni bloquea el cambio de estado
+    // que la originó.
+    public static function notificarCliente(TipoNotificacion $tipoNotificacion, string $numeroReserva): bool
+    {
+        $reserva = self::buscarReserva($numeroReserva);
+
+        if ($reserva === null) {
+            Log::warning('No se envió el correo «'.$tipoNotificacion->value.'»: no existe la reserva '.$numeroReserva.'.');
+
+            return false;
+        }
+
+        return $reserva->notificar($tipoNotificacion);
+    }
+
+    // Pasos 2 a 4: recupera los datos que dice el DS-13, arma el mensaje y lo envía. Lo que se calcula (montos, saldo,
+    // causa) se calcula acá y llega hecho al correo: la vista sólo lo muestra.
+    public function notificar(TipoNotificacion $tipoNotificacion): bool
+    {
+        $excursion = $this->excursion->getDatosExcursion();
+
+        $datos = [
+            'reserva' => $this->getDatos(),
+            'excursion' => [
+                'paquete' => $excursion->paquete->nombre,
+                'fecha_salida' => $excursion->getFechaSalida(),
+            ],
+            'excursionistas' => $this->getExcursionistas()
+                ->map(fn (Excursionista $excursionista) => $excursionista->getDatos())
+                ->all(),
+            'pagos' => $this->pagos
+                ->map(fn (Pago $pago) => $pago->getPago())
+                ->all(),
+            'monto_total' => round($this->calcularMontoTotal(), 2),
+            'monto_abonado' => round($this->sumarPagos(), 2),
+            'saldo_pendiente' => round($this->calcularSaldoPendiente(), 2),
+            // La fecha que informa el correo (por ejemplo, la de la cancelación) es la de este envío. Se toma ahora y no
+            // cuando sale de la cola: un reintento informa la misma.
+            'fecha_envio' => now(),
+        ];
+
+        if (in_array($tipoNotificacion, [TipoNotificacion::PrimeraCompra, TipoNotificacion::PagoSaldo], true)) {
+            $ultimoPago = $this->getUltimoPago();
+            $datos['ultimo_pago'] = $ultimoPago->getPago();
+            $datos['comprobante'] = $ultimoPago->getComprobante()?->getDatos();
+        }
+
+        if ($tipoNotificacion === TipoNotificacion::PrimeraCompra) {
+            $datos['paquete'] = $excursion->paquete->getDatosComprobante();
+        }
+
+        if (in_array($tipoNotificacion, [TipoNotificacion::CancelacionReserva, TipoNotificacion::CancelacionFaltaPermisos], true)) {
+            $datos['devolucion'] = $this->devolucion?->getDatos();
+        }
+
+        if ($tipoNotificacion === TipoNotificacion::CancelacionFaltaPermisos) {
+            $datos['cancelada_por_vencimiento'] = $this->fueCanceladaPorVencimientoConfirmacion();
+        }
+
+        return $this->enviarCorreo($this->correo_electronico, $this->armarMensaje($tipoNotificacion, $datos));
+    }
+
+    public function getDatos(): array
+    {
+        return [
+            'numero_reserva' => $this->numero_reserva,
+            'correo_electronico' => $this->correo_electronico,
+            'estado' => $this->estado,
+            'estado_saldo' => $this->estado_saldo,
+            'noches_extra_antes' => $this->noches_extra_antes,
+            'noches_extra_despues' => $this->noches_extra_despues,
+            'fecha_limite_confirmacion' => $this->fecha_limite_confirmacion,
+            'fecha_limite_saldo' => $this->fecha_limite_saldo,
+        ];
+    }
+
+    // Paso 3: el texto de cada tipo está en la vista del correo; acá se elige el tipo y se le pasan los datos.
+    public function armarMensaje(TipoNotificacion $tipoNotificacion, array $datos): NotificacionCliente
+    {
+        return new NotificacionCliente($tipoNotificacion, $datos);
+    }
+
+    // Paso 4 y A8. El correo va a la cola, que lo reintenta si el servicio de correo falla (NotificacionCliente::INTENTOS).
+    // Si lo que falla es ponerlo en la cola, se anota en el registro y el caso de uso que invocó sigue: su cambio de
+    // estado ya se guardó. Sólo al titular de la reserva, nunca a los excursionistas.
+    public function enviarCorreo(string $correoElectronico, NotificacionCliente $mensaje): bool
+    {
+        try {
+            Mail::to($correoElectronico)->queue($mensaje);
+
+            return true;
+        } catch (Throwable $excepcion) {
+            Log::error('No se pudo enviar el correo «'.$mensaje->tipo->value.'» de la reserva '.$this->numero_reserva
+                .' a '.$correoElectronico.': '.$excepcion->getMessage());
+
+            return false;
+        }
+    }
+
+    // El último pago es el de mayor id_pago y no el de fecha más reciente: pago.fecha guarda sólo el día, y la seña y el
+    // saldo pueden pagarse el mismo día.
+    private function getUltimoPago(): Pago
+    {
+        return $this->pagos->sortByDesc('id_pago')->first();
+    }
+
+    // La causa de «Cancelación por Falta de Permisos»: la devolución de CU-26 se registra después de la fecha límite de
+    // confirmación, que ya venció; la de CU-17 (el cliente pide el reintegro), hasta ese día. Se comparan días, porque
+    // devolucion.fecha no guarda la hora.
+    private function fueCanceladaPorVencimientoConfirmacion(): bool
+    {
+        return $this->devolucion !== null
+            && $this->devolucion->fecha->greaterThan($this->fecha_limite_confirmacion->copy()->startOfDay());
     }
 }
