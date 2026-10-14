@@ -123,6 +123,7 @@ class ListarIntegrantesExcursion extends Page
         return Section::make('Reserva '.$reserva['numero_reserva'])
             ->schema([
                 RepeatableEntry::make('reserva_'.$posicion)
+                    ->label('Integrantes de la reserva '.$reserva['numero_reserva'])
                     ->hiddenLabel()
                     ->state($reserva['integrantes'])
                     ->table([
@@ -133,12 +134,12 @@ class ListarIntegrantesExcursion extends Page
                         TableColumn::make('Permiso'),
                     ])
                     ->schema([
-                        TextEntry::make('nombre'),
-                        TextEntry::make('apellido'),
-                        TextEntry::make('documento_pasaporte'),
-                        TextEntry::make('equipo_camping')
+                        TextEntry::make('nombre')->label('Nombre'),
+                        TextEntry::make('apellido')->label('Apellido'),
+                        TextEntry::make('documento_pasaporte')->label('Documento o pasaporte'),
+                        TextEntry::make('equipo_camping')->label('Equipo de camping')
                             ->formatStateUsing(fn (bool $state) => $state ? 'Sí' : 'No'),
-                        TextEntry::make('estado_permiso')
+                        TextEntry::make('estado_permiso')->label('Permiso')
                             ->formatStateUsing(fn (EstadoPermiso $state) => $state->value),
                     ]),
             ]);
