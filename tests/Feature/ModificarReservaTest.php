@@ -293,6 +293,23 @@ class ModificarReservaTest extends TestCase
         $this->assertSame($this->destino->id_excursion, $reserva->id_excursion);
     }
 
+    public function test_una_fecha_mal_escrita_avisa_que_la_excursion_no_esta_disponible(): void
+    {
+        $this->darAcceso();
+
+        // Lo que manda el navegador se puede tocar: ni una fecha que no existe ni un texto cualquiera dan error 500.
+        foreach (['cualquier-cosa', '2027-02-30', '01/03/2027'] as $fecha) {
+            $this->abrirPantalla()
+                ->call('elegir', $fecha)
+                ->assertSet('paso', 2)
+                ->assertSee('La excursión elegida ya no está disponible.')
+                ->assertSee('Elegí la nueva salida')
+                ->assertDontSee('Resumen del cambio');
+        }
+
+        $this->assertNoCambio(EstadoReserva::Confirmada);
+    }
+
     public function test_con_una_reserva_que_no_admite_el_cambio_muestra_el_aviso_sin_la_lista(): void
     {
         $this->reserva->update(['estado' => EstadoReserva::Pendiente]);

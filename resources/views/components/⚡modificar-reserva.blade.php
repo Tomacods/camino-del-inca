@@ -2,6 +2,7 @@
 
 use App\Models\Reserva;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -66,6 +67,13 @@ new class extends Component
     public function elegir(string $fecha): void
     {
         $this->mensajeError = '';
+
+        // La fecha llega del navegador: si no es una fecha aaaa-mm-dd válida, Carbon::parse lanzaría una excepción que no
+        // es DomainException (error 500). Se avisa como una excursión que ya no está disponible.
+        if (Validator::make(['fecha' => $fecha], ['fecha' => 'date_format:Y-m-d'])->fails()) {
+            $this->mostrarError(new \DomainException('La excursión elegida ya no está disponible.'));
+            return;
+        }
 
         try {
             $this->reserva->elegirExcursionDestino(Carbon::parse($fecha));
