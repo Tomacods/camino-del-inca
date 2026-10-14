@@ -43,11 +43,6 @@
     --color-ambar-fondo: #fdf3dc;
     --color-gris-fondo: #e8e8ed;
 
-    /* Nombres anteriores, que todavía usan las pantallas de Mi reserva. Se quitan cuando pasen a los componentes. */
-    --color-borde: var(--color-divisor);
-    --color-inca: var(--color-accion);
-    --color-peligro: var(--color-error);
-
     --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
     --shadow-tarjeta: 2px 4px 12px rgb(0 0 0 / 0.08);

@@ -8,7 +8,10 @@ use Livewire\Component;
 
 new class extends Component
 {
+    #[Locked]
     public string $correo = '';
+
+    #[Locked]
     public string $numeroReserva = '';
 
     #[Locked]
@@ -41,6 +44,8 @@ new class extends Component
     public function confirmar(): void
     {
         try {
+            // Se vuelve a calcular: si la reserva dejó de estar «Sin Permiso» entre un paso y otro, no se cancela
+            $this->montoReintegro = $this->reserva->calcularReintegro();
             $this->reserva->ejecutarCancelacionConReintegro($this->montoReintegro, Carbon::now());
             $this->paso = 3;
         } catch (\Exception $e) {
@@ -66,8 +71,11 @@ new class extends Component
 };
 ?>
 <div class="mx-auto max-w-xl">
-    <h1 class="text-3xl font-semibold sm:text-4xl">
-        Solicitar reintegro. <span class="text-texto-secundario">Te devolvemos todo lo abonado.</span>
+    <h1 class="text-4xl font-semibold sm:text-5xl">
+        Solicitar reintegro.
+        @if ($paso === 2)
+            <span class="text-texto-secundario">Te devolvemos todo lo abonado.</span>
+        @endif
     </h1>
 
     <div class="mt-8 grid gap-5">

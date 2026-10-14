@@ -9,10 +9,13 @@ use Illuminate\Support\Carbon;
 
 new class extends Component
 {
+    // #[Locked]: el navegador no puede modificar estas propiedades
+    #[Locked]
     public string $correo = '';
+
+    #[Locked]
     public string $numeroReserva = '';
 
-    // #[Locked]: el navegador no puede modificar estas propiedades
     #[Locked]
     public int $paso = 1;
 
@@ -33,36 +36,14 @@ public function mount(string $numeroReserva): void
         return;
     }
 
-    $this->buscar();
-}
-
-    public function buscar(): void
-    {
-        $this->validate([
-            'correo' => 'required|email',
-            'numeroReserva' => ['required', 'regex:/^\d{6}-\d$/'],
-        ], [
-            'correo.required' => 'Ingresá tu correo electrónico.',
-            'correo.email' => 'El correo no tiene un formato válido.',
-            'numeroReserva.required' => 'Ingresá el número de reserva.',
-            'numeroReserva.regex' => 'El número de reserva no tiene un formato válido.',
-        ]);
-
-        $this->mensajeError = '';
-
-        if ($this->reserva === null) {
-            $this->addError('numeroReserva', 'No encontramos una reserva con esos datos.');
-            return;
-        }
-
-        try {
-            // El modelo calcula y se valida a sí mismo
-            $this->montoReembolso = $this->reserva->calcularReembolso(Carbon::now());
-            $this->paso = 2;
-        } catch (\Exception $e) {
-            $this->mensajeError = $e->getMessage();
-        }
+    try {
+        // El modelo calcula y se valida a sí mismo
+        $this->montoReembolso = $this->reserva->calcularReembolso(Carbon::now());
+        $this->paso = 2;
+    } catch (\Exception $e) {
+        $this->mensajeError = $e->getMessage();
     }
+}
 
     public function confirmar(): void
     {
@@ -102,8 +83,11 @@ public function cancelarOperacion()
 @endphp
 
 <div class="mx-auto max-w-xl">
-    <h1 class="text-3xl font-semibold sm:text-4xl">
-        Cancelar reserva. <span class="text-texto-secundario">Revisá cuánto se te devuelve.</span>
+    <h1 class="text-4xl font-semibold sm:text-5xl">
+        Cancelar reserva.
+        @if ($paso === 2)
+            <span class="text-texto-secundario">Revisá cuánto se te devuelve.</span>
+        @endif
     </h1>
 
     <div class="mt-8 grid gap-5">
@@ -143,9 +127,7 @@ public function cancelarOperacion()
         @endif
 
         @if ($paso === 3)
-            <x-aviso titulo="¡Reserva cancelada con éxito!">
-                Te enviamos el detalle por correo.
-            </x-aviso>
+            <x-aviso titulo="¡Reserva cancelada con éxito!" />
 
             <div>
                 <x-boton wire:click="cancelarOperacion">Volver a mi reserva</x-boton>

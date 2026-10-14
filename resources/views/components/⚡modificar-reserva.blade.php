@@ -152,8 +152,11 @@ new class extends Component
 };
 ?>
 <div>
-    <h1 class="text-4xl font-semibold sm:text-4xl">
-        Cambiar de excursión. <span class="text-texto-secundario">Elegí otra fecha de salida.</span>
+    <h1 class="text-4xl font-semibold sm:text-5xl">
+        Cambiar de excursión.
+        @if ($paso === 2)
+            <span class="text-texto-secundario">Elegí otra fecha de salida.</span>
+        @endif
     </h1>
 
     <div class="mt-8 grid items-start gap-5 md:grid-cols-[320px_1fr]">
@@ -178,10 +181,13 @@ new class extends Component
             @if ($mensajeError)
                 <x-aviso tipo="error" titulo="No se puede modificar">
                     {{ $mensajeError }}
-                    @if ($paso === 1)
-                        <x-boton variante="secundario" wire:click="cancelarOperacion" class="mt-4">Volver a mi reserva</x-boton>
-                    @endif
                 </x-aviso>
+
+                @if ($paso === 1)
+                    <div>
+                        <x-boton variante="secundario" wire:click="cancelarOperacion">Volver a mi reserva</x-boton>
+                    </div>
+                @endif
             @endif
 
             {{-- PASO 2: excursiones habilitadas --}}
@@ -196,7 +202,7 @@ new class extends Component
                                         {{ $excursion->cupo_disponible }} lugares · Guía {{ $excursion->guia->nombre }} {{ $excursion->guia->apellido }}
                                     </p>
                                 </div>
-                                <x-boton wire:click="elegir('{{ $excursion->fecha_salida->toDateString() }}')">Elegir</x-boton>
+                                <x-boton variante="secundario" wire:click="elegir('{{ $excursion->fecha_salida->toDateString() }}')">Elegir</x-boton>
                             </li>
                         @empty
                             <li class="py-4">
@@ -249,8 +255,11 @@ new class extends Component
             @if ($paso === 4)
                 <x-aviso titulo="¡Excursión cambiada!">
                     La reserva queda pendiente de validación de permisos.
-                    <x-boton wire:click="cancelarOperacion" class="mt-4">Volver a mi reserva</x-boton>
                 </x-aviso>
+
+                <div>
+                    <x-boton wire:click="cancelarOperacion">Volver a mi reserva</x-boton>
+                </div>
             @endif
         </div>
     </div>
