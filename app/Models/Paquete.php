@@ -55,8 +55,34 @@ class Paquete extends Model
         return $this->hasMany(Excursion::class, 'id_paquete', 'id_paquete');
     }
 
-    // CU-05: el portal lista sólo los paquetes activos, del más nuevo al más antiguo. La fecha de creación no tiene
-    // hora, así que entre dos paquetes creados el mismo día va primero el de clave más alta, que se creó después.
+    /* ------------------------------ CU-15 Pagar ------------------------------- */
+
+    // Las noches extra se contratan para todo el grupo y se cobran por persona; el equipo de camping, por equipo. Los
+    // precios llegan como texto ('750.00') por el cast decimal:2: se pasan a número antes de la cuenta.
+    public function calcularMonto(int $cantidadIntegrantes, int $nochesExtra, int $equiposCamping): float
+    {
+        return (float) $this->precio_base * $cantidadIntegrantes
+            + $nochesExtra * $cantidadIntegrantes * (float) $this->costo_noche_extra_cusco
+            + $equiposCamping * (float) $this->costo_equipo_camping;
+    }
+
+    /* ------------------------- CU-13 Notificar cliente ------------------------ */
+
+    // Lo que el comprobante de la primera compra dice del paquete: el recorrido, con su duración, y los servicios.
+    public function getDatosComprobante(): array
+    {
+        return [
+            'recorrido' => $this->recorrido->getDatosRecorrido(),
+            'servicios' => $this->servicios
+                ->map(fn (Servicio $servicio) => $servicio->getServiciosIncluidos())
+                ->all(),
+        ];
+    }
+
+    /* ------------------------- CU-05 Listar paquetes ------------------------- */
+
+    // El portal lista sólo los paquetes activos, del más nuevo al más antiguo. La fecha de creación no tiene hora, así
+    // que entre dos paquetes creados el mismo día va primero el de clave más alta, que se creó después.
     public static function listarPaquetes(): Collection
     {
         return self::buscarActivos()
@@ -71,7 +97,7 @@ class Paquete extends Model
         return self::where('estado', EstadoPaquete::Activo);
     }
 
-    // CU-05: lo que muestra cada paquete en el listado del portal.
+    // Lo que muestra cada paquete en el listado del portal.
     public function getDatosResumen(): array
     {
         return [

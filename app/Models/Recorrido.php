@@ -29,6 +29,8 @@ class Recorrido extends Model
         return $this->hasMany(Paquete::class, 'id_recorrido', 'id_recorrido');
     }
 
+    /* ------------------------- CU-13 Notificar cliente ------------------------ */
+
     public function getDatosRecorrido(): array
     {
         return [

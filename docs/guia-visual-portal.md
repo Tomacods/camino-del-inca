@@ -6,7 +6,7 @@ tarjetas blancas con sombra suave, botones azules en forma de pastilla y título
 vigente desde el 06/10/2026; la paleta oscura del prototipo quedó reservada (ver
 [Paleta reservada para un posible modo oscuro](#paleta-reservada-para-un-posible-modo-oscuro)).
 
-Para ver todos los componentes juntos, con el servidor local levantado: <http://localhost:8000/guia-visual>. Esa
+Para ver todos los componentes juntos, con el servidor local levantado: <http://127.0.0.1:8000/guia-visual>. Esa
 página sólo existe con `APP_ENV=local`.
 
 ## Paleta
@@ -45,8 +45,10 @@ Reglas:
 
 ## Tipografía
 
-Una sola familia, **Inter**, para títulos y textos (es la de Google Fonts más parecida a la de Apple). Se carga en el
-layout con los pesos 400, 500, 600 y 700.
+Una sola familia, **Inter**, para títulos y textos (la más parecida a la de Apple entre las libres). Se sirve desde el
+proyecto: `resources/fonts/inter-latin.woff2`, declarada con `@font-face` en `app.css`, en su versión variable (todos
+los pesos). No se carga de Google Fonts porque esa hoja externa frenaba el primer pintado de cada página. Su licencia
+(SIL Open Font License 1.1) tiene que acompañar al archivo: está en `resources/fonts/OFL.txt`.
 
 - Títulos en `font-semibold`, con el espaciado entre letras un poco cerrado (ya aplicado a `h1`, `h2` y `h3`).
 - Títulos en dos tonos, como en la tienda de Apple: la primera frase en `texto` y la segunda en `texto-secundario`.
@@ -137,7 +139,7 @@ Para una opción que todavía no tiene pantalla, botón deshabilitado con la ley
 
 ```blade
 <x-boton disabled class="flex-col">
-    Pagar saldo
+    Valorar servicios
     <span class="text-sm">Disponible próximamente</span>
 </x-boton>
 ```
@@ -226,6 +228,47 @@ El estado siempre va escrito: el color ayuda, pero no es lo único que lo indica
 <x-chip-estado :estado="$reserva->estado" />
 <x-chip-estado :estado="$excursionista->estado_permiso" />
 ```
+
+### Hitos del recorrido — `<x-hitos-del-camino>`
+
+| Atributo | Para qué | Por defecto |
+|---|---|---|
+| `href` | Adónde lleva el botón final «Ver fechas de salida» | `/paquetes` |
+
+Sección completa, con título: los cinco hitos del Camino Inca de 4 días como un paseo con el scroll, a la manera de
+[midudev/mcp-higgsfield-landing](https://github.com/midudev/mcp-higgsfield-landing) pero con fotos fijas en vez de video
+y sin GSAP. Hoy está en la portada.
+
+- **Escenario.** Ocupa todo el ancho y queda fijo (`sticky`) mientras pasan las paradas. Tiene una foto por hito y una
+  para el botón final, una encima de la otra. `resources/js/recorrido.js` calcula en qué punto del recorrido está el
+  visitante (0 en el primer hito, 1 en el segundo, 2.5 a mitad de camino entre el tercero y el cuarto) y con eso
+  funde cada foto con la siguiente y la acerca un 6 %. Con «reducir movimiento» del sistema, no la acerca. Salvo la
+  primera, las fotos llevan la dirección en `data-srcset` y `data-src`, y el script las pide cuando el escenario está
+  a una pantalla de distancia: en el celular, quien no baja hasta la sección no las descarga.
+- **Tarjetas.** Cada hito muestra altitud, distancia desde el inicio y dificultad, y se abre con `<details>`, sin
+  JavaScript, para leer la aclimatación y la dificultad del tramo.
+- **Riel.** En pantallas grandes, a la derecha: marca el hito actual (`aria-current="step"`) y lleva a cualquiera.
+  Las paradas tienen `pointer-events-none` (sólo las tarjetas reciben clics) porque se pintan encima del riel.
+- **Sin JavaScript** se ve la primera foto todo el tiempo; el resto de la sección funciona igual.
+
+```blade
+<x-hitos-del-camino class="mt-24 sm:mt-32" />
+<x-hitos-del-camino href="#fechas" />   {{-- en la pantalla de un paquete, directo a sus fechas --}}
+```
+
+Los datos están en el mismo componente: la tabla `etapa` no tiene altitud ni distancia. Los nombres son los de las
+etapas de `RecorridoSeeder`, y `HitosDelCaminoTest` avisa si dejan de coincidir o si falta alguna foto.
+
+**Fotos.** Cada una muestra el lugar de su hito. Las de Machu Picchu (el hito 5 y el cierre) las sacó la tía de
+Tomás; las otras cuatro son de Wikimedia Commons, con licencia CC BY 4.0 o CC BY-SA 4.0. Esas licencias piden nombrar
+al autor y la licencia y avisar que la foto se modificó (están recortadas); las CC BY-SA, además, se comparten con la
+misma licencia. Todo eso va en los créditos, debajo de la sección. Están en `public/img/recorrido/` en dos recortes:
+`-horizontal` (apaisada, hasta 1920 px de ancho) y `-vertical` (hasta 900 × 1350, para celulares); el `<picture>`
+elige según la orientación de la pantalla. Para cambiar una foto: reemplazar los dos archivos con el mismo nombre y
+actualizar sus datos (`muestra`, `autor`, `licencia`, `enlaceLicencia`, `sitio`, `enlace`) en el componente; una foto
+propia lleva esos cuatro últimos en `null`.
+
+Para que el escenario ocupe todo el ancho sin barra horizontal, `html` lleva `overflow-x: clip` en `app.css`.
 
 ## Accesibilidad
 

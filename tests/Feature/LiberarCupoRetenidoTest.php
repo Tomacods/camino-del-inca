@@ -50,6 +50,16 @@ class LiberarCupoRetenidoTest extends TestCase
         $this->assertSame(1, $this->excursion->fresh()->plazas_retenidas);
     }
 
+    public function test_ya_liberada_dice_si_la_retencion_se_libero(): void
+    {
+        $this->assertFalse(LiberarCupoRetenido::yaLiberada('retencion-1'));
+
+        (new LiberarCupoRetenido($this->excursion->id_excursion, 2, 'retencion-1'))->handle();
+
+        $this->assertTrue(LiberarCupoRetenido::yaLiberada('retencion-1'));
+        $this->assertFalse(LiberarCupoRetenido::yaLiberada('retencion-2'));
+    }
+
     private function crearExcursion(int $plazasRetenidas): Excursion
     {
         $recorrido = Recorrido::create(['nombre' => 'Camino Inca de 4 días', 'duracion_dias' => 4, 'cantidad_campings' => 3]);

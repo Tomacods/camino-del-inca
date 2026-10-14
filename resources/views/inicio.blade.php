@@ -1,3 +1,8 @@
+@php
+    $minutosRetencion = config('reserva.minutos_retencion');
+    $plazoRetencion = $minutosRetencion === 1 ? '1 minuto' : $minutosRetencion.' minutos';
+@endphp
+
 <x-layouts::app>
     <section class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between lg:gap-16">
         <h1 class="max-w-3xl text-5xl leading-[1.05] font-semibold sm:text-6xl lg:text-7xl">
@@ -33,7 +38,7 @@
         <ol class="mt-8 grid gap-5 md:grid-cols-3">
             @foreach ([
                 ['Elegí el paquete', 'Mirá qué incluye cada paquete y las fechas de salida con lugares disponibles.'],
-                ['Reservá y pagá', 'Cargá los datos de cada excursionista. Tu lugar queda guardado 5 minutos mientras pagás.'],
+                ['Reservá y pagá', 'Cargá los datos de cada excursionista. Tu lugar queda guardado '.$plazoRetencion.' mientras pagás.'],
                 ['Seguí tu reserva', 'Te llega un correo con el número de reserva. Con ese número y tu correo ves el estado y pagás el saldo.'],
             ] as $indice => [$titulo, $texto])
                 <li class="flex flex-col rounded-[18px] bg-tarjeta p-7 shadow-tarjeta">
@@ -44,4 +49,6 @@
             @endforeach
         </ol>
     </section>
+
+    <x-hitos-del-camino class="mt-24 sm:mt-32" />
 </x-layouts::app>

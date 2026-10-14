@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoPaquete;
 use App\Enums\EstadoReserva;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -150,7 +151,95 @@ class Excursion extends Model
         });
     }
 
-    // CU-05 y CU-06: una salida está disponible si todavía no salió y le queda al menos un lugar.
+    /* ------------------------------ CU-15 Pagar ------------------------------- */
+
+    // Asocia la reserva a esta excursión y la guarda.
+    public function agregarReserva(Reserva $reserva): void
+    {
+        $this->reservas()->save($reserva);
+    }
+
+    /* ------------------------ CU-10 Listar integrantes ------------------------ */
+
+    // Las excursiones a cargo de un guía: en el panel, cada guía ve sólo las suyas.
+    public function scopeDeGuia(Builder $consulta, int $idGuia): Builder
+    {
+        return $consulta->where('id_guia', $idGuia);
+    }
+
+    // El guía ve sólo los integrantes de las reservas confirmadas: las que están pendientes o sin permiso todavía pueden
+    // no viajar. Ordenadas por número, para mostrar los integrantes agrupados por reserva.
+    public function reservasConfirmadas(): HasMany
+    {
+        return $this->reservas()->where('estado', EstadoReserva::Confirmada)->orderBy('numero_reserva');
+    }
+
+    // Busca la excursión por el paquete y la fecha de salida, que la identifican. Trae de una vez el paquete, el guía y las
+    // reservas confirmadas con sus integrantes, así mostrarla no consulta la base por cada reserva.
+    public static function seleccionarExcursion(int $idPaquete, string $fechaSalida): ?self
+    {
+        return self::buscarPorFechaSalida($idPaquete, $fechaSalida)?->load([
+            'paquete',
+            'guia',
+            'reservasConfirmadas.excursionistas' => fn ($consulta) => $consulta->orderBy('apellido')->orderBy('nombre'),
+        ]);
+    }
+
+    // El encabezado de la página de integrantes. No se llama getDatosExcursion() porque ese nombre lo usan CU-20 y CU-13
+    // para traer la excursión con el paquete y el guía.
+    public function getEncabezado(): array
+    {
+        return [
+            'paquete' => $this->paquete->nombre,
+            'fecha_salida' => $this->getFechaSalida(),
+            'guia' => $this->guia->getNombreCompleto(),
+            'cupo' => $this->cupo,
+            'integrantes' => $this->contarIntegrantesConfirmados(),
+        ];
+    }
+
+    public function getReservasConfirmadas(): Collection
+    {
+        return $this->reservasConfirmadas;
+    }
+
+    // La cantidad que muestra «Mis excursiones»: los mismos integrantes que lista la página de la excursión.
+    public function contarIntegrantesConfirmados(): int
+    {
+        return $this->getReservasConfirmadas()->sum(fn (Reserva $reserva) => $reserva->getExcursionistas()->count());
+    }
+
+    /* ------------------------------ CU-20 Modificar ------------------------------- */
+
+    public function getDatosExcursion(): self
+    {
+        return $this->load(['paquete', 'guia']);
+    }
+
+    // No se revisa el estado del paquete: R-03 no deja pasar a «Inactivo» un paquete con reservas «Pendiente»,
+    // «Confirmada» o «Sin Permiso», así que el de una reserva «Confirmada» está siempre «Activo».
+    public static function buscarOtrasDelPaquete(int $idPaquete, Carbon $fechaOrigen, int $cantidad): Collection
+    {
+        $otras = self::with(['paquete', 'guia'])
+            ->where('id_paquete', $idPaquete)
+            ->whereDate('fecha_salida', '!=', $fechaOrigen)
+            ->get();
+
+        return self::filtrarHabilitadas($otras, $cantidad);
+    }
+
+    public static function filtrarHabilitadas(Collection $excursiones, int $cantidad): Collection
+    {
+        return $excursiones
+            ->filter(fn ($excursion) => $excursion->cumpleAnticipacionMinima(now()))
+            ->each(fn ($excursion) => $excursion->cupo_disponible = $excursion->obtenerCupoDisponible())
+            ->filter(fn ($excursion) => $excursion->cupo_disponible >= $cantidad)
+            ->values();
+    }
+
+    /* ------------------------- CU-05 Listar paquetes ------------------------- */
+
+    // También para CU-06: una salida está disponible si todavía no salió y le queda al menos un lugar.
     public static function getExcursionesDisponibles(int $idPaquete): Collection
     {
         return self::buscarFuturas($idPaquete)

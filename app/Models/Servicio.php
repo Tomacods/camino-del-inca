@@ -30,4 +30,16 @@ class Servicio extends Model
     {
         return $this->belongsToMany(Paquete::class, 'paquete_servicio', 'id_servicio', 'id_paquete');
     }
+
+    /* ------------------------- CU-13 Notificar cliente ------------------------ */
+
+    // Los datos de este servicio. El nombre es el del DS-13: Paquete::getDatosComprobante() lo llama por cada servicio
+    // que incluye el paquete.
+    public function getServiciosIncluidos(): array
+    {
+        return [
+            'tipo' => $this->tipo,
+            'nombre' => $this->nombre,
+        ];
+    }
 }

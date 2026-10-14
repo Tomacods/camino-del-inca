@@ -43,6 +43,46 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Porcentaje de la seña
+    |--------------------------------------------------------------------------
+    |
+    | La parte del monto total que se paga si el cliente elige abonar la seña,
+    | como fracción: 0.50 es el 50 % (CU-15 Pagar Reserva).
+    |
+    */
+
+    'porcentaje_sena' => 0.50,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Anticipación de las fechas límite
+    |--------------------------------------------------------------------------
+    |
+    | Meses antes de la salida en que vencen la confirmación de la reserva y, si
+    | se pagó la seña, el pago del saldo. Vencen a las 23:59:59 de ese día
+    | (CU-15 Pagar Reserva).
+    |
+    */
+
+    'meses_anticipacion_fechas_limite' => 1,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Vigencia del pedido de cobro del saldo
+    |--------------------------------------------------------------------------
+    |
+    | Minutos que tiene el cliente para pagar el saldo en Mercado Pago después
+    | de confirmar; si la fecha límite del saldo llega antes, el pedido vence
+    | en ella. No hay una retención que lo limite, y un pedido abierto por
+    | semanas se podría pagar con el saldo ya abonado (CU-16 Pagar Saldo
+    | Pendiente).
+    |
+    */
+
+    'minutos_vigencia_pago_saldo' => 5,
+
+    /*
+    |--------------------------------------------------------------------------
     | Anticipación para el reembolso
     |--------------------------------------------------------------------------
     |

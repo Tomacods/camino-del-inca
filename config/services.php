@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    // Checkout Pro (CU-15). Sólo el Access Token: la Public Key es para el SDK del navegador, que no se usa.
+    'mercadopago' => [
+        'access_token' => env('MERCADOPAGO_ACCESS_TOKEN'),
+    ],
+
 ];

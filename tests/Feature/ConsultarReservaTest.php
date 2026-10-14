@@ -18,6 +18,7 @@ use App\Models\Reserva;
 use App\Models\Usuario;
 use App\Models\Valoracion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -30,6 +31,9 @@ class ConsultarReservaTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // «Modificar reserva» depende de la fecha: se fija para que la prueba no cambie de resultado con los días.
+        $this->travelTo(Carbon::parse('2026-10-13 10:00:00'));
 
         $this->crearReservaConfirmada();
     }
@@ -66,13 +70,52 @@ class ConsultarReservaTest extends TestCase
             ->assertSee('USD 650');
     }
 
-    public function test_las_opciones_sin_pantalla_se_muestran_deshabilitadas(): void
+    public function test_las_opciones_con_pantalla_se_muestran_como_enlaces(): void
     {
         $this->consultarReserva('000125-9')
-            ->assertSee('Pagar saldo')
-            ->assertSee('Modificar reserva')
-            ->assertSee('Disponible próximamente')
-            ->assertSeeHtml('href="/mi-reserva/000125-9/cancelar"');
+            ->assertSeeHtml('href="/mi-reserva/000125-9/pagar-saldo"')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/modificar"')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/cancelar"')
+            ->assertDontSee('Disponible próximamente');
+    }
+
+    public function test_a_menos_de_3_meses_de_la_salida_no_ofrece_modificar_la_reserva(): void
+    {
+        // Desde el 02/11/2026, la salida del 01/02/2027 queda a menos de 3 meses: la pantalla de modificar la rechazaría.
+        $this->travelTo(Carbon::parse('2026-11-02 09:00:00'));
+
+        $this->consultarReserva('000125-9')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/pagar-saldo"')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/cancelar"')
+            ->assertDontSeeHtml('/mi-reserva/000125-9/modificar')
+            ->assertDontSee('Modificar reserva');
+    }
+
+    public function test_justo_a_3_meses_de_la_salida_todavia_ofrece_modificar_la_reserva(): void
+    {
+        // El 01/11/2026, aunque sea de noche, la salida del 01/02/2027 está justo a 3 meses.
+        $this->travelTo(Carbon::parse('2026-11-01 23:00:00'));
+
+        $this->consultarReserva('000125-9')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/modificar"');
+    }
+
+    public function test_las_opciones_sin_pantalla_se_muestran_deshabilitadas(): void
+    {
+        $this->crearReservaSinPermiso('000123-5', 'ana.gomez@mail.com');
+
+        $componente = $this->consultarReserva('000123-5', 'ana.gomez@mail.com')
+            ->assertSee('Reserva 000123-5')
+            ->assertSeeHtmlInOrder(['disabled="disabled"', 'Solicitar reprogramación', 'Disponible próximamente']);
+
+        // Sólo Reprogramar: el reintegro ya tiene pantalla.
+        $this->assertSame(1, substr_count($componente->html(), 'Disponible próximamente'));
+    }
+
+    public function test_pagar_saldo_lleva_a_su_pantalla(): void
+    {
+        $this->consultarReserva('000125-9')
+            ->assertSeeHtmlInOrder(['<a href="/mi-reserva/000125-9/pagar-saldo"', 'Pagar saldo', '</a>']);
     }
 
     public function test_encuentra_la_reserva_aunque_el_correo_tenga_otras_mayusculas(): void
@@ -192,6 +235,22 @@ class ConsultarReservaTest extends TestCase
             'noches_extra_despues' => 0,
             'fecha_limite_saldo' => null,
             'fecha_limite_confirmacion' => '2026-08-07 23:59:59',
+        ]);
+    }
+
+    private function crearReservaSinPermiso(string $numeroReserva, string $correo): Reserva
+    {
+        return Reserva::create([
+            'id_excursion' => $this->excursion->id_excursion,
+            'numero_reserva' => $numeroReserva,
+            'correo_electronico' => $correo,
+            'fecha_reserva' => '2026-10-01 10:00:00',
+            'estado' => EstadoReserva::SinPermiso,
+            'estado_saldo' => EstadoSaldo::Adeudado,
+            'noches_extra_antes' => 0,
+            'noches_extra_despues' => 0,
+            'fecha_limite_saldo' => '2027-01-01 23:59:59',
+            'fecha_limite_confirmacion' => '2027-01-01 23:59:59',
         ]);
     }
 }

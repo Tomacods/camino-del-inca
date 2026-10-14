@@ -31,11 +31,24 @@ class LiberarCupoRetenido implements ShouldQueue
         DB::transaction(function () {
             // add() sólo guarda si la clave no existía, y dice si la guardó: la primera vez da verdadero y las
             // siguientes, falso.
-            $primeraVez = Cache::add('retencion-liberada:'.$this->idRetencion, true, now()->addHours(self::HORAS_MARCA_LIBERADA));
+            $primeraVez = Cache::add(self::claveMarcaLiberada($this->idRetencion), true, now()->addHours(self::HORAS_MARCA_LIBERADA));
 
             if ($primeraVez) {
                 Excursion::findOrFail($this->idExcursion)->liberarCupoRetenido($this->cantidadPlazas);
             }
         });
+    }
+
+    // Si la retención ya se liberó, por vencimiento, por cancelación o por un pago (CU-15). Lee la misma marca que
+    // deja handle().
+    public static function yaLiberada(string $idRetencion): bool
+    {
+        return Cache::has(self::claveMarcaLiberada($idRetencion));
+    }
+
+    // La clave de la marca se arma sólo acá, así handle() y yaLiberada() leen siempre la misma.
+    private static function claveMarcaLiberada(string $idRetencion): string
+    {
+        return 'retencion-liberada:'.$idRetencion;
     }
 }

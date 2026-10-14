@@ -202,8 +202,8 @@ Reserva grupal de una excursión.
 | `estado_saldo` | Enumeración EstadoSaldo | No | «Adeudado» si se pagó la seña; «Abonado» si se pagó el total |
 | `noches_extra_antes` | SMALLINT | No | Mayor o igual a 0. Sumada a `noches_extra_despues`, a lo sumo 2 |
 | `noches_extra_despues` | SMALLINT | No | Mayor o igual a 0 |
-| `fecha_limite_saldo` | TIMESTAMP | Sí | Nulo si se abonó el total |
-| `fecha_limite_confirmacion` | TIMESTAMP | No |  |
+| `fecha_limite_saldo` | TIMESTAMP | Sí | Nulo si se abonó el total. Si se pagó la seña, un mes antes de la fecha de salida, a las 23:59:59 |
+| `fecha_limite_confirmacion` | TIMESTAMP | No | Un mes antes de la fecha de salida, a las 23:59:59 |
 
 ### excursionista
 
@@ -240,7 +240,7 @@ Constancia emitida por cada pago.
 |---|---|---|---|
 | `id_comprobante` | BIGINT | No | Clave primaria, autoincremental |
 | `id_pago` | BIGINT | No | Clave foránea a `pago`. Único: un comprobante por pago |
-| `numero_comprobante` | VARCHAR(20) | No | Único |
+| `numero_comprobante` | VARCHAR(20) | No | Único. `0001-` más `id_pago` con ocho cifras (`0001-00000009`): como `id_pago` no se repite, no hace falta otro contador |
 | `fecha_emision` | TIMESTAMP | No |  |
 
 ### devolucion

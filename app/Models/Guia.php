@@ -32,4 +32,11 @@ class Guia extends Model
     {
         return $this->hasMany(Excursion::class, 'id_guia', 'id_usuario');
     }
+
+    /* ------------------------ CU-10 Listar integrantes ------------------------ */
+
+    public function getNombreCompleto(): string
+    {
+        return $this->nombre.' '.$this->apellido;
+    }
 }

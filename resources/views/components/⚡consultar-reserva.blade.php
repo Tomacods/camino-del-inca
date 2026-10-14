@@ -168,7 +168,7 @@ new class extends Component
 
                 <h3 class="mt-8 text-lg font-semibold">Pagos</h3>
                 <dl class="mt-1 divide-y divide-divisor text-[17px]">
-                    <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Monto total</dt><dd class="tabular-nums">USD {{ number_format($reserva->obtenerMontoTotal(), 0, ',', '.') }}</dd></div>
+                    <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Monto total</dt><dd class="tabular-nums">USD {{ number_format($reserva->calcularMontoTotal(), 0, ',', '.') }}</dd></div>
                     <div class="flex justify-between gap-4 py-3">
                         <dt class="text-texto-secundario">Saldo</dt>
                         <dd class="text-right tabular-nums {{ $saldoPorPagar ? 'font-semibold text-ambar' : '' }}">
@@ -201,8 +201,12 @@ new class extends Component
                             <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/cancelar">{{ $opcion }}</x-boton>
                         @elseif ($opcion === Reserva::OPCION_REINTEGRO)
                             <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/reintegro">{{ $opcion }}</x-boton>
+                        @elseif ($opcion === Reserva::OPCION_MODIFICAR)
+                            <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/modificar">{{ $opcion }}</x-boton>
+                        @elseif ($opcion === Reserva::OPCION_PAGAR_SALDO)
+                            <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/pagar-saldo">{{ $opcion }}</x-boton>
                         @else
-                            {{-- Pagar saldo, modificar, reprogramar y valorar todavía no tienen pantalla. --}}
+                            {{-- Reprogramar y valorar todavía no tienen pantalla. --}}
                             <x-boton disabled class="flex-col">
                                 {{ $opcion }}
                                 <span class="text-sm">Disponible próximamente</span>
