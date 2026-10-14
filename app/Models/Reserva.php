@@ -600,23 +600,24 @@ class Reserva extends Model
             ->endOfDay();
     }
 
-    private function armarResumenCambio(Collection $habilitadas,Carbon $fechaElegida ){
-    $destino = $habilitadas->first(
-                fn ($excursion) => $excursion->fecha_salida->isSameDay($fechaElegida)
-            );
+    private function armarResumenCambio(Collection $habilitadas, Carbon $fechaElegida)
+    {
+        $destino = $habilitadas->first(
+            fn ($excursion) => $excursion->fecha_salida->isSameDay($fechaElegida)
+        );
 
-            if ($destino === null) {
-                throw new DomainException('La excursión elegida ya no está disponible.');
-            }
+        if ($destino === null) {
+            throw new DomainException('La excursión elegida ya no está disponible.');
+        }
 
-            $fechaLimite = self::calcularFechaLimite($destino->getFechaSalida());
+        $fechaLimite = self::calcularFechaLimite($destino->getFechaSalida());
 
-            return [
-                'origen' => $this->excursion->getDatosExcursion(),
-                'destino' => $destino->getDatosExcursion(),
-                'fecha_limite' => $fechaLimite,
-                'fecha_limite_saldo' => $this->estado_saldo === EstadoSaldo::Adeudado ? $fechaLimite : null,
-            ];
+        return [
+            'origen' => $this->excursion->getDatosExcursion(),
+            'destino' => $destino->getDatosExcursion(),
+            'fecha_limite' => $fechaLimite,
+            'fecha_limite_saldo' => $this->estado_saldo === EstadoSaldo::Adeudado ? $fechaLimite : null,
+        ];
 
     }
 
@@ -637,12 +638,12 @@ class Reserva extends Model
     // Cruce con CU-16: R-16 sólo cobra el saldo con la reserva «Confirmada». Si el cliente modifica con un cobro abierto
     // en Mercado Pago, ese pago queda sin registrar y la devolución es manual, con la agencia (decisión del grupo del
     // 13/09). No se bloquea la modificación porque la base no tiene dónde guardar el cobro abierto.
-    private function cambiarDeExcursionPendiente(EstadoReserva $estado,string $mensaje, Excursion $destino): void
+    private function cambiarDeExcursionPendiente(EstadoReserva $estado, string $mensaje, Excursion $destino): void
     {
-        DB::transaction(function () use ($destino) {
+        DB::transaction(function () use ($destino, $estado, $mensaje) {
             $actual = self::with('excursionistas')->lockForUpdate()->findOrFail($this->id_reserva);
 
-            if (! $actual->validarEstado([$estado])) { 
+            if (! $actual->validarEstado([$estado])) {
                 throw new DomainException($mensaje);
             }
 
@@ -670,18 +671,19 @@ class Reserva extends Model
         // Quien la llamó (la pantalla) ve la reserva como quedó.
         $this->refresh();
     }
-        public function modificarExcursion(Excursion $destino): void
+
+    public function modificarExcursion(Excursion $destino): void
     {
         $this->cambiarDeExcursionPendiente(
-            $destino,
             EstadoReserva::Confirmada,
-            'La reserva no admite modificación.'
+            'La reserva no admite modificación.',
+            $destino
         );
     }
 
     /* ----------------------------- CU-19 Solicitar Reprogramacion Por Falta de Permisos ---------------------------- */
 
-        public function iniciarReprogramacion(): Collection
+    public function iniciarReprogramacion(): Collection
     {
         if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
             throw new DomainException('La reserva no admite reprogramación.');
@@ -702,10 +704,9 @@ class Reserva extends Model
     public function reprogramar(Excursion $destino): void
     {
         $this->cambiarDeExcursionPendiente(
-            $destino,
             EstadoReserva::SinPermiso,
-            'La reserva no admite reprogramación.'
+            'La reserva no admite reprogramación.',
+            $destino
         );
     }
-
 }
