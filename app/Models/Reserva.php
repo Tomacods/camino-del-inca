@@ -621,10 +621,17 @@ class Reserva extends Model
         $this->excursion()->associate($destino);
     }
 
+    // Todo se hace sobre $actual, la reserva leída con su fila bloqueada, y no sobre esta instancia, que la pantalla leyó
+    // antes: si mientras tanto se registró el pago del saldo (Pago::registrarPagoSaldo(), que bloquea la misma fila) o se
+    // canceló la reserva, $this tiene el estado viejo y fijarFechasLimite() usaría un estado_saldo que ya no es.
+    //
+    // Cruce con CU-16: R-16 sólo cobra el saldo con la reserva «Confirmada». Si el cliente modifica con un cobro abierto
+    // en Mercado Pago, ese pago queda sin registrar y la devolución es manual, con la agencia (decisión del grupo del
+    // 13/09). No se bloquea la modificación porque la base no tiene dónde guardar el cobro abierto.
     public function modificarExcursion(Excursion $destino): void
     {
         DB::transaction(function () use ($destino) {
-            $actual = self::lockForUpdate()->findOrFail($this->id_reserva);
+            $actual = self::with('excursionistas')->lockForUpdate()->findOrFail($this->id_reserva);
 
             if (! $actual->validarEstado([EstadoReserva::Confirmada])) {
                 throw new DomainException('La reserva no admite modificación.');
@@ -632,19 +639,22 @@ class Reserva extends Model
 
             $destino = Excursion::lockForUpdate()->findOrFail($destino->id_excursion);
 
-            if (! $destino->tieneCupoPara($this->getCantidadExcursionistas())) {
+            if (! $destino->tieneCupoPara($actual->getCantidadExcursionistas())) {
                 throw new DomainException('La excursión elegida ya no tiene lugar.');
             }
 
-            $this->cambiarExcursion($destino);
-            $this->estado = EstadoReserva::Pendiente;
+            $actual->cambiarExcursion($destino);
+            $actual->estado = EstadoReserva::Pendiente;
 
-            foreach ($this->excursionistas as $excursionista) {
+            foreach ($actual->excursionistas as $excursionista) {
                 $excursionista->actualizarPermiso(EstadoPermiso::Pendiente);
             }
 
-            $this->fijarFechasLimite($destino->getFechaSalida());
-            $this->save();
+            $actual->fijarFechasLimite($destino->getFechaSalida());
+            $actual->save();
         });
+
+        // Quien la llamó (la pantalla) ve la reserva como quedó.
+        $this->refresh();
     }
 }
