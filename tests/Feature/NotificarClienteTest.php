@@ -25,11 +25,13 @@ class NotificarClienteTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected $seed = true;
-
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Dentro de la transacción de cada prueba, que al terminar se deshace. Con $seed = true sólo se sembraría si
+        // esta fuera la primera clase en migrar la base en memoria, que las pruebas comparten.
+        $this->seed();
 
         // Antes de todas las fechas límite de los seeders que se usan acá.
         $this->travelTo('2026-10-14 12:00:00');
