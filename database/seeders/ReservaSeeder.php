@@ -126,10 +126,12 @@ class ReservaSeeder extends Seeder
         ]);
     }
 
+    // whereDate compara sólo el día, como Excursion::buscarPorFechaSalida(): así los seeders corren también en SQLite
+    // (las pruebas), que guarda la fecha con hora.
     private function crearReserva(string $nombrePaquete, string $fechaSalida, array $datosReserva, array $excursionistas): void
     {
         $excursion = Paquete::where('nombre', $nombrePaquete)->firstOrFail()
-            ->excursiones()->where('fecha_salida', $fechaSalida)->firstOrFail();
+            ->excursiones()->whereDate('fecha_salida', $fechaSalida)->firstOrFail();
 
         $reserva = Reserva::firstOrCreate(
             ['numero_reserva' => $datosReserva['numero_reserva']],
