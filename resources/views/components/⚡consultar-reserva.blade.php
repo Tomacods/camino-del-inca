@@ -205,8 +205,10 @@ new class extends Component
                             <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/modificar">{{ $opcion }}</x-boton>
                         @elseif ($opcion === Reserva::OPCION_PAGAR_SALDO)
                             <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/pagar-saldo">{{ $opcion }}</x-boton>
+                        @elseif ($opcion === Reserva::OPCION_REPROGRAMAR)
+                            <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/reprogramar">{{ $opcion }}</x-boton>
                         @else
-                            {{-- Reprogramar y valorar todavía no tienen pantalla. --}}
+                            {{-- valorar todavía no tienen pantalla. --}}
                             <x-boton disabled class="flex-col">
                                 {{ $opcion }}
                                 <span class="text-sm">Disponible próximamente</span>
