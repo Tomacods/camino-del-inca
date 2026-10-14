@@ -6,7 +6,9 @@ use App\Enums\EstadoPaquete;
 use App\Enums\EstadoReserva;
 use App\Enums\EstadoSaldo;
 use App\Enums\Rol;
+use App\Enums\TipoNotificacion;
 use App\Enums\TipoPago;
+use App\Mail\NotificacionCliente;
 use App\Models\Excursion;
 use App\Models\Guia;
 use App\Models\Paquete;
@@ -15,9 +17,12 @@ use App\Models\Reserva;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\MercadoPagoDePrueba;
+use Tests\ServicioCorreoQueFalla;
 use Tests\TestCase;
 
 // La vuelta de Mercado Pago y la pantalla de la reserva registrada (CU-15, pasos 6 a 11 y cursos A2 y A3).
@@ -286,6 +291,54 @@ class ReservaConfirmadaTest extends TestCase
                 ->assertOk()
                 ->assertSeeInOrder(['Tu número de reserva', $numeroReserva]);
         }
+    }
+
+    /* ---------------------- Paso 12: Notificar Cliente (CU-13) ---------------- */
+
+    public function test_con_la_reserva_registrada_envia_el_correo_primera_compra_al_titular(): void
+    {
+        Mail::fake();
+
+        $numeroReserva = $this->registrarUnaReserva();
+
+        Mail::assertQueuedCount(1);
+        Mail::assertQueued(NotificacionCliente::class, fn (NotificacionCliente $correo) => $correo->tipo === TipoNotificacion::PrimeraCompra
+            && $correo->hasTo('ana.perez@mail.com')
+            && $correo->datos['reserva']['numero_reserva'] === $numeroReserva);
+    }
+
+    public function test_la_misma_vuelta_dos_veces_envia_un_solo_correo(): void
+    {
+        Mail::fake();
+        $this->registrarUnaReserva();
+
+        $this->volverDeMercadoPago();
+
+        Mail::assertQueuedCount(1);
+    }
+
+    public function test_si_la_reserva_no_se_registra_no_envia_ningun_correo(): void
+    {
+        Mail::fake();
+        $enCurso = $this->guardarReservaEnCurso();
+        $this->mercadoPago->responder($this->pago('rejected', $enCurso['id_retencion'].'_Total'));
+
+        $this->volverDeMercadoPago(['status' => 'rejected']);
+
+        Mail::assertNothingQueued();
+    }
+
+    // A8 de CU-13: el correo falla, pero la reserva ya quedó registrada y el cliente ve su número.
+    public function test_si_el_correo_falla_la_reserva_queda_registrada(): void
+    {
+        ServicioCorreoQueFalla::instalar();
+        Log::spy();
+
+        $numeroReserva = $this->registrarUnaReserva();
+
+        Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, ServicioCorreoQueFalla::MENSAJE));
+        $this->assertSame(EstadoReserva::Pendiente, Reserva::sole()->estado);
+        $this->get('/reservar/confirmada')->assertOk()->assertSeeInOrder(['Tu número de reserva', $numeroReserva]);
     }
 
     // Registra una reserva por el camino normal (pago aprobado y vuelta) y devuelve su número.

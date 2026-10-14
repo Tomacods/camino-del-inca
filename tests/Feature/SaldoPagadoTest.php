@@ -7,7 +7,9 @@ use App\Enums\EstadoPermiso;
 use App\Enums\EstadoReserva;
 use App\Enums\EstadoSaldo;
 use App\Enums\Rol;
+use App\Enums\TipoNotificacion;
 use App\Enums\TipoPago;
+use App\Mail\NotificacionCliente;
 use App\Models\Excursion;
 use App\Models\Guia;
 use App\Models\Pago;
@@ -18,9 +20,11 @@ use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\MercadoPagoDePrueba;
+use Tests\ServicioCorreoQueFalla;
 use Tests\TestCase;
 
 // La vuelta de Mercado Pago del saldo y la pantalla del comprobante (CU-16, pasos 7 a 10 y curso A4), con la reserva
@@ -423,6 +427,45 @@ class SaldoPagadoTest extends TestCase
         $this->pagarSaldo();
 
         $this->get('/mi-reserva/000122-3/saldo-pagado')->assertRedirect('/mi-reserva/000122-3/pagar-saldo');
+    }
+
+    /* ---------------------- Paso 11: Notificar Cliente (CU-13) ---------------- */
+
+    public function test_con_el_saldo_registrado_envia_el_correo_pago_de_saldo_al_titular(): void
+    {
+        Mail::fake();
+        $this->darAcceso();
+
+        $this->pagarSaldo();
+
+        Mail::assertQueuedCount(1);
+        Mail::assertQueued(NotificacionCliente::class, fn (NotificacionCliente $correo) => $correo->tipo === TipoNotificacion::PagoSaldo
+            && $correo->hasTo('federico.rios@mail.com'));
+    }
+
+    public function test_si_el_saldo_no_se_registra_no_envia_ningun_correo(): void
+    {
+        Mail::fake();
+        $this->darAcceso();
+        $this->mercadoPago->responder($this->pago('rejected', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago(['status' => 'rejected']);
+
+        Mail::assertNothingQueued();
+    }
+
+    // A8 de CU-13: el correo falla, pero el pago del saldo ya quedó registrado y el cliente ve su comprobante.
+    public function test_si_el_correo_falla_el_saldo_queda_registrado(): void
+    {
+        ServicioCorreoQueFalla::instalar();
+        Log::spy();
+        $this->darAcceso();
+
+        $this->pagarSaldo();
+
+        Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, ServicioCorreoQueFalla::MENSAJE));
+        $this->assertSame(EstadoSaldo::Abonado, $this->reserva->fresh()->estado_saldo);
+        $this->assertNotNull($this->pagoSaldo()->comprobante);
     }
 
     // La pantalla después de la vuelta, sin parámetros: con 'saldo_pagado' en la sesión, muestra el pago registrado.
