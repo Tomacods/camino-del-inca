@@ -152,7 +152,7 @@ new class extends Component
 };
 ?>
 <div>
-    <h1 class="text-4xl font-semibold sm:text-4phpxl">
+    <h1 class="text-4xl font-semibold sm:text-4xl">
         Cambiar de excursión. <span class="text-texto-secundario">Elegí otra fecha de salida.</span>
     </h1>
 
