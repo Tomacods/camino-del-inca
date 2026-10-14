@@ -311,7 +311,7 @@ class SaldoPagadoTest extends TestCase
 
         $this->volverDeMercadoPago()
             ->assertOk()
-            ->assertSeeInOrder(['No pudimos registrar el pago', 'La devolución del dinero se gestiona con la agencia', self::NUMERO_OPERACION]);
+            ->assertSeeInOrder(['No pudimos registrar el pago', 'se cambió de excursión mientras pagabas', 'La devolución del dinero se gestiona con la agencia', self::NUMERO_OPERACION]);
 
         $this->assertNoSeRegistroElSaldo();
         $this->assertSame(EstadoReserva::Pendiente, $this->reserva->fresh()->estado);

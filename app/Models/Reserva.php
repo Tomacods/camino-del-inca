@@ -233,7 +233,6 @@ class Reserva extends Model
     // Vencen a las 23:59:59, como en los seeders. subMonthsNoOverflow no se pasa al mes siguiente: del 29/03 va al 28/02
     // y no al 01/03. Carbon::parse hace una copia, así no cambia la fecha de salida de la excursión. Usa estado_saldo:
     // se llama después de asignarlo (en el DS-15 va antes de setEstadoSaldo). Sólo asigna: guarda quien la llama.
-
     public function fijarFechasLimite($fechaSalida): void
     {
         $fechaLimite = self::calcularFechaLimite($fechaSalida);
@@ -564,7 +563,7 @@ class Reserva extends Model
 
     /* ----------------------------- CU-20 Modificar ---------------------------- */
 
-    public function iniciarModificacion()
+    public function iniciarModificacion(): Collection
     {
         if (! $this->validarEstado([EstadoReserva::Confirmada])) {
             throw new DomainException('La reserva no admite modificación.');

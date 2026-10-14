@@ -85,17 +85,17 @@ new class extends Component
     }
 
     private function mostrarError(\DomainException $e): void
-{
-    unset($this->reserva);   // descarta la reserva cacheada y la vuelve a leer
-    $this->mensajeError = $e->getMessage();
+    {
+        unset($this->reserva);   // descarta la reserva cacheada y la vuelve a leer
+        $this->mensajeError = $e->getMessage();
 
-    try {
-        $this->reserva->iniciarModificacion();
-        $this->paso = 2;      // sigue admitiendo cambios: vuelve a la lista actualizada
-    } catch (\DomainException) {
-        $this->paso = 1;      // ya no admite cambios: sin lista, solo el aviso
+        try {
+            $this->reserva->iniciarModificacion();
+            $this->paso = 2;      // sigue admitiendo cambios: vuelve a la lista actualizada
+        } catch (\DomainException) {
+            $this->paso = 1;      // ya no admite cambios: sin lista, solo el aviso
+        }
     }
-}
 
     public function confirmar(): void
     {
