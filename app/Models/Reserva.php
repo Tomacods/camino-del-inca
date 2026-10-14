@@ -275,9 +275,16 @@ class Reserva extends Model
         return $this->calcularMontoTotal() - $this->sumarPagos();
     }
 
+    // «Modificar reserva» se ofrece con la misma anticipación que exige iniciarModificacion() (CU-20): a menos de 3 meses
+    // de la salida, la pantalla de modificar la rechazaría.
     public function getOpcionesHabilitadas(): array
     {
-        return $this->determinarOpciones($this->estado, $this->estado_saldo, $this->tieneValoracion());
+        return $this->determinarOpciones(
+            $this->estado,
+            $this->estado_saldo,
+            $this->tieneValoracion(),
+            $this->excursion->cumpleAnticipacionMinima(now()),
+        );
     }
 
     public function tieneValoracion(): bool
@@ -285,12 +292,12 @@ class Reserva extends Model
         return $this->valoracion()->exists();
     }
 
-    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion): array
+    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion, bool $cumpleAnticipacionMinima): array
     {
         return match ($estado) {
             EstadoReserva::Confirmada => array_values(array_filter([
                 $estadoSaldo === EstadoSaldo::Adeudado ? self::OPCION_PAGAR_SALDO : null,
-                self::OPCION_MODIFICAR,
+                $cumpleAnticipacionMinima ? self::OPCION_MODIFICAR : null,
                 self::OPCION_CANCELAR,
             ])),
             EstadoReserva::Pendiente => [self::OPCION_CANCELAR],
