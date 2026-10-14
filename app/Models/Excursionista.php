@@ -54,14 +54,15 @@ class Excursionista extends Model
         $this->save();
     }
 
-    /* ------------------------- CU-13 Notificar cliente ------------------------ */
+    /* -------------------- CU-10 Listar integrantes y CU-13 -------------------- */
 
-    // Lo que el correo dice de cada integrante, como en el DS-13: el documento no va.
+    // Los datos de un integrante: los mismos que en CU-04, más el equipo de camping y el permiso. Lo usan la página de
+    // integrantes del guía (CU-10) y el correo de Notificar Cliente (CU-13), que toma sólo lo que dice el DS-13. En el
+    // diagrama de clases es privado; acá es público porque lo llaman la página del panel y la reserva.
     public function getDatos(): array
     {
-        return [
-            'nombre' => $this->nombre,
-            'apellido' => $this->apellido,
+        return $this->consultarDatosExcursionistas() + [
+            'equipo_camping' => $this->equipo_camping,
             'estado_permiso' => $this->estado_permiso,
         ];
     }

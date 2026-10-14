@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -280,9 +281,16 @@ class Reserva extends Model
         return $this->calcularMontoTotal() - $this->sumarPagos();
     }
 
+    // «Modificar reserva» se ofrece con la misma anticipación que exige iniciarModificacion() (CU-20): a menos de 3 meses
+    // de la salida, la pantalla de modificar la rechazaría.
     public function getOpcionesHabilitadas(): array
     {
-        return $this->determinarOpciones($this->estado, $this->estado_saldo, $this->tieneValoracion());
+        return $this->determinarOpciones(
+            $this->estado,
+            $this->estado_saldo,
+            $this->tieneValoracion(),
+            $this->excursion->cumpleAnticipacionMinima(now()),
+        );
     }
 
     public function tieneValoracion(): bool
@@ -290,12 +298,12 @@ class Reserva extends Model
         return $this->valoracion()->exists();
     }
 
-    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion): array
+    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion, bool $cumpleAnticipacionMinima): array
     {
         return match ($estado) {
             EstadoReserva::Confirmada => array_values(array_filter([
                 $estadoSaldo === EstadoSaldo::Adeudado ? self::OPCION_PAGAR_SALDO : null,
-                self::OPCION_MODIFICAR,
+                $cumpleAnticipacionMinima ? self::OPCION_MODIFICAR : null,
                 self::OPCION_CANCELAR,
             ])),
             EstadoReserva::Pendiente => [self::OPCION_CANCELAR],
@@ -692,8 +700,9 @@ class Reserva extends Model
                 'paquete' => $excursion->paquete->nombre,
                 'fecha_salida' => $excursion->getFechaSalida(),
             ],
+            // Del integrante, sólo lo que dice el DS-13: el documento no va en el correo.
             'excursionistas' => $this->getExcursionistas()
-                ->map(fn (Excursionista $excursionista) => $excursionista->getDatos())
+                ->map(fn (Excursionista $excursionista) => Arr::only($excursionista->getDatos(), ['nombre', 'apellido', 'estado_permiso']))
                 ->all(),
             'pagos' => $this->pagos
                 ->map(fn (Pago $pago) => $pago->getPago())

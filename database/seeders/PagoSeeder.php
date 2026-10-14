@@ -96,6 +96,16 @@ class PagoSeeder extends Seeder
             fechaHoraPago: '2026-10-01 18:20:00',
             numeroComprobante: '0001-00000008',
         );
+
+        // Confirmada en una salida de guia@: 2 × 750 + 1 equipo × 45.
+        $this->crearPago(
+            numeroReserva: '000126-0',
+            tipoPago: TipoPago::Total,
+            monto: 1545,
+            medioPago: 'Tarjeta de crédito',
+            fechaHoraPago: '2026-10-05 12:15:00',
+            numeroComprobante: '0001-00000009',
+        );
     }
 
     private function crearPago(

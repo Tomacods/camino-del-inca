@@ -18,6 +18,7 @@ use App\Models\Reserva;
 use App\Models\Usuario;
 use App\Models\Valoracion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -30,6 +31,9 @@ class ConsultarReservaTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // «Modificar reserva» depende de la fecha: se fija para que la prueba no cambie de resultado con los días.
+        $this->travelTo(Carbon::parse('2026-10-13 10:00:00'));
 
         $this->crearReservaConfirmada();
     }
@@ -73,6 +77,27 @@ class ConsultarReservaTest extends TestCase
             ->assertSeeHtml('href="/mi-reserva/000125-9/modificar"')
             ->assertSeeHtml('href="/mi-reserva/000125-9/cancelar"')
             ->assertDontSee('Disponible próximamente');
+    }
+
+    public function test_a_menos_de_3_meses_de_la_salida_no_ofrece_modificar_la_reserva(): void
+    {
+        // Desde el 02/11/2026, la salida del 01/02/2027 queda a menos de 3 meses: la pantalla de modificar la rechazaría.
+        $this->travelTo(Carbon::parse('2026-11-02 09:00:00'));
+
+        $this->consultarReserva('000125-9')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/pagar-saldo"')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/cancelar"')
+            ->assertDontSeeHtml('/mi-reserva/000125-9/modificar')
+            ->assertDontSee('Modificar reserva');
+    }
+
+    public function test_justo_a_3_meses_de_la_salida_todavia_ofrece_modificar_la_reserva(): void
+    {
+        // El 01/11/2026, aunque sea de noche, la salida del 01/02/2027 está justo a 3 meses.
+        $this->travelTo(Carbon::parse('2026-11-01 23:00:00'));
+
+        $this->consultarReserva('000125-9')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/modificar"');
     }
 
     public function test_las_opciones_sin_pantalla_se_muestran_deshabilitadas(): void
