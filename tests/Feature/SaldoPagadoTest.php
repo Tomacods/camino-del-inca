@@ -293,6 +293,30 @@ class SaldoPagadoTest extends TestCase
         $this->assertNoSeRegistroElSaldo();
     }
 
+    public function test_con_la_reserva_cambiada_de_excursion_mientras_pagaba_no_registra_el_saldo(): void
+    {
+        // Con el cobro abierto en Mercado Pago, el cliente cambia la reserva a otra salida del paquete (CU-20): vuelve a
+        // «Pendiente» y R-16 ya no deja cobrarle el saldo. La devolución es manual (decisión del grupo del 13/09).
+        $this->darAcceso();
+        Excursion::create([
+            'id_paquete' => $this->excursion->id_paquete,
+            'id_guia' => $this->excursion->id_guia,
+            'fecha_salida' => '2027-03-01',
+            'cupo' => 12,
+            'plazas_retenidas' => 0,
+        ]);
+        $cambio = $this->reserva->elegirExcursionDestino(Carbon::parse('2027-03-01'));
+        $this->reserva->modificarExcursion($cambio['destino']);
+        $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
+
+        $this->volverDeMercadoPago()
+            ->assertOk()
+            ->assertSeeInOrder(['No pudimos registrar el pago', 'La devolución del dinero se gestiona con la agencia', self::NUMERO_OPERACION]);
+
+        $this->assertNoSeRegistroElSaldo();
+        $this->assertSame(EstadoReserva::Pendiente, $this->reserva->fresh()->estado);
+    }
+
     public function test_la_misma_vuelta_dos_veces_registra_un_solo_pago_y_muestra_el_comprobante(): void
     {
         $this->darAcceso();
