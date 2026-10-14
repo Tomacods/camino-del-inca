@@ -475,7 +475,7 @@ class ValidarPermisosTest extends TestCase
         $pagina = $this->abrirPagina();
         $this->marcarTodos($pagina, EstadoPermiso::Obtenido);
         $pagina->callAction($this->accionConfirmar())
-            ->assertNotified($this->avisoValidacion(EstadoReserva::Confirmada, 'Correo «Permisos Obtenidos» enviado a titular.000124-7@mail.com.'));
+            ->assertNotified($this->avisoValidacion(EstadoReserva::Confirmada, 'El correo «Permisos Obtenidos» se enviará a titular.000124-7@mail.com.'));
 
         Mail::assertQueuedCount(1);
         Mail::assertQueued(NotificacionCliente::class, fn (NotificacionCliente $correo) => $correo->tipo === TipoNotificacion::PermisosObtenidos
@@ -491,7 +491,7 @@ class ValidarPermisosTest extends TestCase
             ->set('marcas.1', EstadoPermiso::NoObtenido->value)
             ->set('marcas.2', EstadoPermiso::Obtenido->value)
             ->callAction($this->accionConfirmar())
-            ->assertNotified($this->avisoValidacion(EstadoReserva::SinPermiso, 'Correo «Permisos Rechazados» enviado a titular.000124-7@mail.com.'));
+            ->assertNotified($this->avisoValidacion(EstadoReserva::SinPermiso, 'El correo «Permisos Rechazados» se enviará a titular.000124-7@mail.com.'));
 
         Mail::assertQueuedCount(1);
         Mail::assertQueued(NotificacionCliente::class, fn (NotificacionCliente $correo) => $correo->tipo === TipoNotificacion::PermisosRechazados
@@ -509,10 +509,29 @@ class ValidarPermisosTest extends TestCase
         Mail::assertNothingQueued();
     }
 
-    // A8 de CU-13: el correo falla, pero los permisos y el estado de la reserva ya quedaron guardados.
-    public function test_si_el_correo_falla_la_reserva_queda_validada_y_el_aviso_lo_dice(): void
+    // A8 de CU-13, como en producción: con la cola en la base y el servicio de correo caído, el correo queda en la cola
+    // para reintentarse. El aviso no dice que se envió, y la reserva ya quedó validada.
+    public function test_si_el_servicio_de_correo_falla_el_correo_queda_en_la_cola_y_la_reserva_validada(): void
     {
+        config(['queue.default' => 'database']);
         ServicioCorreoQueFalla::instalar();
+
+        $pagina = $this->abrirPagina();
+        $this->marcarTodos($pagina, EstadoPermiso::Obtenido);
+        $pagina->callAction($this->accionConfirmar())
+            ->assertNotified($this->avisoValidacion(EstadoReserva::Confirmada, 'El correo «Permisos Obtenidos» se enviará a titular.000124-7@mail.com.'));
+
+        $this->artisan('queue:work', ['--once' => true]);
+
+        $this->assertSame(1, (int) DB::table('jobs')->sole()->attempts);
+        $this->assertSame(EstadoReserva::Confirmada, $this->reserva->fresh()->estado);
+        $this->assertPermisos([EstadoPermiso::Obtenido, EstadoPermiso::Obtenido, EstadoPermiso::Obtenido]);
+    }
+
+    // A8 de CU-13: si ni siquiera se puede poner el correo en la cola, el aviso lo dice y la reserva queda validada.
+    public function test_si_el_correo_no_se_puede_encolar_la_reserva_queda_validada_y_el_aviso_lo_dice(): void
+    {
+        config(['queue.default' => 'no-configurada']);
         Log::spy();
 
         $pagina = $this->abrirPagina();
@@ -525,7 +544,7 @@ class ValidarPermisosTest extends TestCase
         $this->assertSame(EstadoReserva::Confirmada, $this->reserva->fresh()->estado);
         $this->assertPermisos([EstadoPermiso::Obtenido, EstadoPermiso::Obtenido, EstadoPermiso::Obtenido]);
         Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, '000124-7')
-            && str_contains($mensaje, ServicioCorreoQueFalla::MENSAJE));
+            && str_contains($mensaje, 'no-configurada'));
     }
 
     /* -------------------------------- Ayudantes ------------------------------- */

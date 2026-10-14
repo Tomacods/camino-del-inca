@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\MercadoPagoDePrueba;
-use Tests\ServicioCorreoQueFalla;
 use Tests\TestCase;
 
 // La vuelta de Mercado Pago y la pantalla de la reserva registrada (CU-15, pasos 6 a 11 y cursos A2 y A3).
@@ -328,15 +327,17 @@ class ReservaConfirmadaTest extends TestCase
         Mail::assertNothingQueued();
     }
 
-    // A8 de CU-13: el correo falla, pero la reserva ya quedó registrada y el cliente ve su número.
-    public function test_si_el_correo_falla_la_reserva_queda_registrada(): void
+    // A8 de CU-13: el correo no se puede poner en la cola, pero la reserva ya quedó registrada y el cliente ve su número.
+    // Si lo que falla es el servicio de correo, el correo ya está en la cola y se reintenta (NotificarClienteTest).
+    public function test_si_el_correo_no_se_puede_encolar_la_reserva_queda_registrada(): void
     {
-        ServicioCorreoQueFalla::instalar();
+        config(['queue.default' => 'no-configurada']);
         Log::spy();
 
         $numeroReserva = $this->registrarUnaReserva();
 
-        Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, ServicioCorreoQueFalla::MENSAJE));
+        Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, 'Primera Compra')
+            && str_contains($mensaje, $numeroReserva));
         $this->assertSame(EstadoReserva::Pendiente, Reserva::sole()->estado);
         $this->get('/reservar/confirmada')->assertOk()->assertSeeInOrder(['Tu número de reserva', $numeroReserva]);
     }

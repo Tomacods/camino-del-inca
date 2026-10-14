@@ -5,16 +5,17 @@ namespace App\Mail;
 use App\Enums\TipoNotificacion;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 // El correo de Notificar Cliente (CU-13): el ServicioCorreo del DS-13 es el Mail de Laravel. Lo arma
-// Reserva::armarMensaje() y sale por la cola, fuera del pedido del cliente o del administrador. Va en la cola recién
-// cuando termina la transacción del caso de uso que lo invoca: si esa transacción se deshace, el correo no sale.
-class NotificacionCliente extends Mailable implements ShouldQueue, ShouldQueueAfterCommit
+// Reserva::armarMensaje() y sale por la cola, fuera del pedido del cliente o del administrador. Se encola en el momento:
+// por eso Reserva::notificarCliente() se invoca después de la transacción del caso de uso, y si falla al encolar, lo
+// anota sin romper nada (A8). Con la cola en la base (QUEUE_CONNECTION=database), el trabajo se guarda en la misma
+// conexión: si alguien lo invocara dentro de la transacción y ésta se deshiciera, el correo tampoco quedaría.
+class NotificacionCliente extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

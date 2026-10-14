@@ -61,6 +61,13 @@ class NotificarClienteTest extends TestCase
         }
         $correo->assertSeeInHtml('1 antes y 1 después del recorrido');
         $correo->assertSeeInOrderInHtml(['Precio final', 'USD 2.700,00', 'Abonado (Seña)', 'USD 1.350,00']);
+
+        // La tabla común: los pagos, el saldo que falta con su fecha límite y el plazo de los permisos.
+        $correo->assertSeeInOrderInHtml([
+            'Pagos', 'Seña · 30/09/2026 · USD 1.350,00',
+            'Saldo pendiente', 'USD 1.350,00, hasta el 18/12/2026',
+            'Confirmación de permisos', 'hasta el 18/12/2026',
+        ]);
     }
 
     public function test_pago_de_saldo_confirma_el_pago_total_con_su_comprobante(): void
@@ -115,8 +122,7 @@ class NotificarClienteTest extends TestCase
         $correo->assertHasSubject('Tu reserva 000124-7 fue cancelada');
         $correo->assertSeeInHtml('fue cancelada el 14/10/2026');
         $correo->assertSeeInHtml('Camino Inca Clásico');
-        $correo->assertSeeInHtml('un reembolso del 50 % de lo abonado');
-        $correo->assertSeeInHtml('USD 675,00');
+        $correo->assertSeeInOrderInHtml(['más de 30 días', 'el 50 % de lo abonado', 'un reembolso de', 'USD 675,00', 'registrado el 14/10/2026']);
         $correo->assertDontSeeInHtml('no tiene devolución');
     }
 
@@ -132,7 +138,7 @@ class NotificarClienteTest extends TestCase
         $correo = $this->correoEnviado(TipoNotificacion::CancelacionReserva, 'lucia.fernandez@mail.com');
         $correo->assertSeeInHtml('fue cancelada el 25/12/2026');
         $correo->assertSeeInHtml('la cancelación no tiene devolución');
-        $correo->assertDontSeeInHtml('reembolso del');
+        $correo->assertDontSeeInHtml('reembolso de');
     }
 
     public function test_permisos_obtenidos_con_saldo_adeudado_informa_el_saldo_y_su_fecha_limite(): void
@@ -176,10 +182,13 @@ class NotificarClienteTest extends TestCase
 
         $correo->assertSeeInOrderInHtml([
             '«Sin Permiso»', 'Hasta el', '04/12/2026',
-            'reintegro del 100 % de lo abonado (USD 870,00)',
+            'reintegro de todo lo abonado: USD 870,00',
             'Reprogramar la reserva',
-            'la reserva se cancela y te reintegramos el 100 %',
+            'la reserva se cancela y te reintegramos todo lo abonado',
         ]);
+
+        // En «Sin Permiso» el saldo ya no se paga: el correo no lo pide.
+        $correo->assertDontSeeInHtml('Saldo pendiente');
     }
 
     // CU-22 todavía no existe: se simula su cambio de estado.
@@ -211,24 +220,24 @@ class NotificarClienteTest extends TestCase
         $correo->assertSeeInHtml('Ya podés valorar los servicios');
     }
 
-    // La causa sale de la fecha de la devolución: hasta la fecha límite de confirmación (el 04/12/2026, incluido) la
-    // cancelación la pidió el cliente (CU-17); después, la hizo el sistema al vencer el plazo (CU-26, que todavía no
-    // existe: se simula con el mismo método del modelo).
+    // La causa la dice quien cancela: CU-17 (el cliente pidió el reintegro) o CU-26 (venció la fecha límite de
+    // confirmación). No se deduce de la fecha: aunque el cliente pida el reintegro después del 04/12/2026, el correo dice
+    // que lo pidió él. CU-26 todavía no existe: se simula con el mismo método del modelo.
     #[DataProvider('causasFaltaDePermisos')]
-    public function test_cancelacion_por_falta_de_permisos_reintegra_el_100_e_informa_la_causa(string $fecha, string $causa, string $otraCausa): void
+    public function test_cancelacion_por_falta_de_permisos_reintegra_todo_e_informa_la_causa(string $fecha, bool $canceladaPorVencimiento, string $causa, string $otraCausa): void
     {
         Mail::fake();
         $this->travelTo($fecha);
         $reserva = Reserva::buscarReserva('000123-5');
         $reserva->ejecutarCancelacionConReintegro($reserva->calcularReintegro(), now());
 
-        Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, '000123-5');
+        Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, '000123-5', canceladaPorVencimiento: $canceladaPorVencimiento);
 
         $correo = $this->correoEnviado(TipoNotificacion::CancelacionFaltaPermisos, 'diego.morales@mail.com');
         $correo->assertHasSubject('Tu reserva 000123-5 fue cancelada por falta de permisos');
         $correo->assertSeeInHtml($causa);
         $correo->assertDontSeeInHtml($otraCausa);
-        $correo->assertSeeInHtml('Te reintegramos el 100 % de lo abonado: <strong>USD 870,00</strong>', false);
+        $correo->assertSeeInHtml('Te reintegramos todo lo abonado: un reintegro de <strong>USD 870,00</strong>', false);
     }
 
     public static function causasFaltaDePermisos(): array
@@ -237,9 +246,9 @@ class NotificarClienteTest extends TestCase
         $vencimiento = 'porque el 04/12/2026 venció el plazo';
 
         return [
-            'pedido del cliente (CU-17)' => ['2026-10-14 12:00:00', $pedido, $vencimiento],
-            'pedido del cliente el último día' => ['2026-12-04 18:00:00', $pedido, $vencimiento],
-            'vencimiento de la fecha límite (CU-26)' => ['2026-12-05 03:00:00', $vencimiento, $pedido],
+            'pedido del cliente (CU-17)' => ['2026-10-14 12:00:00', false, $pedido, $vencimiento],
+            'pedido del cliente después de la fecha límite' => ['2026-12-05 03:00:00', false, $pedido, $vencimiento],
+            'vencimiento de la fecha límite (CU-26)' => ['2026-12-05 03:00:00', true, $vencimiento, $pedido],
         ];
     }
 
@@ -250,12 +259,13 @@ class NotificarClienteTest extends TestCase
     {
         Mail::fake();
 
+        // 000123-5 está en «Sin Permiso», el único estado en que vale «Permisos Rechazados»: así salen los ocho tipos.
         foreach (TipoNotificacion::cases() as $tipoNotificacion) {
-            Reserva::notificarCliente($tipoNotificacion, '000118-1');
+            $this->assertTrue(Reserva::notificarCliente($tipoNotificacion, '000123-5'));
         }
 
         Mail::assertQueuedCount(count(TipoNotificacion::cases()));
-        Mail::assertQueued(NotificacionCliente::class, fn (NotificacionCliente $correo) => array_column($correo->to, 'address') === ['paula.benitez@mail.com']
+        Mail::assertQueued(NotificacionCliente::class, fn (NotificacionCliente $correo) => array_column($correo->to, 'address') === ['diego.morales@mail.com']
             && $correo->cc === [] && $correo->bcc === []);
     }
 
@@ -290,15 +300,14 @@ class NotificarClienteTest extends TestCase
 
     /* ---------------------------------- A8 ------------------------------------ */
 
-    public function test_el_correo_va_en_la_cola_con_reintentos_y_despues_del_commit(): void
+    public function test_el_correo_va_en_la_cola_con_reintentos(): void
     {
         Queue::fake();
 
         Reserva::notificarCliente(TipoNotificacion::PrimeraCompra, '000124-7');
 
         Queue::assertPushed(SendQueuedMailable::class, fn (SendQueuedMailable $tarea) => $tarea->tries === NotificacionCliente::INTENTOS
-            && $tarea->backoff() === NotificacionCliente::SEGUNDOS_ENTRE_INTENTOS
-            && $tarea->afterCommit === true);
+            && $tarea->backoff() === NotificacionCliente::SEGUNDOS_ENTRE_INTENTOS);
     }
 
     // Con la cola de la base, como en .env.example: el servicio de correo falla, la reserva conserva su nuevo estado y
@@ -341,8 +350,23 @@ class NotificarClienteTest extends TestCase
         $this->assertFalse(Reserva::notificarCliente(TipoNotificacion::PermisosObtenidos, '000124-7'));
 
         Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, 'Permisos Obtenidos')
-            && str_contains($mensaje, '000124-7') && str_contains($mensaje, 'lucia.fernandez@mail.com'));
+            && str_contains($mensaje, '000124-7') && str_contains($mensaje, 'no-configurada'));
         $this->assertSame(EstadoReserva::Confirmada, $reserva->fresh()->estado);
+    }
+
+    // Lo que falla puede estar antes de encolar, al juntar los datos: tampoco lanza. Una reserva sin pagos no existe en
+    // el sistema (se registra con el primer pago), pero si existiera, «Primera Compra» no tendría comprobante que mostrar.
+    public function test_si_falla_al_juntar_los_datos_no_lanza_y_lo_anota(): void
+    {
+        Mail::fake();
+        Log::spy();
+        Pago::where('id_reserva', Reserva::buscarReserva('000124-7')->id_reserva)->delete();
+
+        $this->assertFalse(Reserva::notificarCliente(TipoNotificacion::PrimeraCompra, '000124-7'));
+
+        Mail::assertNothingQueued();
+        Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, 'Primera Compra')
+            && str_contains($mensaje, '000124-7'));
     }
 
     /* -------------------------------- Ayudantes ------------------------------- */

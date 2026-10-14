@@ -24,7 +24,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\MercadoPagoDePrueba;
-use Tests\ServicioCorreoQueFalla;
 use Tests\TestCase;
 
 // La vuelta de Mercado Pago del saldo y la pantalla del comprobante (CU-16, pasos 7 a 10 y curso A4), con la reserva
@@ -454,18 +453,22 @@ class SaldoPagadoTest extends TestCase
         Mail::assertNothingQueued();
     }
 
-    // A8 de CU-13: el correo falla, pero el pago del saldo ya quedó registrado y el cliente ve su comprobante.
-    public function test_si_el_correo_falla_el_saldo_queda_registrado(): void
+    // A8 de CU-13: el correo no se puede poner en la cola, pero el pago del saldo ya quedó registrado y el cliente ve su
+    // comprobante, también si recarga. Si lo que falla es el servicio de correo, el correo ya está en la cola y se
+    // reintenta (NotificarClienteTest).
+    public function test_si_el_correo_no_se_puede_encolar_el_saldo_queda_registrado(): void
     {
-        ServicioCorreoQueFalla::instalar();
+        config(['queue.default' => 'no-configurada']);
         Log::spy();
         $this->darAcceso();
 
         $this->pagarSaldo();
 
-        Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, ServicioCorreoQueFalla::MENSAJE));
+        Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, 'Pago de Saldo')
+            && str_contains($mensaje, '000125-9'));
         $this->assertSame(EstadoSaldo::Abonado, $this->reserva->fresh()->estado_saldo);
-        $this->assertNotNull($this->pagoSaldo()->comprobante);
+        $this->assertSame(['numero_reserva' => '000125-9', 'numero_operacion' => self::NUMERO_OPERACION], session('saldo_pagado'));
+        $this->abrirPantalla()->assertSet('estado', 'registrado')->assertSee($this->pagoSaldo()->comprobante->numero_comprobante);
     }
 
     // La pantalla después de la vuelta, sin parámetros: con 'saldo_pagado' en la sesión, muestra el pago registrado.

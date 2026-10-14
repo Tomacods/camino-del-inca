@@ -100,14 +100,16 @@ new #[Title('Pago del saldo')] class extends Component
         // La base no tiene dónde guardar el número de operación de Mercado Pago: queda en el registro, con la reserva.
         Log::info('Saldo de la reserva '.$numeroReserva.' registrado con el pago '.$idTransaccion.' de Mercado Pago.');
 
-        // Paso 11. El pago ya quedó registrado: si el correo falla, se anota en el registro y la pantalla sigue (A8 de
-        // CU-13).
-        Reserva::notificarCliente(TipoNotificacion::PagoSaldo, $numeroReserva);
-
+        // Primero la sesión: si la notificación tuviera un problema, al recargar el cliente igual ve su comprobante y no
+        // el aviso de un pago repetido.
         session(['saldo_pagado' => [
             'numero_reserva' => $numeroReserva,
             'numero_operacion' => $idTransaccion,
         ]]);
+
+        // Paso 11. El pago ya quedó registrado: si el correo falla, se anota en el registro y la pantalla sigue (A8 de
+        // CU-13).
+        Reserva::notificarCliente(TipoNotificacion::PagoSaldo, $numeroReserva);
 
         // Sin parámetros: si el cliente recarga, no se le vuelve a preguntar a Mercado Pago.
         $this->redirect('/mi-reserva/'.$numeroReserva.'/saldo-pagado');

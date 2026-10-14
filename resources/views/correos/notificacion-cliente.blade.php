@@ -1,9 +1,7 @@
 {{-- Correo de Notificar Cliente (CU-13). Una sola vista para los ocho tipos: lo común (los datos de la reserva y el botón
-     a Mi reserva) va para todos, y en el medio, el bloque del tipo. Los datos llegan calculados desde
-     Reserva::notificar(): la vista sólo los muestra. HTML simple, con los estilos en cada etiqueta, porque los programas
-     de correo no leen hojas de estilo. --}}
-@use('App\Enums\EstadoPermiso')
-@use('App\Enums\EstadoReserva')
+     a Mi reserva) va para todos, y en el medio, el bloque del tipo. Todo llega calculado desde Reserva::notificar(): la
+     vista sólo lo muestra. HTML simple, con los estilos en cada etiqueta, porque los programas de correo no leen hojas
+     de estilo. --}}
 @use('App\Enums\EstadoSaldo')
 @use('App\Enums\TipoNotificacion')
 
@@ -11,9 +9,6 @@
     $dolares = fn (float $monto) => 'USD '.number_format($monto, 2, ',', '.');
     $reserva = $datos['reserva'];
     $excursion = $datos['excursion'];
-    $sinPermiso = array_filter($datos['excursionistas'], fn (array $integrante) => $integrante['estado_permiso'] === EstadoPermiso::NoObtenido);
-    $diasReembolso = config('reserva.dias_anticipacion_reembolso');
-    $porcentajeReembolso = (int) round(config('reserva.porcentaje_reembolso') * 100);
     $celdaTitulo = 'padding:6px 12px 6px 0;color:#6b6259;vertical-align:top;white-space:nowrap';
     $celdaDato = 'padding:6px 0;font-weight:bold;vertical-align:top';
 @endphp
@@ -69,7 +64,7 @@
                         <tr><td style="{{ $celdaTitulo }}">Emitido</td><td style="{{ $celdaDato }}">{{ $datos['comprobante']['fecha_emision']->format('d/m/Y H:i') }}</td></tr>
                     @endif
                     <tr><td style="{{ $celdaTitulo }}">Monto abonado</td><td style="{{ $celdaDato }}">{{ $dolares($datos['ultimo_pago']['monto']) }}, con {{ $datos['ultimo_pago']['medio_pago'] }}</td></tr>
-                    <tr><td style="{{ $celdaTitulo }}">Saldo</td><td style="{{ $celdaDato }}">{{ EstadoSaldo::Abonado->value }}</td></tr>
+                    <tr><td style="{{ $celdaTitulo }}">Saldo</td><td style="{{ $celdaDato }}">{{ $reserva['estado_saldo']->value }}</td></tr>
                 </table>
                 @break
 
@@ -77,17 +72,17 @@
                 <p style="margin:0 0 16px">Tu reserva <strong>{{ $reserva['numero_reserva'] }}</strong> fue cancelada el {{ $datos['fecha_envio']->format('d/m/Y') }}.</p>
 
                 @if ($datos['devolucion'] !== null)
-                    <p style="margin:0 0 24px">Como cancelaste con más de {{ $diasReembolso }} días de anticipación, te corresponde un reembolso del {{ $porcentajeReembolso }} % de lo abonado: <strong>{{ $dolares($datos['devolucion']['monto']) }}</strong>.</p>
+                    <p style="margin:0 0 24px">Como cancelaste con más de {{ $datos['dias_anticipacion_reembolso'] }} días de anticipación, te corresponde el {{ $datos['porcentaje_reembolso'] }} % de lo abonado: un {{ mb_strtolower($datos['devolucion']['motivo']->value) }} de <strong>{{ $dolares($datos['devolucion']['monto']) }}</strong>, registrado el {{ $datos['devolucion']['fecha']->format('d/m/Y') }}.</p>
                 @else
-                    <p style="margin:0 0 24px">Como faltaban {{ $diasReembolso }} días o menos para la salida, la cancelación no tiene devolución.</p>
+                    <p style="margin:0 0 24px">Como faltaban {{ $datos['dias_anticipacion_reembolso'] }} días o menos para la salida, la cancelación no tiene devolución.</p>
                 @endif
                 @break
 
             @case(TipoNotificacion::PermisosObtenidos)
-                <p style="margin:0 0 16px">Todos los integrantes obtuvieron el permiso de ingreso al Camino Inca: tu reserva pasó a <strong>«{{ EstadoReserva::Confirmada->value }}»</strong>.</p>
+                <p style="margin:0 0 16px">Todos los integrantes obtuvieron el permiso de ingreso al Camino Inca: tu reserva pasó a <strong>«{{ $reserva['estado']->value }}»</strong>.</p>
 
-                @if ($reserva['estado_saldo'] === EstadoSaldo::Adeudado)
-                    <p style="margin:0 0 24px">Te queda un saldo de <strong>{{ $dolares($datos['saldo_pendiente']) }}</strong>, que podés pagar desde Mi reserva hasta el {{ $reserva['fecha_limite_saldo']->format('d/m/Y') }}. Si no se paga a tiempo, la reserva se cancela y la seña no se devuelve.</p>
+                @if ($datos['saldo_por_pagar'] !== null)
+                    <p style="margin:0 0 24px">Te queda un saldo de <strong>{{ $dolares($datos['saldo_por_pagar']['monto']) }}</strong>, que podés pagar desde Mi reserva hasta el {{ $datos['saldo_por_pagar']['fecha_limite']->format('d/m/Y') }}.</p>
                 @else
                     <p style="margin:0 0 24px">Tu reserva ya está pagada por completo.</p>
                 @endif
@@ -96,16 +91,16 @@
             @case(TipoNotificacion::PermisosRechazados)
                 <p style="margin:0 0 8px">Estos integrantes no obtuvieron el permiso de ingreso al Camino Inca:</p>
                 <ul style="margin:0 0 16px;padding-left:20px">
-                    @foreach ($sinPermiso as $integrante)
-                        <li>{{ $integrante['nombre'] }} {{ $integrante['apellido'] }}</li>
+                    @foreach ($datos['sin_permiso'] as $integrante)
+                        <li>{{ $integrante }}</li>
                     @endforeach
                 </ul>
-                <p style="margin:0 0 8px">Por eso tu reserva completa pasó a <strong>«{{ EstadoReserva::SinPermiso->value }}»</strong>. Hasta el <strong>{{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }}</strong> podés elegir, desde Mi reserva, una de estas opciones:</p>
+                <p style="margin:0 0 8px">Por eso tu reserva completa pasó a <strong>«{{ $reserva['estado']->value }}»</strong>. Hasta el <strong>{{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }}</strong> podés elegir, desde Mi reserva, una de estas opciones:</p>
                 <ul style="margin:0 0 16px;padding-left:20px">
-                    <li>Pedir el reintegro del 100 % de lo abonado ({{ $dolares($datos['monto_abonado']) }}).</li>
+                    <li>Pedir el reintegro de todo lo abonado: {{ $dolares($datos['monto_reintegro']) }}.</li>
                     <li>Reprogramar la reserva para otra salida.</li>
                 </ul>
-                <p style="margin:0 0 24px">Si al vencer esa fecha no elegiste ninguna, la reserva se cancela y te reintegramos el 100 % de lo abonado.</p>
+                <p style="margin:0 0 24px">Si al vencer esa fecha no elegiste ninguna, la reserva se cancela y te reintegramos todo lo abonado.</p>
                 @break
 
             @case(TipoNotificacion::CancelacionFaltaPago)
@@ -114,7 +109,7 @@
                 @break
 
             @case(TipoNotificacion::EtapaFinal)
-                <p style="margin:0 0 16px">Tu excursión terminó y tu reserva pasó a <strong>«{{ EstadoReserva::Finalizada->value }}»</strong>. ¡Gracias por recorrer el Camino Inca con nosotros!</p>
+                <p style="margin:0 0 16px">Tu excursión terminó y tu reserva pasó a <strong>«{{ $reserva['estado']->value }}»</strong>. ¡Gracias por recorrer el Camino Inca con nosotros!</p>
                 <p style="margin:0 0 24px">Ya podés valorar los servicios desde Mi reserva.</p>
                 @break
 
@@ -128,7 +123,7 @@
                     @endif
                 </p>
                 @if ($datos['devolucion'] !== null)
-                    <p style="margin:0 0 24px">Te reintegramos el 100 % de lo abonado: <strong>{{ $dolares($datos['devolucion']['monto']) }}</strong>.</p>
+                    <p style="margin:0 0 24px">Te reintegramos todo lo abonado: un {{ mb_strtolower($datos['devolucion']['motivo']->value) }} de <strong>{{ $dolares($datos['devolucion']['monto']) }}</strong>, registrado el {{ $datos['devolucion']['fecha']->format('d/m/Y') }}.</p>
                 @endif
                 @break
         @endswitch
@@ -147,18 +142,24 @@
                     @endforeach
                 </td>
             </tr>
-            <tr><td style="{{ $celdaTitulo }}">Noches extra</td><td style="{{ $celdaDato }}">{{ $reserva['noches_extra_antes'] + $reserva['noches_extra_despues'] }}</td></tr>
+            <tr><td style="{{ $celdaTitulo }}">Noches extra</td><td style="{{ $celdaDato }}">{{ $datos['noches_extra'] }}</td></tr>
             <tr><td style="{{ $celdaTitulo }}">Monto total</td><td style="{{ $celdaDato }}">{{ $dolares($datos['monto_total']) }}</td></tr>
+            <tr>
+                <td style="{{ $celdaTitulo }}">Pagos</td>
+                <td style="{{ $celdaDato }}">
+                    @foreach ($datos['pagos'] as $pago)
+                        {{ $pago['tipo_pago']->value }} · {{ $pago['fecha']->format('d/m/Y') }} · {{ $dolares($pago['monto']) }} · {{ $pago['medio_pago'] }}<br>
+                    @endforeach
+                </td>
+            </tr>
             <tr><td style="{{ $celdaTitulo }}">Abonado</td><td style="{{ $celdaDato }}">{{ $dolares($datos['monto_abonado']) }}</td></tr>
-            @if ($reserva['estado'] !== EstadoReserva::Cancelada)
-                @if ($reserva['estado_saldo'] === EstadoSaldo::Adeudado)
-                    <tr><td style="{{ $celdaTitulo }}">Saldo pendiente</td><td style="{{ $celdaDato }}">{{ $dolares($datos['saldo_pendiente']) }}@if ($reserva['fecha_limite_saldo'] !== null), hasta el {{ $reserva['fecha_limite_saldo']->format('d/m/Y') }}@endif</td></tr>
-                @else
-                    <tr><td style="{{ $celdaTitulo }}">Saldo</td><td style="{{ $celdaDato }}">{{ EstadoSaldo::Abonado->value }}</td></tr>
-                @endif
+            @if ($datos['saldo_por_pagar'] !== null)
+                <tr><td style="{{ $celdaTitulo }}">Saldo pendiente</td><td style="{{ $celdaDato }}">{{ $dolares($datos['saldo_por_pagar']['monto']) }}, hasta el {{ $datos['saldo_por_pagar']['fecha_limite']->format('d/m/Y') }}</td></tr>
+            @elseif ($reserva['estado_saldo'] === EstadoSaldo::Abonado)
+                <tr><td style="{{ $celdaTitulo }}">Saldo</td><td style="{{ $celdaDato }}">{{ $reserva['estado_saldo']->value }}</td></tr>
             @endif
-            @if ($reserva['estado'] === EstadoReserva::Pendiente)
-                <tr><td style="{{ $celdaTitulo }}">Confirmación de permisos</td><td style="{{ $celdaDato }}">hasta el {{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }}</td></tr>
+            @if ($datos['fecha_limite_permisos'] !== null)
+                <tr><td style="{{ $celdaTitulo }}">Confirmación de permisos</td><td style="{{ $celdaDato }}">hasta el {{ $datos['fecha_limite_permisos']->format('d/m/Y') }}</td></tr>
             @endif
         </table>
 
