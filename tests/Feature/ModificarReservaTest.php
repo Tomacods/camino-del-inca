@@ -285,7 +285,7 @@ class ModificarReservaTest extends TestCase
             ->assertSeeHtmlInOrder(['Nueva fecha límite de pago del saldo', '01/02/2027'])
             ->call('confirmar')
             ->assertSee('¡Excursión cambiada!')
-            ->assertSeeHtmlInOrder(['Estado', EstadoReserva::Pendiente->value])
+            ->assertSeeHtmlInOrder(['Reserva 000125-9', EstadoReserva::Pendiente->value])
             ->assertSeeHtmlInOrder(['Salida actual', '01/03/2027']);
 
         $reserva = $this->reserva->fresh();
