@@ -124,6 +124,22 @@ class ReservaSeeder extends Seeder
             ['nombre' => 'Federico', 'apellido' => 'Ríos', 'documento_pasaporte' => 'AAH715300', 'equipo_camping' => false, 'estado_permiso' => EstadoPermiso::Obtenido],
             ['nombre' => 'Lorena', 'apellido' => 'Ríos', 'documento_pasaporte' => 'AAH715301', 'equipo_camping' => false, 'estado_permiso' => EstadoPermiso::Obtenido],
         ]);
+
+        // Confirmada en una salida de guia@: para ver los integrantes con esa cuenta (CU-10). Se abonó el total al reservar.
+        $this->crearReserva('Camino Inca Clásico', '2027-03-01', [
+            'numero_reserva' => '000126-0',
+            'correo_electronico' => 'gabriela.sosa@mail.com',
+            'fecha_reserva' => '2026-10-05 12:15:00',
+            'estado' => EstadoReserva::Confirmada,
+            'estado_saldo' => EstadoSaldo::Abonado,
+            'noches_extra_antes' => 0,
+            'noches_extra_despues' => 0,
+            'fecha_limite_saldo' => null,
+            'fecha_limite_confirmacion' => '2027-02-01 23:59:59',
+        ], [
+            ['nombre' => 'Gabriela', 'apellido' => 'Sosa', 'documento_pasaporte' => 'AAJ820144', 'equipo_camping' => true, 'estado_permiso' => EstadoPermiso::Obtenido],
+            ['nombre' => 'Tomás', 'apellido' => 'Acosta', 'documento_pasaporte' => 'AAJ820145', 'equipo_camping' => false, 'estado_permiso' => EstadoPermiso::Obtenido],
+        ]);
     }
 
     private function crearReserva(string $nombrePaquete, string $fechaSalida, array $datosReserva, array $excursionistas): void

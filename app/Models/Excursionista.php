@@ -53,4 +53,16 @@ class Excursionista extends Model
         $this->estado_permiso = $estadoPermiso;
         $this->save();
     }
+
+    /* ------------------------ CU-10 Listar integrantes ------------------------ */
+
+    // Lo que el guía ve de cada integrante: los mismos datos que en CU-04, más el equipo de camping y el permiso. En el
+    // diagrama de clases es privado; acá es público porque la página del panel arma la lista con él.
+    public function getDatos(): array
+    {
+        return $this->consultarDatosExcursionistas() + [
+            'equipo_camping' => $this->equipo_camping,
+            'estado_permiso' => $this->estado_permiso,
+        ];
+    }
 }
