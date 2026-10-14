@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\EstadoSaldo;
+use App\Enums\TipoNotificacion;
 use App\Models\Pago;
 use App\Models\Reserva;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -108,7 +109,9 @@ new #[Title('Pago de la reserva')] class extends Component
         // La base no tiene dónde guardar el número de operación de Mercado Pago: queda en el registro, con la reserva.
         Log::info('Reserva '.$reserva->numero_reserva.' registrada con el pago '.$idTransaccion.' de Mercado Pago.');
 
-        // Paso 12: acá se invoca Notificar Cliente (CU-13) con el tipo «Primera Compra», cuando exista.
+        // Paso 12. La reserva ya quedó registrada: si el correo falla, se anota en el registro y la pantalla sigue (A8 de
+        // CU-13).
+        Reserva::notificarCliente(TipoNotificacion::PrimeraCompra, $reserva->numero_reserva);
 
         // Sin parámetros: si el cliente recarga, no se le vuelve a preguntar a Mercado Pago.
         $this->redirect('/reservar/confirmada');
