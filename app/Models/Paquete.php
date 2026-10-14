@@ -63,4 +63,17 @@ class Paquete extends Model
             + $nochesExtra * $cantidadIntegrantes * (float) $this->costo_noche_extra_cusco
             + $equiposCamping * (float) $this->costo_equipo_camping;
     }
+
+    /* ------------------------- CU-13 Notificar cliente ------------------------ */
+
+    // Lo que el comprobante de la primera compra dice del paquete: el recorrido, con su duración, y los servicios.
+    public function getDatosComprobante(): array
+    {
+        return [
+            'recorrido' => $this->recorrido->getDatosRecorrido(),
+            'servicios' => $this->servicios
+                ->map(fn (Servicio $servicio) => $servicio->getServiciosIncluidos())
+                ->all(),
+        ];
+    }
 }

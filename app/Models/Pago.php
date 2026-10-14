@@ -293,4 +293,22 @@ class Pago extends Model
             return $pago;
         });
     }
+
+    /* ------------------------- CU-13 Notificar cliente ------------------------ */
+
+    // El monto llega como texto ('240.00') por el cast decimal:2: se pasa a número para el correo.
+    public function getPago(): array
+    {
+        return [
+            'fecha' => $this->fecha,
+            'monto' => (float) $this->monto,
+            'tipo_pago' => $this->tipo_pago,
+            'medio_pago' => $this->medio_pago,
+        ];
+    }
+
+    public function getComprobante(): ?Comprobante
+    {
+        return $this->comprobante;
+    }
 }

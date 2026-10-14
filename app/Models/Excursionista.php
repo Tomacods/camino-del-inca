@@ -53,4 +53,16 @@ class Excursionista extends Model
         $this->estado_permiso = $estadoPermiso;
         $this->save();
     }
+
+    /* ------------------------- CU-13 Notificar cliente ------------------------ */
+
+    // Lo que el correo dice de cada integrante, como en el DS-13: el documento no va.
+    public function getDatos(): array
+    {
+        return [
+            'nombre' => $this->nombre,
+            'apellido' => $this->apellido,
+            'estado_permiso' => $this->estado_permiso,
+        ];
+    }
 }
