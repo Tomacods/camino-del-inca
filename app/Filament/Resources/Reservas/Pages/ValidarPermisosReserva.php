@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Reservas\Pages;
 
 use App\Enums\EstadoPermiso;
 use App\Enums\EstadoReserva;
+use App\Enums\TipoNotificacion;
 use App\Filament\Resources\Reservas\ReservaResource;
 use App\Models\Reserva;
 use DomainException;
@@ -179,12 +180,19 @@ class ValidarPermisosReserva extends Page
             return;
         }
 
-        // Paso 6 y A1: acá se invoca Notificar Cliente (CU-13) con el tipo «Permisos Obtenidos» o «Permisos Rechazados»,
-        // según el estado final de la reserva, cuando exista.
+        // Paso 6 y A1: Notificar Cliente (CU-13), con el tipo según el estado en que quedó la reserva. La validación ya se
+        // guardó: si el correo no sale, se avisa y la reserva queda como está (A8 de CU-13).
+        $tipoNotificacion = $reserva->estado === EstadoReserva::Confirmada
+            ? TipoNotificacion::PermisosObtenidos
+            : TipoNotificacion::PermisosRechazados;
+        $correoEnviado = Reserva::notificarCliente($tipoNotificacion, $reserva->numero_reserva);
 
         Notification::make()
             ->title('Reserva '.$reserva->numero_reserva.' en «'.$reserva->estado->value.'».')
-            ->success()
+            ->body($correoEnviado
+                ? 'Correo «'.$tipoNotificacion->value.'» enviado a '.$reserva->correo_electronico.'.'
+                : 'No se pudo enviar el correo «'.$tipoNotificacion->value.'» a '.$reserva->correo_electronico.': quedó anotado en el registro.')
+            ->status($correoEnviado ? 'success' : 'warning')
             ->send();
 
         $this->redirect(ReservaResource::getUrl('view', ['record' => $reserva]));
