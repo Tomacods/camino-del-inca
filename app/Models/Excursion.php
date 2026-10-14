@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoPaquete;
 use App\Enums\EstadoReserva;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -155,5 +156,33 @@ class Excursion extends Model
     public function agregarReserva(Reserva $reserva): void
     {
         $this->reservas()->save($reserva);
+    }
+
+    /* ------------------------------ CU-20 Modificar ------------------------------- */
+
+    public function getDatosExcursion(): self
+    {
+        return $this->load(['paquete', 'guia']);
+    }
+
+    // No se revisa el estado del paquete: R-03 no deja pasar a «Inactivo» un paquete con reservas «Pendiente»,
+    // «Confirmada» o «Sin Permiso», así que el de una reserva «Confirmada» está siempre «Activo».
+    public static function buscarOtrasDelPaquete(int $idPaquete, Carbon $fechaOrigen, int $cantidad): Collection
+    {
+        $otras = self::with(['paquete', 'guia'])
+            ->where('id_paquete', $idPaquete)
+            ->whereDate('fecha_salida', '!=', $fechaOrigen)
+            ->get();
+
+        return self::filtrarHabilitadas($otras, $cantidad);
+    }
+
+    public static function filtrarHabilitadas(Collection $excursiones, int $cantidad): Collection
+    {
+        return $excursiones
+            ->filter(fn ($excursion) => $excursion->cumpleAnticipacionMinima(now()))
+            ->each(fn ($excursion) => $excursion->cupo_disponible = $excursion->obtenerCupoDisponible())
+            ->filter(fn ($excursion) => $excursion->cupo_disponible >= $cantidad)
+            ->values();
     }
 }
