@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Reservas;
 
 use App\Enums\Rol;
 use App\Filament\Resources\Reservas\Pages\ListReservas;
+use App\Filament\Resources\Reservas\Pages\ValidarPermisosReserva;
 use App\Filament\Resources\Reservas\Pages\ViewReserva;
 use App\Filament\Resources\Reservas\Schemas\ReservaInfolist;
 use App\Filament\Resources\Reservas\Tables\ReservasTable;
@@ -54,6 +55,7 @@ class ReservaResource extends Resource
         return [
             'index' => ListReservas::route('/'),
             'view' => ViewReserva::route('/{record}'),
+            'permisos' => ValidarPermisosReserva::route('/{record}/permisos'),
         ];
     }
 }

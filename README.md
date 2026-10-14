@@ -73,14 +73,20 @@ Después:
 5. Levantar la aplicación, en tres ventanas de Git Bash:
 
    ```bash
-   php artisan serve        # http://localhost:8000   (panel: http://localhost:8000/admin)
+   php artisan serve        # http://127.0.0.1:8000   (panel: http://127.0.0.1:8000/admin)
    npm run dev              # recompila los estilos mientras se trabaja
    php artisan queue:work   # corre las tareas de la cola
    ```
 
+   El sitio se abre en `http://127.0.0.1:8000` y no en `localhost:8000`: en Windows, `localhost` apunta primero a la
+   dirección IPv6 (`::1`), donde `php artisan serve` no escucha, y cada pedido puede tardar unos 300 ms de más.
+
    Sin `php artisan queue:work`, las retenciones de cupo que el cliente abandona no se liberan: las plazas quedan
    retenidas hasta que se levante la cola. Si cambiás el código de una tarea (`app/Jobs`), cortá `queue:work` con
    Ctrl+C y volvé a levantarlo, porque guarda el código en memoria.
+
+Si al abrir el sitio aparece *Connection refused* en el puerto 5432, PostgreSQL está detenido: ver
+[Problemas conocidos](docs/instalacion-windows.md#problemas-conocidos) en la guía de instalación.
 
 El archivo `.env` es de cada uno y no se sube. Si se agrega una variable nueva, se agrega también en `.env.example`.
 
@@ -90,6 +96,35 @@ Después de cada `git pull` que traiga cambios: `composer install`, `npm install
 Mientras se arma la base (hasta la etiqueta `v0.1`) las migraciones se corrigen y se renombran, y `php artisan migrate`
 solo falla o deja la base a medias: por eso se reconstruye entera. Se pierden los datos cargados a mano; los de prueba
 los repone el *seeder*. A partir de `v0.1` alcanza con `php artisan migrate`.
+
+## Probar el pago con Mercado Pago
+
+Lo necesita quien pruebe el pago de la reserva (CU-15) y la PC con la que se muestre el sistema en la presentación. El
+resto del sistema funciona sin esto.
+
+1. En `.env`, completar `MERCADOPAGO_ACCESS_TOKEN` con el *Access Token* de las credenciales **de prueba** de tu cuenta
+   de Mercado Pago Developers. Empieza con `APP_USR-`, igual que el de producción: en Checkout Pro es así. Nunca las
+   credenciales reales.
+2. Mercado Pago no acepta `localhost` como dirección de vuelta, así que el sitio se abre por un túnel de ngrok:
+
+   ```bash
+   ngrok http 8000
+   ```
+
+   y se copia la dirección `https://…` que muestra a `APP_URL`, en `.env`. Cómo instalar ngrok y usar el túnel:
+   [paso 8 de la guía de instalación](docs/instalacion-windows.md#8-ngrok-para-probar-el-pago-y-para-la-presentación),
+   que también tiene la lista para la presentación.
+3. Compilar los estilos una vez con `npm run build`, en lugar de dejar `npm run dev`: el servidor de Vite escucha en
+   `localhost` y desde la dirección del túnel no se alcanza.
+4. Levantar `php artisan serve` y `php artisan queue:work` como siempre, y entrar **siempre por la dirección del túnel**,
+   no por `127.0.0.1:8000`: la reserva en curso queda en la sesión, y la sesión es de una sola dirección.
+
+Para pagar se usa el comprador de prueba de la cuenta y las tarjetas de prueba de Mercado Pago: con el titular `APRO`
+el pago se aprueba; con `FUND` u `OTHE`, se rechaza. Mercado Pago cobra en pesos el equivalente de los dólares, con su
+cotización del momento.
+
+Si al pagar aparece «No pudimos conectar con Mercado Pago» y el registro habla de un certificado, ver
+[Problemas conocidos](docs/instalacion-windows.md#problemas-conocidos) en la guía de instalación.
 
 ## Cómo trabajamos
 
