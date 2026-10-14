@@ -1,0 +1,361 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\EstadoPermiso;
+use App\Enums\EstadoReserva;
+use App\Enums\TipoNotificacion;
+use App\Mail\NotificacionCliente;
+use App\Models\Pago;
+use App\Models\Reserva;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\SendQueuedMailable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\ServicioCorreoQueFalla;
+use Tests\TestCase;
+
+// Notificar Cliente (CU-13), con las reservas de los seeders. Las invocaciones desde cada pantalla se prueban en
+// ReservaConfirmadaTest (CU-15), SaldoPagadoTest (CU-16) y ValidarPermisosTest (CU-04).
+class NotificarClienteTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected $seed = true;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Antes de todas las fechas límite de los seeders que se usan acá.
+        $this->travelTo('2026-10-14 12:00:00');
+    }
+
+    /* --------------------------- Los ocho tipos ------------------------------- */
+
+    public function test_primera_compra_lleva_el_numero_de_reserva_y_el_comprobante(): void
+    {
+        Mail::fake();
+        $reserva = Reserva::buscarReserva('000124-7');
+
+        $this->assertTrue(Reserva::notificarCliente(TipoNotificacion::PrimeraCompra, '000124-7'));
+
+        $correo = $this->correoEnviado(TipoNotificacion::PrimeraCompra, 'lucia.fernandez@mail.com');
+        $correo->assertHasSubject('Tu reserva 000124-7 está registrada');
+
+        $paquete = $reserva->excursion->paquete;
+        $correo->assertSeeInOrderInHtml([
+            '000124-7',
+            $reserva->pagos()->sole()->comprobante->numero_comprobante,
+            'Camino Inca Clásico, salida el 18/01/2027',
+            $paquete->recorrido->nombre.' ('.$paquete->recorrido->duracion_dias.' días)',
+        ]);
+        foreach ($paquete->servicios as $servicio) {
+            $correo->assertSeeInHtml($servicio->tipo->value.': '.$servicio->nombre);
+        }
+        $correo->assertSeeInHtml('1 antes y 1 después del recorrido');
+        $correo->assertSeeInOrderInHtml(['Precio final', 'USD 2.700,00', 'Abonado (Seña)', 'USD 1.350,00']);
+    }
+
+    public function test_pago_de_saldo_confirma_el_pago_total_con_su_comprobante(): void
+    {
+        Mail::fake();
+        $pagoSaldo = Pago::registrarPagoSaldo(Reserva::buscarReserva('000125-9'), 'Tarjeta de débito');
+
+        Reserva::notificarCliente(TipoNotificacion::PagoSaldo, '000125-9');
+
+        $correo = $this->correoEnviado(TipoNotificacion::PagoSaldo, 'federico.rios@mail.com');
+        $correo->assertHasSubject('Recibimos el pago del saldo de tu reserva 000125-9');
+        $correo->assertSeeInHtml('está pagada por completo');
+        $correo->assertSeeInOrderInHtml([
+            $pagoSaldo->comprobante->numero_comprobante,
+            'Monto abonado', $this->dolares($pagoSaldo->monto).', con Tarjeta de débito',
+            'Saldo', 'Abonado',
+        ]);
+    }
+
+    #[DataProvider('tiposConComprobante')]
+    public function test_el_comprobante_es_el_del_ultimo_pago(TipoNotificacion $tipoNotificacion): void
+    {
+        Mail::fake();
+        $reserva = Reserva::buscarReserva('000125-9');
+        $comprobanteSena = $reserva->pagos()->sole()->comprobante->numero_comprobante;
+        $comprobanteSaldo = Pago::registrarPagoSaldo($reserva, 'Tarjeta de débito')->comprobante->numero_comprobante;
+
+        Reserva::notificarCliente($tipoNotificacion, '000125-9');
+
+        $correo = $this->correoEnviado($tipoNotificacion, 'federico.rios@mail.com');
+        $correo->assertSeeInHtml($comprobanteSaldo);
+        $correo->assertDontSeeInHtml($comprobanteSena);
+    }
+
+    public static function tiposConComprobante(): array
+    {
+        return [
+            'Primera Compra' => [TipoNotificacion::PrimeraCompra],
+            'Pago de Saldo' => [TipoNotificacion::PagoSaldo],
+        ];
+    }
+
+    // CU-21 con más de 30 días de anticipación: el 50 % de lo abonado. La fecha de cancelación es la del envío.
+    public function test_cancelacion_de_reserva_con_reembolso(): void
+    {
+        Mail::fake();
+        Reserva::buscarReserva('000124-7')->confirmarCancelacion(now());
+
+        Reserva::notificarCliente(TipoNotificacion::CancelacionReserva, '000124-7');
+
+        $correo = $this->correoEnviado(TipoNotificacion::CancelacionReserva, 'lucia.fernandez@mail.com');
+        $correo->assertHasSubject('Tu reserva 000124-7 fue cancelada');
+        $correo->assertSeeInHtml('fue cancelada el 14/10/2026');
+        $correo->assertSeeInHtml('Camino Inca Clásico');
+        $correo->assertSeeInHtml('un reembolso del 50 % de lo abonado');
+        $correo->assertSeeInHtml('USD 675,00');
+        $correo->assertDontSeeInHtml('no tiene devolución');
+    }
+
+    // CU-21 con 30 días o menos de anticipación: no se registra devolución.
+    public function test_cancelacion_de_reserva_sin_devolucion(): void
+    {
+        Mail::fake();
+        $this->travelTo('2026-12-25 10:00:00');
+        Reserva::buscarReserva('000124-7')->confirmarCancelacion(now());
+
+        Reserva::notificarCliente(TipoNotificacion::CancelacionReserva, '000124-7');
+
+        $correo = $this->correoEnviado(TipoNotificacion::CancelacionReserva, 'lucia.fernandez@mail.com');
+        $correo->assertSeeInHtml('fue cancelada el 25/12/2026');
+        $correo->assertSeeInHtml('la cancelación no tiene devolución');
+        $correo->assertDontSeeInHtml('reembolso del');
+    }
+
+    public function test_permisos_obtenidos_con_saldo_adeudado_informa_el_saldo_y_su_fecha_limite(): void
+    {
+        Mail::fake();
+        $saldoPendiente = Reserva::buscarReserva('000125-9')->calcularSaldoPendiente();
+
+        Reserva::notificarCliente(TipoNotificacion::PermisosObtenidos, '000125-9');
+
+        $correo = $this->correoEnviado(TipoNotificacion::PermisosObtenidos, 'federico.rios@mail.com');
+        $correo->assertHasSubject('Tu reserva 000125-9 está confirmada');
+        $correo->assertSeeInHtml('Todos los integrantes obtuvieron el permiso');
+        $correo->assertSeeInHtml('«Confirmada»');
+        $correo->assertSeeInOrderInHtml(['Te queda un saldo de', $this->dolares($saldoPendiente), 'hasta el 01/01/2027']);
+    }
+
+    public function test_permisos_obtenidos_con_saldo_abonado_no_pide_saldo(): void
+    {
+        Mail::fake();
+
+        Reserva::notificarCliente(TipoNotificacion::PermisosObtenidos, '000122-3');
+
+        $correo = $this->correoEnviado(TipoNotificacion::PermisosObtenidos, 'valentina.diaz@mail.com');
+        $correo->assertSeeInHtml('Tu reserva ya está pagada por completo.');
+        $correo->assertDontSeeInHtml('Te queda un saldo');
+    }
+
+    public function test_permisos_rechazados_nombra_a_quienes_no_obtuvieron_el_permiso_y_las_opciones(): void
+    {
+        Mail::fake();
+
+        Reserva::notificarCliente(TipoNotificacion::PermisosRechazados, '000123-5');
+
+        $correo = $this->correoEnviado(TipoNotificacion::PermisosRechazados, 'diego.morales@mail.com');
+        $correo->assertHasSubject('Tu reserva 000123-5 quedó sin permiso');
+
+        // En la lista de los que no obtuvieron el permiso está Camila y no Diego, que sí lo obtuvo.
+        $sinPermiso = Str::between($correo->render(), 'no obtuvieron el permiso', 'Por eso');
+        $this->assertStringContainsString('Camila Morales', $sinPermiso);
+        $this->assertStringNotContainsString('Diego Morales', $sinPermiso);
+
+        $correo->assertSeeInOrderInHtml([
+            '«Sin Permiso»', 'Hasta el', '04/12/2026',
+            'reintegro del 100 % de lo abonado (USD 870,00)',
+            'Reprogramar la reserva',
+            'la reserva se cancela y te reintegramos el 100 %',
+        ]);
+    }
+
+    // CU-22 todavía no existe: se simula su cambio de estado.
+    public function test_cancelacion_por_falta_de_pago_avisa_que_la_sena_no_se_devuelve(): void
+    {
+        Mail::fake();
+        $reserva = Reserva::buscarReserva('000125-9');
+        $reserva->estado = EstadoReserva::Cancelada;
+        $reserva->save();
+
+        Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPago, '000125-9');
+
+        $correo = $this->correoEnviado(TipoNotificacion::CancelacionFaltaPago, 'federico.rios@mail.com');
+        $correo->assertHasSubject('Tu reserva 000125-9 fue cancelada por falta de pago');
+        $correo->assertSeeInHtml('el saldo no se pagó antes de la fecha límite, el 01/01/2027');
+        $correo->assertSeeInHtml('no es reembolsable');
+    }
+
+    // CU-12 todavía no existe: se usa la reserva «Finalizada» de los seeders.
+    public function test_etapa_final_invita_a_valorar_los_servicios(): void
+    {
+        Mail::fake();
+
+        Reserva::notificarCliente(TipoNotificacion::EtapaFinal, '000118-1');
+
+        $correo = $this->correoEnviado(TipoNotificacion::EtapaFinal, 'paula.benitez@mail.com');
+        $correo->assertHasSubject('Tu excursión terminó: contanos cómo te fue');
+        $correo->assertSeeInHtml('«Finalizada»');
+        $correo->assertSeeInHtml('Ya podés valorar los servicios');
+    }
+
+    // La causa sale de la fecha de la devolución: hasta la fecha límite de confirmación (el 04/12/2026, incluido) la
+    // cancelación la pidió el cliente (CU-17); después, la hizo el sistema al vencer el plazo (CU-26, que todavía no
+    // existe: se simula con el mismo método del modelo).
+    #[DataProvider('causasFaltaDePermisos')]
+    public function test_cancelacion_por_falta_de_permisos_reintegra_el_100_e_informa_la_causa(string $fecha, string $causa, string $otraCausa): void
+    {
+        Mail::fake();
+        $this->travelTo($fecha);
+        $reserva = Reserva::buscarReserva('000123-5');
+        $reserva->ejecutarCancelacionConReintegro($reserva->calcularReintegro(), now());
+
+        Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, '000123-5');
+
+        $correo = $this->correoEnviado(TipoNotificacion::CancelacionFaltaPermisos, 'diego.morales@mail.com');
+        $correo->assertHasSubject('Tu reserva 000123-5 fue cancelada por falta de permisos');
+        $correo->assertSeeInHtml($causa);
+        $correo->assertDontSeeInHtml($otraCausa);
+        $correo->assertSeeInHtml('Te reintegramos el 100 % de lo abonado: <strong>USD 870,00</strong>', false);
+    }
+
+    public static function causasFaltaDePermisos(): array
+    {
+        $pedido = 'porque pediste el reintegro';
+        $vencimiento = 'porque el 04/12/2026 venció el plazo';
+
+        return [
+            'pedido del cliente (CU-17)' => ['2026-10-14 12:00:00', $pedido, $vencimiento],
+            'pedido del cliente el último día' => ['2026-12-04 18:00:00', $pedido, $vencimiento],
+            'vencimiento de la fecha límite (CU-26)' => ['2026-12-05 03:00:00', $vencimiento, $pedido],
+        ];
+    }
+
+    /* ----------------------------- Destinatario ------------------------------- */
+
+    // El correo va sólo al titular. Los excursionistas no tienen correo en el esquema, y el de la reserva es el único.
+    public function test_va_solo_al_correo_de_la_reserva(): void
+    {
+        Mail::fake();
+
+        foreach (TipoNotificacion::cases() as $tipoNotificacion) {
+            Reserva::notificarCliente($tipoNotificacion, '000118-1');
+        }
+
+        Mail::assertQueuedCount(count(TipoNotificacion::cases()));
+        Mail::assertQueued(NotificacionCliente::class, fn (NotificacionCliente $correo) => array_column($correo->to, 'address') === ['paula.benitez@mail.com']
+            && $correo->cc === [] && $correo->bcc === []);
+    }
+
+    public function test_una_reserva_que_no_existe_no_envia_nada(): void
+    {
+        Mail::fake();
+        Log::spy();
+
+        $this->assertFalse(Reserva::notificarCliente(TipoNotificacion::PrimeraCompra, '999999-9'));
+
+        Mail::assertNothingQueued();
+        Log::shouldHaveReceived('warning')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, '999999-9'));
+    }
+
+    /* ---------------------------------- A8 ------------------------------------ */
+
+    public function test_el_correo_va_en_la_cola_con_reintentos_y_despues_del_commit(): void
+    {
+        Queue::fake();
+
+        Reserva::notificarCliente(TipoNotificacion::PrimeraCompra, '000124-7');
+
+        Queue::assertPushed(SendQueuedMailable::class, fn (SendQueuedMailable $tarea) => $tarea->tries === NotificacionCliente::INTENTOS
+            && $tarea->backoff() === NotificacionCliente::SEGUNDOS_ENTRE_INTENTOS
+            && $tarea->afterCommit === true);
+    }
+
+    // Con la cola de la base, como en .env.example: el servicio de correo falla, la reserva conserva su nuevo estado y
+    // el correo vuelve a la cola para otro intento, cada vez con más espera.
+    public function test_si_el_envio_falla_la_reserva_conserva_su_estado_y_el_correo_se_reintenta(): void
+    {
+        config(['queue.default' => 'database']);
+        ServicioCorreoQueFalla::instalar();
+
+        $reserva = $this->validarTodosLosPermisos('000124-7');
+        $this->assertTrue(Reserva::notificarCliente(TipoNotificacion::PermisosObtenidos, '000124-7'));
+        $this->assertSame(1, DB::table('jobs')->count());
+
+        // Primer intento: falla y vuelve a la cola, disponible en un minuto.
+        $this->artisan('queue:work', ['--once' => true]);
+
+        $tarea = DB::table('jobs')->sole();
+        $this->assertSame(1, (int) $tarea->attempts);
+        $this->assertSame(now()->addSeconds(NotificacionCliente::SEGUNDOS_ENTRE_INTENTOS[0])->getTimestamp(), (int) $tarea->available_at);
+
+        // Segundo intento, pasado el minuto: falla otra vez y espera más.
+        $this->travel(NotificacionCliente::SEGUNDOS_ENTRE_INTENTOS[0])->seconds();
+        $this->artisan('queue:work', ['--once' => true]);
+
+        $tarea = DB::table('jobs')->sole();
+        $this->assertSame(2, (int) $tarea->attempts);
+        $this->assertSame(now()->addSeconds(NotificacionCliente::SEGUNDOS_ENTRE_INTENTOS[1])->getTimestamp(), (int) $tarea->available_at);
+
+        $this->assertSame(0, DB::table('failed_jobs')->count());
+        $this->assertSame(EstadoReserva::Confirmada, $reserva->fresh()->estado);
+    }
+
+    // Si ni siquiera se puede poner el correo en la cola, se anota en el registro y el caso de uso sigue.
+    public function test_si_no_se_puede_poner_en_la_cola_no_lanza_y_la_reserva_conserva_su_estado(): void
+    {
+        $reserva = $this->validarTodosLosPermisos('000124-7');
+        config(['queue.default' => 'no-configurada']);
+        Log::spy();
+
+        $this->assertFalse(Reserva::notificarCliente(TipoNotificacion::PermisosObtenidos, '000124-7'));
+
+        Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, 'Permisos Obtenidos')
+            && str_contains($mensaje, '000124-7') && str_contains($mensaje, 'lucia.fernandez@mail.com'));
+        $this->assertSame(EstadoReserva::Confirmada, $reserva->fresh()->estado);
+    }
+
+    /* -------------------------------- Ayudantes ------------------------------- */
+
+    // El único correo en la cola, del tipo esperado y sólo para el titular.
+    private function correoEnviado(TipoNotificacion $tipoNotificacion, string $correoTitular): NotificacionCliente
+    {
+        Mail::assertQueuedCount(1);
+        $correo = Mail::queued(NotificacionCliente::class)->sole();
+
+        $this->assertSame($tipoNotificacion, $correo->tipo);
+        $this->assertSame([$correoTitular], array_column($correo->to, 'address'));
+
+        return $correo;
+    }
+
+    // El cambio de estado de CU-04, por el modelo: la reserva pasa a «Confirmada».
+    private function validarTodosLosPermisos(string $numeroReserva): Reserva
+    {
+        $reserva = Reserva::buscarReserva($numeroReserva);
+
+        foreach ($reserva->getExcursionistas() as $excursionista) {
+            $reserva->registrarPermiso($excursionista->documento_pasaporte, EstadoPermiso::Obtenido);
+        }
+        $reserva->ejecutarValidacionPermisos();
+
+        $this->assertSame(EstadoReserva::Confirmada, $reserva->fresh()->estado);
+
+        return $reserva;
+    }
+
+    private function dolares(float|string $monto): string
+    {
+        return 'USD '.number_format((float) $monto, 2, ',', '.');
+    }
+}
