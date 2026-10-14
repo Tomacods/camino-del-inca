@@ -567,11 +567,11 @@ class Reserva extends Model
     public function iniciarModificacion()
     {
         if (! $this->validarEstado([EstadoReserva::Confirmada])) {
-            throw new \DomainException('La reserva no admite modificación.');
+            throw new DomainException('La reserva no admite modificación.');
         }
 
         if (! $this->excursion->cumpleAnticipacionMinima(now())) {
-            throw new \DomainException('Ya no se puede modificar: falta poco para la salida.');
+            throw new DomainException('Ya no se puede modificar: falta poco para la salida.');
         }
 
         return Excursion::buscarOtrasDelPaquete(
@@ -603,7 +603,7 @@ class Reserva extends Model
         );
 
         if ($destino === null) {
-            throw new \DomainException('La excursión elegida ya no está disponible.');
+            throw new DomainException('La excursión elegida ya no está disponible.');
         }
 
         $fechaLimite = self::calcularFechaLimite($destino->getFechaSalida());
@@ -627,13 +627,13 @@ class Reserva extends Model
             $actual = self::lockForUpdate()->findOrFail($this->id_reserva);
 
             if (! $actual->validarEstado([EstadoReserva::Confirmada])) {
-                throw new \DomainException('La reserva no admite modificación.');
+                throw new DomainException('La reserva no admite modificación.');
             }
 
             $destino = Excursion::lockForUpdate()->findOrFail($destino->id_excursion);
 
             if (! $destino->tieneCupoPara($this->getCantidadExcursionistas())) {
-                throw new \DomainException('La excursión elegida ya no tiene lugar.');
+                throw new DomainException('La excursión elegida ya no tiene lugar.');
             }
 
             $this->cambiarExcursion($destino);

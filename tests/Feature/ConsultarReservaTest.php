@@ -66,26 +66,26 @@ class ConsultarReservaTest extends TestCase
             ->assertSee('USD 650');
     }
 
-   public function test_las_opciones_con_pantalla_se_muestran_como_enlaces(): void
-{
-    $this->consultarReserva('000125-9')
-        ->assertSeeHtml('href="/mi-reserva/000125-9/pagar-saldo"')
-        ->assertSeeHtml('href="/mi-reserva/000125-9/modificar"')
-        ->assertSeeHtml('href="/mi-reserva/000125-9/cancelar"')
-        ->assertDontSee('Disponible próximamente');
-}
+    public function test_las_opciones_con_pantalla_se_muestran_como_enlaces(): void
+    {
+        $this->consultarReserva('000125-9')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/pagar-saldo"')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/modificar"')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/cancelar"')
+            ->assertDontSee('Disponible próximamente');
+    }
 
-public function test_las_opciones_sin_pantalla_se_muestran_deshabilitadas(): void
-{
-    $this->crearReservaSinPermiso('000123-5', 'ana.gomez@mail.com');
+    public function test_las_opciones_sin_pantalla_se_muestran_deshabilitadas(): void
+    {
+        $this->crearReservaSinPermiso('000123-5', 'ana.gomez@mail.com');
 
-    $componente = $this->consultarReserva('000123-5', 'ana.gomez@mail.com')
-        ->assertSee('Reserva 000123-5')
-        ->assertSeeHtmlInOrder(['disabled="disabled"', 'Solicitar reprogramación', 'Disponible próximamente']);
+        $componente = $this->consultarReserva('000123-5', 'ana.gomez@mail.com')
+            ->assertSee('Reserva 000123-5')
+            ->assertSeeHtmlInOrder(['disabled="disabled"', 'Solicitar reprogramación', 'Disponible próximamente']);
 
-    // Sólo Reprogramar: el reintegro ya tiene pantalla.
-    $this->assertSame(1, substr_count($componente->html(), 'Disponible próximamente'));
-}
+        // Sólo Reprogramar: el reintegro ya tiene pantalla.
+        $this->assertSame(1, substr_count($componente->html(), 'Disponible próximamente'));
+    }
 
     public function test_pagar_saldo_lleva_a_su_pantalla(): void
     {
@@ -212,19 +212,20 @@ public function test_las_opciones_sin_pantalla_se_muestran_deshabilitadas(): voi
             'fecha_limite_confirmacion' => '2026-08-07 23:59:59',
         ]);
     }
+
     private function crearReservaSinPermiso(string $numeroReserva, string $correo): Reserva
-{
-    return Reserva::create([
-        'id_excursion' => $this->excursion->id_excursion,
-        'numero_reserva' => $numeroReserva,
-        'correo_electronico' => $correo,
-        'fecha_reserva' => '2026-10-01 10:00:00',
-        'estado' => EstadoReserva::SinPermiso,
-        'estado_saldo' => EstadoSaldo::Adeudado,
-        'noches_extra_antes' => 0,
-        'noches_extra_despues' => 0,
-        'fecha_limite_saldo' => '2027-01-01 23:59:59',
-        'fecha_limite_confirmacion' => '2027-01-01 23:59:59',
-    ]);
-}
+    {
+        return Reserva::create([
+            'id_excursion' => $this->excursion->id_excursion,
+            'numero_reserva' => $numeroReserva,
+            'correo_electronico' => $correo,
+            'fecha_reserva' => '2026-10-01 10:00:00',
+            'estado' => EstadoReserva::SinPermiso,
+            'estado_saldo' => EstadoSaldo::Adeudado,
+            'noches_extra_antes' => 0,
+            'noches_extra_despues' => 0,
+            'fecha_limite_saldo' => '2027-01-01 23:59:59',
+            'fecha_limite_confirmacion' => '2027-01-01 23:59:59',
+        ]);
+    }
 }
