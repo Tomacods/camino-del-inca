@@ -151,113 +151,122 @@ new class extends Component
     }
 };
 ?>
+<div>
+    <h1 class="text-3xl font-semibold sm:text-4xl">
+        Reprogramar la reserva. <span class="text-texto-secundario">Elegí otra fecha de salida.</span>
+    </h1>
 
-<div class="grid gap-6 md:grid-cols-[300px_1fr]">
-    {{-- COLUMNA IZQUIERDA: reserva actual --}}
-    <section class="self-start rounded-lg border border-borde bg-tarjeta p-5">
-        <h1 class="mb-4 font-bold">Reprogramar la reserva</h1>
-
+    <div class="mt-8 grid items-start gap-5 md:grid-cols-[320px_1fr]">
+        {{-- COLUMNA IZQUIERDA: reserva actual --}}
         @if ($this->reserva)
-            <dl class="divide-y divide-borde text-sm">
-                <div class="flex justify-between py-2"><dt class="text-texto-secundario">Reserva</dt><dd class="font-semibold">{{ $this->reserva->numero_reserva }}</dd></div>
-                <div class="flex justify-between py-2"><dt class="text-texto-secundario">Estado</dt><dd>{{ $this->reserva->estado->value }}</dd></div>
-                <div class="flex justify-between py-2"><dt class="text-texto-secundario">Paquete</dt><dd>{{ $this->reserva->excursion->paquete->nombre }}</dd></div>
-                <div class="flex justify-between py-2"><dt class="text-texto-secundario">Salida actual</dt><dd>{{ $this->reserva->excursion->getFechaSalida()->format('d/m/Y') }}</dd></div>
-                <div class="flex justify-between py-2"><dt class="text-texto-secundario">Integrantes</dt><dd>{{ $this->reserva->excursionistas->count() }}</dd></div>
-            </dl>
+            <x-tarjeta>
+                <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
+                    <h2 class="text-2xl font-semibold">Reserva {{ $this->reserva->numero_reserva }}</h2>
+                    <x-chip-estado :estado="$this->reserva->estado" />
+                </div>
+
+                <dl class="divide-y divide-divisor text-[17px]">
+                    <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Paquete</dt><dd class="text-right">{{ $this->reserva->excursion->paquete->nombre }}</dd></div>
+                    <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Salida actual</dt><dd class="tabular-nums">{{ $this->reserva->excursion->getFechaSalida()->format('d/m/Y') }}</dd></div>
+                    <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Integrantes</dt><dd class="tabular-nums">{{ $this->reserva->excursionistas->count() }}</dd></div>
+                </dl>
+            </x-tarjeta>
         @endif
-    </section>
 
-    {{-- COLUMNA DERECHA: pasos --}}
-    <div>
-    @if ($mensajeError)
-        <div class="mb-4 rounded-lg border border-peligro bg-tarjeta p-5">
-            <h2 class="text-lg font-bold text-peligro">No se puede reprogramar</h2>
-            <p class="mt-2 text-sm text-texto">{{ $mensajeError }}</p>
-            @if ($paso === 1)
-                <button type="button" wire:click="cancelarOperacion"
-                        class="mt-4 rounded border border-borde px-4 py-2 text-sm font-semibold text-texto hover:bg-fondo">Volver a mi reserva</button>
-            @endif
-        </div>
-    @endif
+        {{-- COLUMNA DERECHA: pasos --}}
+        <div class="grid gap-5">
+            @if ($mensajeError)
+                <x-aviso tipo="error" titulo="No se puede reprogramar">
+                    {{ $mensajeError }}
+                </x-aviso>
 
-        {{-- PASO 2: excursiones habilitadas --}}
-        @if ($paso === 2)
-            <section class="rounded-lg border border-borde bg-tarjeta p-5">
-                <h2 class="mb-4 text-lg font-bold">Elegí la nueva salida</h2>
-
-                @forelse ($this->habilitadas as $excursion)
-                    <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-borde bg-fondo p-4">
-                        <div class="text-sm">
-                            <p class="font-semibold">{{ $excursion->fecha_salida->format('d/m/Y') }}</p>
-                            <p class="text-texto-secundario">
-                                {{ $excursion->cupo_disponible }} lugares · Guía {{ $excursion->guia->nombre }} {{ $excursion->guia->apellido }}
-                            </p>
-                        </div>
-                        <button type="button" wire:click="elegir('{{ $excursion->fecha_salida->toDateString() }}')"
-                                class="rounded bg-inca px-4 py-2 text-sm font-semibold text-fondo">Elegir</button>
-                    </div>
-                @empty
-                    <div class="mb-4 rounded border-l-4 border-ambar bg-fondo p-3 text-sm text-texto">
-                    No hay otras salidas de este paquete con lugar para todo el grupo y con la anticipación mínima. Podés solicitar el reintegro del 100 % de lo abonado.
-                    </div>
-                    <a href="/mi-reserva/{{ $this->reserva->numero_reserva }}/reintegro"
-                    class="rounded bg-inca px-4 py-2 text-sm font-semibold text-fondo">Solicitar reintegro</a>
+                @if ($paso === 1)
                     <div>
+                        <x-boton variante="secundario" wire:click="cancelarOperacion">Volver a mi reserva</x-boton>
+                    </div>
+                @endif
+            @endif
 
-                    </div>
-                @endforelse
+            {{-- PASO 2: excursiones habilitadas --}}
+            @if ($paso === 2)
+                <x-tarjeta>
+                    @if ($this->habilitadas->isNotEmpty())
+                        <h2 class="text-2xl font-semibold">Elegí la nueva salida</h2>
 
-                <button type="button" wire:click="cancelarOperacion"
-                        class="mt-2 rounded border border-borde px-4 py-2 text-sm font-semibold text-texto hover:bg-fondo">Volver</button>
-            </section>
-        @endif
+                        <ul class="mt-2 divide-y divide-divisor">
+                            @foreach ($this->habilitadas as $excursion)
+                                <li class="flex flex-wrap items-center justify-between gap-3 py-4">
+                                    <div>
+                                        <p class="text-[17px] font-medium tabular-nums">{{ $excursion->fecha_salida->format('d/m/Y') }}</p>
+                                        <p class="text-[15px] text-texto-secundario">
+                                            {{ $excursion->cupo_disponible }} lugares · Guía {{ $excursion->guia->nombre }} {{ $excursion->guia->apellido }}
+                                        </p>
+                                    </div>
+                                    <x-boton wire:click="elegir('{{ $excursion->fecha_salida->toDateString() }}')">Elegir</x-boton>
+                                </li>
+                            @endforeach
+                        </ul>
 
-        {{-- PASO 3: resumen del cambio --}}
-        @if ($paso === 3)
-            @php($cambio = $this->resumen)
-            <section class="rounded-lg border border-borde bg-tarjeta p-5">
-                <h2 class="mb-4 text-lg font-bold">Resumen del cambio</h2>
-                <dl class="mb-6 divide-y divide-borde text-sm">
-                    <div class="flex justify-between py-2">
-                        <dt class="text-texto-secundario">Salida</dt>
-                        <dd>{{ $cambio['origen']->fecha_salida->format('d/m/Y') }} → <span class="font-semibold">{{ $cambio['destino']->fecha_salida->format('d/m/Y') }}</span></dd>
-                    </div>
-                    <div class="flex justify-between py-2">
-                        <dt class="text-texto-secundario">Guía</dt>
-                        <dd>{{ $cambio['destino']->guia->nombre }} {{ $cambio['destino']->guia->apellido }}</dd>
-                    </div>
-                    <div class="flex justify-between py-2">
-                        <dt class="text-texto-secundario">Nueva fecha límite de confirmación</dt>
-                        <dd>{{ $cambio['fecha_limite']->format('d/m/Y') }}</dd>
-                    </div>
-                    @if ($cambio['fecha_limite_saldo'])
-                        <div class="flex justify-between py-2">
-                            <dt class="text-texto-secundario">Nueva fecha límite de pago del saldo</dt>
-                            <dd>{{ $cambio['fecha_limite_saldo']->format('d/m/Y') }}</dd>
+                        <x-boton variante="secundario" wire:click="cancelarOperacion" class="mt-4">Volver</x-boton>
+                    @else
+                        <x-aviso titulo="No hay otras salidas disponibles">
+                            No hay otras salidas de este paquete con lugar para todo el grupo y con la anticipación mínima. Podés solicitar el reintegro del 100 % de lo abonado.
+                        </x-aviso>
+
+                        <div class="mt-4 flex flex-wrap gap-3">
+                            <x-boton href="/mi-reserva/{{ $this->reserva->numero_reserva }}/reintegro">Solicitar reintegro</x-boton>
+                            <x-boton variante="secundario" wire:click="cancelarOperacion">Volver</x-boton>
                         </div>
                     @endif
-                </dl>
+                </x-tarjeta>
+            @endif
 
-                <div class="mb-6 rounded border-l-4 border-ambar bg-fondo p-3 text-sm text-texto">
-                    La reserva vuelve a «Pendiente» y los permisos de los {{ $this->reserva->excursionistas->count() }} integrantes se validan de nuevo.
+            {{-- PASO 3: resumen del cambio --}}
+            @if ($paso === 3)
+                @php($cambio = $this->resumen)
+                <x-tarjeta titulo="Resumen del cambio">
+                    <dl class="divide-y divide-divisor text-[17px]">
+                        <div class="flex justify-between gap-4 py-3">
+                            <dt class="text-texto-secundario">Salida</dt>
+                            <dd class="tabular-nums">{{ $cambio['origen']->fecha_salida->format('d/m/Y') }} → <span class="font-semibold">{{ $cambio['destino']->fecha_salida->format('d/m/Y') }}</span></dd>
+                        </div>
+                        <div class="flex justify-between gap-4 py-3">
+                            <dt class="text-texto-secundario">Guía</dt>
+                            <dd>{{ $cambio['destino']->guia->nombre }} {{ $cambio['destino']->guia->apellido }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-4 py-3">
+                            <dt class="text-texto-secundario">Nueva fecha límite de confirmación</dt>
+                            <dd class="tabular-nums">{{ $cambio['fecha_limite']->format('d/m/Y') }}</dd>
+                        </div>
+                        @if ($cambio['fecha_limite_saldo'])
+                            <div class="flex justify-between gap-4 py-3">
+                                <dt class="text-texto-secundario">Nueva fecha límite de pago del saldo</dt>
+                                <dd class="tabular-nums">{{ $cambio['fecha_limite_saldo']->format('d/m/Y') }}</dd>
+                            </div>
+                        @endif
+                    </dl>
+
+                    <x-aviso class="mt-5">
+                        La reserva vuelve a «Pendiente» y los permisos de los {{ $this->reserva->excursionistas->count() }} integrantes se validan de nuevo.
+                    </x-aviso>
+
+                    <div class="mt-5 flex flex-wrap gap-3">
+                        <x-boton wire:click="confirmar">Confirmar cambio</x-boton>
+                        <x-boton variante="secundario" wire:click="volverALista">Volver</x-boton>
+                    </div>
+                </x-tarjeta>
+            @endif
+
+            {{-- PASO 4: éxito --}}
+            @if ($paso === 4)
+                <x-aviso titulo="¡Reserva reprogramada!">
+                    La reserva fue reprogramada y queda pendiente de validación de permisos.
+                </x-aviso>
+
+                <div>
+                    <x-boton wire:click="cancelarOperacion">Volver a mi reserva</x-boton>
                 </div>
-
-                <div class="flex flex-wrap gap-3">
-                    <button type="button" wire:click="confirmar" class="rounded bg-inca px-4 py-2 text-sm font-semibold text-fondo">Confirmar cambio</button>
-                    <button type="button" wire:click="volverALista" class="rounded border border-borde px-4 py-2 text-sm font-semibold text-texto hover:bg-fondo">Volver</button>
-                </div>
-            </section>
-        @endif
-
-        {{-- PASO 4: éxito --}}
-        @if ($paso === 4)
-            <section class="rounded-lg border border-inca bg-tarjeta p-8 text-center">
-                <h2 class="mb-2 text-xl font-bold text-inca">¡Reserva reprogramada!</h2>
-                <p class="mb-4 text-sm text-texto">La reserva fue reprogramada y queda pendiente de validación de permisos.</p>
-                <button type="button" wire:click="cancelarOperacion" class="rounded bg-inca px-6 py-2 font-semibold text-fondo">Volver a mi reserva</button>
-            </section>
-        @endif
-
+            @endif
+        </div>
     </div>
 </div>
