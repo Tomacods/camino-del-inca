@@ -407,16 +407,6 @@ class Reserva extends Model
     }
 
     /* ----------------------------- CU-20 Modificar ---------------------------- */
-    public static function modificarReserva(string $correo, string $numeroReserva)
-    {
-        $reserva = self::buscarPorCorreoYNumero($correo, $numeroReserva);
-
-        if ($reserva === null) {
-            throw new \DomainException('No encontramos una reserva con esos datos.');
-        }
-
-        return $reserva->iniciarModificacion();
-    }
 
     public function iniciarModificacion()
     {
@@ -450,11 +440,7 @@ class Reserva extends Model
 
     public function elegirExcursionDestino(Carbon $fechaElegida): array
     {
-        $habilitadas = Excursion::buscarOtrasDelPaquete(
-            $this->excursion->id_paquete,
-            $this->excursion->fecha_salida,
-            $this->getCantidadExcursionistas()
-        );
+        $habilitadas = $this->iniciarModificacion();
 
         $destino = $habilitadas->first(
             fn ($excursion) => $excursion->fecha_salida->isSameDay($fechaElegida)
@@ -476,12 +462,24 @@ class Reserva extends Model
 
     private function cambiarExcursion(Excursion $destino): void
     {
-        $this->id_excursion = $destino->id_excursion;
+        $this->excursion()->associate($destino);
     }
 
     public function modificarExcursion(Excursion $destino): void
     {
         DB::transaction(function () use ($destino) {
+            $actual = self::lockForUpdate()->findOrFail($this->id_reserva);
+
+            if (! $actual->validarEstado([EstadoReserva::Confirmada])) {
+                throw new \DomainException('La reserva no admite modificación.');
+            }
+
+            $destino = Excursion::lockForUpdate()->findOrFail($destino->id_excursion);
+
+            if (! $destino->tieneCupoPara($this->getCantidadExcursionistas())) {
+                throw new \DomainException('La excursión elegida ya no tiene lugar.');
+            }
+
             $this->cambiarExcursion($destino);
             $this->estado = EstadoReserva::Pendiente;
 

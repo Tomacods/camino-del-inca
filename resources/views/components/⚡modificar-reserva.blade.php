@@ -8,7 +8,10 @@ use Livewire\Component;
 
 new class extends Component
 {
+    #[Locked]
     public string $correo = '';
+
+    #[Locked]
     public string $numeroReserva = '';
 
     #[Locked]
@@ -53,11 +56,10 @@ new class extends Component
         }
 
         try {
-            // Solo valida: la lista se arma en habilitadas()
             $this->reserva->iniciarModificacion();
             $this->paso = 2;
-        } catch (\Exception $e) {
-            $this->mensajeError = $e->getMessage();
+        } catch (\DomainException $e) {
+            $this->mensajeError = $e->getMessage();   // paso 1: no hay lista a la cual volver
         }
     }
 
@@ -69,23 +71,34 @@ new class extends Component
             $this->reserva->elegirExcursionDestino(Carbon::parse($fecha));
             $this->fechaDestino = $fecha;
             $this->paso = 3;
-        } catch (\Exception $e) {
-            $this->mensajeError = $e->getMessage();
+        } catch (\DomainException $e) {
+            $this->mostrarError($e);
         }
     }
+
+    private function mostrarError(\DomainException $e): void
+{
+    unset($this->reserva);   // descarta la reserva cacheada y la vuelve a leer
+    $this->mensajeError = $e->getMessage();
+
+    try {
+        $this->reserva->iniciarModificacion();
+        $this->paso = 2;      // sigue admitiendo cambios: vuelve a la lista actualizada
+    } catch (\DomainException) {
+        $this->paso = 1;      // ya no admite cambios: sin lista, solo el aviso
+    }
+}
 
     public function confirmar(): void
     {
         $this->mensajeError = '';
 
         try {
-            // Se vuelve a validar cupo y anticipación: pudieron cambiar mientras miraba el resumen
             $cambio = $this->reserva->elegirExcursionDestino(Carbon::parse($this->fechaDestino));
             $this->reserva->modificarExcursion($cambio['destino']);
             $this->paso = 4;
-        } catch (\Exception $e) {
-            $this->mensajeError = $e->getMessage();
-            $this->paso = 2;
+        } catch (\DomainException $e) {
+            $this->mostrarError($e);
         }
     }
 
@@ -93,7 +106,13 @@ new class extends Component
     {
         $this->mensajeError = '';
         $this->fechaDestino = '';
-        $this->paso = 2;
+
+        try {
+            $this->reserva->iniciarModificacion();
+            $this->paso = 2;
+        } catch (\DomainException $e) {
+            $this->mostrarError($e);
+        }
     }
 
     public function cancelarOperacion()
@@ -143,12 +162,16 @@ new class extends Component
 
     {{-- COLUMNA DERECHA: pasos --}}
     <div>
-        @if ($mensajeError)
-            <div class="mb-4 rounded-lg border border-peligro bg-tarjeta p-5">
-                <h2 class="text-lg font-bold text-peligro">No se puede modificar</h2>
-                <p class="mt-2 text-sm text-texto">{{ $mensajeError }}</p>
-            </div>
-        @endif
+    @if ($mensajeError)
+        <div class="mb-4 rounded-lg border border-peligro bg-tarjeta p-5">
+            <h2 class="text-lg font-bold text-peligro">No se puede modificar</h2>
+            <p class="mt-2 text-sm text-texto">{{ $mensajeError }}</p>
+            @if ($paso === 1)
+                <button type="button" wire:click="cancelarOperacion"
+                        class="mt-4 rounded border border-borde px-4 py-2 text-sm font-semibold text-texto hover:bg-fondo">Volver a mi reserva</button>
+            @endif
+        </div>
+    @endif
 
         {{-- PASO 2: excursiones habilitadas --}}
         @if ($paso === 2)
@@ -160,7 +183,7 @@ new class extends Component
                         <div class="text-sm">
                             <p class="font-semibold">{{ $excursion->fecha_salida->format('d/m/Y') }}</p>
                             <p class="text-texto-secundario">
-                                {{ $excursion->obtenerCupoDisponible() }} lugares · Guía {{ $excursion->guia->nombre }} {{ $excursion->guia->apellido }}
+                                {{ $excursion->cupo_disponible }} lugares · Guía {{ $excursion->guia->nombre }} {{ $excursion->guia->apellido }}
                             </p>
                         </div>
                         <button type="button" wire:click="elegir('{{ $excursion->fecha_salida->toDateString() }}')"
@@ -222,5 +245,6 @@ new class extends Component
                 <button type="button" wire:click="cancelarOperacion" class="rounded bg-inca px-6 py-2 font-semibold text-fondo">Volver a mi reserva</button>
             </section>
         @endif
+
     </div>
 </div>

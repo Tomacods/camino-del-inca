@@ -176,9 +176,10 @@ class Excursion extends Model
 
     public static function filtrarHabilitadas($excursiones, int $cantidad)
     {
-        return $excursiones->filter(function ($excursion) use ($cantidad) {
-            return $excursion->cumpleAnticipacionMinima(now())
-                && $excursion->tieneCupoPara($cantidad);
-        })->values();
+        return $excursiones
+            ->filter(fn ($excursion) => $excursion->cumpleAnticipacionMinima(now()))
+            ->each(fn ($excursion) => $excursion->cupo_disponible = $excursion->obtenerCupoDisponible())
+            ->filter(fn ($excursion) => $excursion->cupo_disponible >= $cantidad)
+            ->values();
     }
 }
