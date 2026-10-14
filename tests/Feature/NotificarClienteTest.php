@@ -259,6 +259,24 @@ class NotificarClienteTest extends TestCase
             && $correo->cc === [] && $correo->bcc === []);
     }
 
+    // Excursionista::getDatos() también lo usa CU-10 con el documento: el correo toma sólo lo que dice el DS-13.
+    public function test_el_correo_no_lleva_el_documento_de_los_integrantes(): void
+    {
+        Mail::fake();
+        $reserva = Reserva::buscarReserva('000125-9');
+
+        Reserva::notificarCliente(TipoNotificacion::PermisosObtenidos, '000125-9');
+
+        $correo = $this->correoEnviado(TipoNotificacion::PermisosObtenidos, 'federico.rios@mail.com');
+        foreach ($correo->datos['excursionistas'] as $integrante) {
+            $this->assertSame(['nombre', 'apellido', 'estado_permiso'], array_keys($integrante));
+        }
+        foreach ($reserva->excursionistas as $excursionista) {
+            $correo->assertSeeInHtml($excursionista->nombre.' '.$excursionista->apellido);
+            $correo->assertDontSeeInHtml($excursionista->documento_pasaporte);
+        }
+    }
+
     public function test_una_reserva_que_no_existe_no_envia_nada(): void
     {
         Mail::fake();
