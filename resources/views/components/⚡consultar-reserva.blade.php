@@ -206,7 +206,7 @@ new class extends Component
                         @elseif ($opcion === Reserva::OPCION_PAGAR_SALDO)
                             <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/pagar-saldo">{{ $opcion }}</x-boton>
                         @else
-                            {{-- Modificar, reprogramar y valorar todavía no tienen pantalla. --}}
+                            {{-- Reprogramar y valorar todavía no tienen pantalla. --}}
                             <x-boton disabled class="flex-col">
                                 {{ $opcion }}
                                 <span class="text-sm">Disponible próximamente</span>
