@@ -17,7 +17,12 @@ class ExcursionesTable
             // La columna de integrantes los cuenta por reserva: se traen con la excursión para no consultar por cada fila.
             // Filament pasa la consulta por el nombre del parámetro: tiene que llamarse $query.
             ->modifyQueryUsing(fn (Builder $query) => $query->with(['paquete', 'reservasConfirmadas.excursionistas']))
-            ->defaultSort('fecha_salida')
+            // Primero las salidas de hoy en adelante, de la más cercana a la más lejana; después las pasadas, de la más
+            // reciente a la más vieja. El primer CASE separa los dos grupos; los otros dos ordenan cada uno.
+            ->defaultSort(fn (Builder $query) => $query
+                ->orderByRaw('CASE WHEN fecha_salida >= ? THEN 0 ELSE 1 END', [today()->toDateString()])
+                ->orderByRaw('CASE WHEN fecha_salida >= ? THEN fecha_salida END ASC', [today()->toDateString()])
+                ->orderByRaw('CASE WHEN fecha_salida < ? THEN fecha_salida END DESC', [today()->toDateString()]))
             ->columns([
                 TextColumn::make('paquete.nombre')
                     ->label('Paquete'),

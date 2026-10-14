@@ -174,7 +174,7 @@ class Excursion extends Model
         return $this->reservas()->where('estado', EstadoReserva::Confirmada)->orderBy('numero_reserva');
     }
 
-    // Paso 2: el paquete y la fecha de salida identifican a la excursión. Trae de una vez el paquete, el guía y las
+    // Busca la excursión por el paquete y la fecha de salida, que la identifican. Trae de una vez el paquete, el guía y las
     // reservas confirmadas con sus integrantes, así mostrarla no consulta la base por cada reserva.
     public static function seleccionarExcursion(int $idPaquete, string $fechaSalida): ?self
     {
@@ -185,7 +185,9 @@ class Excursion extends Model
         ]);
     }
 
-    public function getDatosExcursion(): array
+    // El encabezado de la página de integrantes. No se llama getDatosExcursion() porque ese nombre lo usan CU-20 y CU-13
+    // para traer la excursión con el paquete y el guía.
+    public function getEncabezado(): array
     {
         return [
             'paquete' => $this->paquete->nombre,
@@ -205,5 +207,33 @@ class Excursion extends Model
     public function contarIntegrantesConfirmados(): int
     {
         return $this->getReservasConfirmadas()->sum(fn (Reserva $reserva) => $reserva->getExcursionistas()->count());
+    }
+
+    /* ------------------------------ CU-20 Modificar ------------------------------- */
+
+    public function getDatosExcursion(): self
+    {
+        return $this->load(['paquete', 'guia']);
+    }
+
+    // No se revisa el estado del paquete: R-03 no deja pasar a «Inactivo» un paquete con reservas «Pendiente»,
+    // «Confirmada» o «Sin Permiso», así que el de una reserva «Confirmada» está siempre «Activo».
+    public static function buscarOtrasDelPaquete(int $idPaquete, Carbon $fechaOrigen, int $cantidad): Collection
+    {
+        $otras = self::with(['paquete', 'guia'])
+            ->where('id_paquete', $idPaquete)
+            ->whereDate('fecha_salida', '!=', $fechaOrigen)
+            ->get();
+
+        return self::filtrarHabilitadas($otras, $cantidad);
+    }
+
+    public static function filtrarHabilitadas(Collection $excursiones, int $cantidad): Collection
+    {
+        return $excursiones
+            ->filter(fn ($excursion) => $excursion->cumpleAnticipacionMinima(now()))
+            ->each(fn ($excursion) => $excursion->cupo_disponible = $excursion->obtenerCupoDisponible())
+            ->filter(fn ($excursion) => $excursion->cupo_disponible >= $cantidad)
+            ->values();
     }
 }

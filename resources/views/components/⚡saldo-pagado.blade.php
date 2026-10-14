@@ -238,8 +238,9 @@ new #[Title('Pago del saldo')] class extends Component
 
         <x-aviso tipo="error" titulo="No pudimos registrar el pago" class="mt-8">
             Mercado Pago aprobó el pago, pero la reserva ya no estaba confirmada con el saldo pendiente: por ejemplo, se
-            canceló mientras pagabas. La devolución del dinero se gestiona con la agencia: comunicate con nosotros e indicá
-            el número de operación de Mercado Pago, <span class="font-semibold tabular-nums">{{ $numeroOperacion }}</span>.
+            canceló o se cambió de excursión mientras pagabas. La devolución del dinero se gestiona con la agencia:
+            comunicate con nosotros e indicá el número de operación de Mercado Pago,
+            <span class="font-semibold tabular-nums">{{ $numeroOperacion }}</span>.
         </x-aviso>
 
         <x-boton href="/mi-reserva" class="mt-6">Ir a Mi reserva</x-boton>

@@ -28,7 +28,7 @@ class ListarIntegrantesExcursion extends Page
 
     protected static string $resource = ExcursionResource::class;
 
-    // Paquete, fecha de salida, guía, cupo y cantidad de integrantes, como los devuelve getDatosExcursion().
+    // Paquete, fecha de salida, guía, cupo y cantidad de integrantes, como los devuelve getEncabezado().
     #[Locked]
     public array $datosExcursion = [];
 
@@ -62,12 +62,17 @@ class ListarIntegrantesExcursion extends Page
         $this->seleccionarExcursion($this->record->id_paquete, $this->record->fecha_salida->format('Y-m-d'));
     }
 
-    // Pasos 2 y 3. No es pública: la excursión es la de la dirección, y desde el navegador no se puede cambiar.
+    // Busca la excursión y guarda el encabezado y las reservas confirmadas con sus integrantes. No es pública: la excursión
+    // es la de la dirección, y desde el navegador no se puede cambiar.
     protected function seleccionarExcursion(int $idPaquete, string $fechaSalida): void
     {
         $excursion = Excursion::seleccionarExcursion($idPaquete, $fechaSalida);
 
-        $this->datosExcursion = $excursion->getDatosExcursion();
+        if ($excursion === null) {
+            abort(404);
+        }
+
+        $this->datosExcursion = $excursion->getEncabezado();
 
         $this->reservas = $excursion->getReservasConfirmadas()
             ->map(fn (Reserva $reserva) => [

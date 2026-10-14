@@ -56,15 +56,34 @@ class ListarIntegrantesTest extends TestCase
 
     /* ------------------------ Curso normal: el listado ------------------------ */
 
-    public function test_el_guia_ve_solo_sus_excursiones_ordenadas_por_fecha_de_salida(): void
+    public function test_el_guia_ve_solo_sus_excursiones(): void
     {
         $this->actingAs($this->usuarioGuia);
 
         Livewire::test(ListExcursiones::class)
             ->assertSee('Mis excursiones')
-            ->assertCanSeeTableRecords([$this->excursionRealizada, $this->excursionSinConfirmadas, $this->excursion], inOrder: true)
+            ->assertCanSeeTableRecords([$this->excursionSinConfirmadas, $this->excursion, $this->excursionRealizada], inOrder: true)
             ->assertCanNotSeeTableRecords([$this->excursionDeOtroGuia])
             ->assertCountTableRecords(3);
+    }
+
+    // Hoy es 14/10/2026: la de hoy cuenta como próxima.
+    public function test_primero_las_proximas_salidas_y_despues_las_pasadas(): void
+    {
+        $excursionDeHoy = $this->crearExcursion($this->paquete, '2026-10-14', $this->usuarioGuia);
+        $excursionMasVieja = $this->crearExcursion($this->paquete, '2026-05-04', $this->usuarioGuia);
+
+        $this->actingAs($this->usuarioGuia);
+
+        Livewire::test(ListExcursiones::class)
+            ->assertCanSeeTableRecords([
+                $excursionDeHoy,
+                $this->excursionSinConfirmadas,
+                $this->excursion,
+                $this->excursionRealizada,
+                $excursionMasVieja,
+            ], inOrder: true)
+            ->assertCountTableRecords(5);
     }
 
     public function test_el_listado_cuenta_solo_los_integrantes_de_reservas_confirmadas(): void
@@ -135,7 +154,7 @@ class ListarIntegrantesTest extends TestCase
         $this->assertSame(['000125-9', '000126-0'], $excursion->getReservasConfirmadas()->pluck('numero_reserva')->all());
         $this->assertSame(3, $excursion->contarIntegrantesConfirmados());
 
-        $datos = $excursion->getDatosExcursion();
+        $datos = $excursion->getEncabezado();
 
         $this->assertSame('Camino Inca Clásico', $datos['paquete']);
         $this->assertSame('2027-03-01', $datos['fecha_salida']->format('Y-m-d'));

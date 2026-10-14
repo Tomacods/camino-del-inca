@@ -235,9 +235,7 @@ class Reserva extends Model
     // se llama después de asignarlo (en el DS-15 va antes de setEstadoSaldo). Sólo asigna: guarda quien la llama.
     public function fijarFechasLimite($fechaSalida): void
     {
-        $fechaLimite = Carbon::parse($fechaSalida)
-            ->subMonthsNoOverflow(config('reserva.meses_anticipacion_fechas_limite'))
-            ->endOfDay();
+        $fechaLimite = self::calcularFechaLimite($fechaSalida);
 
         $this->fecha_limite_confirmacion = $fechaLimite;
         $this->fecha_limite_saldo = $this->estado_saldo === EstadoSaldo::Adeudado ? $fechaLimite : null;
@@ -277,9 +275,16 @@ class Reserva extends Model
         return $this->calcularMontoTotal() - $this->sumarPagos();
     }
 
+    // «Modificar reserva» se ofrece con la misma anticipación que exige iniciarModificacion() (CU-20): a menos de 3 meses
+    // de la salida, la pantalla de modificar la rechazaría.
     public function getOpcionesHabilitadas(): array
     {
-        return $this->determinarOpciones($this->estado, $this->estado_saldo, $this->tieneValoracion());
+        return $this->determinarOpciones(
+            $this->estado,
+            $this->estado_saldo,
+            $this->tieneValoracion(),
+            $this->excursion->cumpleAnticipacionMinima(now()),
+        );
     }
 
     public function tieneValoracion(): bool
@@ -287,12 +292,12 @@ class Reserva extends Model
         return $this->valoracion()->exists();
     }
 
-    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion): array
+    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion, bool $cumpleAnticipacionMinima): array
     {
         return match ($estado) {
             EstadoReserva::Confirmada => array_values(array_filter([
                 $estadoSaldo === EstadoSaldo::Adeudado ? self::OPCION_PAGAR_SALDO : null,
-                self::OPCION_MODIFICAR,
+                $cumpleAnticipacionMinima ? self::OPCION_MODIFICAR : null,
                 self::OPCION_CANCELAR,
             ])),
             EstadoReserva::Pendiente => [self::OPCION_CANCELAR],
@@ -561,5 +566,101 @@ class Reserva extends Model
     public function scopeConServicio(Builder $consulta, TipoServicio $tipo): Builder
     {
         return $consulta->whereHas('excursion.paquete.servicios', fn (Builder $servicio) => $servicio->where('tipo', $tipo->value));
+    }
+
+    /* ----------------------------- CU-20 Modificar ---------------------------- */
+
+    public function iniciarModificacion(): Collection
+    {
+        if (! $this->validarEstado([EstadoReserva::Confirmada])) {
+            throw new DomainException('La reserva no admite modificación.');
+        }
+
+        if (! $this->excursion->cumpleAnticipacionMinima(now())) {
+            throw new DomainException('Ya no se puede modificar: falta poco para la salida.');
+        }
+
+        return Excursion::buscarOtrasDelPaquete(
+            $this->excursion->id_paquete,
+            $this->excursion->fecha_salida,
+            $this->getCantidadExcursionistas()
+        );
+    }
+
+    private function getCantidadExcursionistas(): int
+    {
+        return $this->excursionistas->count();
+    }
+
+    // Solo calcula: no asigna ni guarda. Lo usan fijarFechasLimite y el resumen de CU-20.
+    public static function calcularFechaLimite($fechaSalida): Carbon
+    {
+        return Carbon::parse($fechaSalida)
+            ->subMonthsNoOverflow(config('reserva.meses_anticipacion_fechas_limite'))
+            ->endOfDay();
+    }
+
+    public function elegirExcursionDestino(Carbon $fechaElegida): array
+    {
+        $habilitadas = $this->iniciarModificacion();
+
+        $destino = $habilitadas->first(
+            fn ($excursion) => $excursion->fecha_salida->isSameDay($fechaElegida)
+        );
+
+        if ($destino === null) {
+            throw new DomainException('La excursión elegida ya no está disponible.');
+        }
+
+        $fechaLimite = self::calcularFechaLimite($destino->getFechaSalida());
+
+        return [
+            'origen' => $this->excursion->getDatosExcursion(),
+            'destino' => $destino->getDatosExcursion(),
+            'fecha_limite' => $fechaLimite,
+            'fecha_limite_saldo' => $this->estado_saldo === EstadoSaldo::Adeudado ? $fechaLimite : null,
+        ];
+    }
+
+    private function cambiarExcursion(Excursion $destino): void
+    {
+        $this->excursion()->associate($destino);
+    }
+
+    // Todo se hace sobre $actual, la reserva leída con su fila bloqueada, y no sobre esta instancia, que la pantalla leyó
+    // antes: si mientras tanto se registró el pago del saldo (Pago::registrarPagoSaldo(), que bloquea la misma fila) o se
+    // canceló la reserva, $this tiene el estado viejo y fijarFechasLimite() usaría un estado_saldo que ya no es.
+    //
+    // Cruce con CU-16: R-16 sólo cobra el saldo con la reserva «Confirmada». Si el cliente modifica con un cobro abierto
+    // en Mercado Pago, ese pago queda sin registrar y la devolución es manual, con la agencia (decisión del grupo del
+    // 13/09). No se bloquea la modificación porque la base no tiene dónde guardar el cobro abierto.
+    public function modificarExcursion(Excursion $destino): void
+    {
+        DB::transaction(function () use ($destino) {
+            $actual = self::with('excursionistas')->lockForUpdate()->findOrFail($this->id_reserva);
+
+            if (! $actual->validarEstado([EstadoReserva::Confirmada])) {
+                throw new DomainException('La reserva no admite modificación.');
+            }
+
+            $destino = Excursion::lockForUpdate()->findOrFail($destino->id_excursion);
+
+            if (! $destino->tieneCupoPara($actual->getCantidadExcursionistas())) {
+                throw new DomainException('La excursión elegida ya no tiene lugar.');
+            }
+
+            $actual->cambiarExcursion($destino);
+            $actual->estado = EstadoReserva::Pendiente;
+
+            foreach ($actual->excursionistas as $excursionista) {
+                $excursionista->actualizarPermiso(EstadoPermiso::Pendiente);
+            }
+
+            $actual->fijarFechasLimite($destino->getFechaSalida());
+            $actual->save();
+        });
+
+        // Quien la llamó (la pantalla) ve la reserva como quedó.
+        $this->refresh();
     }
 }
