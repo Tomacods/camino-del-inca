@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Excursiones\Actions;
 
-use App\Filament\Resources\Excursiones\ExcursionResource;
 use App\Models\Excursion;
 use DomainException;
 use Filament\Actions\Action;
@@ -32,16 +31,14 @@ class IniciarRecorrido
             ->action(fn (Excursion $record) => self::iniciarRecorrido($record));
     }
 
-    // Paso 4, A1 y A2. La excursión se vuelve a buscar con la consulta del recurso, que sólo tiene las del guía: un guía no
-    // inicia la de otro aunque arme el pedido a mano. Antes de llegar acá, Filament vuelve a leer la excursión y a evaluar
+    // Paso 4, A1 y A2. La excursión llega de la consulta del recurso, que sólo tiene las del guía: en la tabla y en la página
+    // de integrantes, la de otro guía no se encuentra. Antes de llegar acá, Filament vuelve a leer la excursión y a evaluar
     // visible(); aun así, dos pedidos casi juntos pueden pasar los dos ese control, y por eso la excursión valida otra vez
     // con la fila bloqueada: el segundo recibe el aviso de A1.
     private static function iniciarRecorrido(Excursion $record): void
     {
-        $excursion = ExcursionResource::getEloquentQuery()->findOrFail($record->getKey());
-
         try {
-            $excursion->iniciarRecorrido();
+            $record->iniciarRecorrido();
         } catch (DomainException $excepcion) {
             Notification::make()
                 ->title('No se inició el recorrido')
@@ -51,9 +48,6 @@ class IniciarRecorrido
 
             return;
         }
-
-        // Así la acción se oculta y la columna del inicio se actualiza sin recargar la página.
-        $record->refresh();
 
         Notification::make()
             ->title('Recorrido iniciado')
