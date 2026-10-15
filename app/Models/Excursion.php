@@ -218,16 +218,26 @@ class Excursion extends Model
         return $this->fecha_hora_inicio_recorrido !== null;
     }
 
-    // Se comparan días, no horas, como en cumpleAnticipacionMinima(): vale cualquier hora del día de la salida.
-    public function esDiaDeSalida($fecha): bool
+    // Un recorrido de 4 días que sale el lunes termina el jueves: el día de salida cuenta como el primero.
+    public function getUltimoDiaRecorrido(): Carbon
     {
-        return $this->fecha_salida->isSameDay(Carbon::parse($fecha));
+        return $this->fecha_salida->copy()->addDays($this->paquete->recorrido->duracion_dias - 1);
+    }
+
+    // «El día correspondiente» es cualquiera de los días del recorrido, no sólo el de la salida: si el guía se olvida de
+    // iniciarlo el lunes, lo puede hacer después y la excursión no queda sin poder reportar etapas (CU-12). Se comparan
+    // días, no horas, como en cumpleAnticipacionMinima(): vale cualquier hora del primero y del último día.
+    public function esDiaDelRecorrido($fecha): bool
+    {
+        $dia = Carbon::parse($fecha)->startOfDay();
+
+        return $dia->betweenIncluded($this->fecha_salida, $this->getUltimoDiaRecorrido());
     }
 
     // Para mostrar u ocultar la acción en el panel. La misma regla que controla iniciarRecorrido() antes de registrar.
     public function admiteInicioRecorrido($fecha): bool
     {
-        return ! $this->recorridoIniciado() && $this->esDiaDeSalida($fecha);
+        return ! $this->recorridoIniciado() && $this->esDiaDelRecorrido($fecha);
     }
 
     // Paso 4, A1 y A2. La fila se bloquea hasta el final de la transacción: si el guía toca dos veces o tiene la salida
@@ -244,8 +254,9 @@ class Excursion extends Model
                     .$excursion->fecha_hora_inicio_recorrido->format('H:i').'.');
             }
 
-            if (! $excursion->esDiaDeSalida($ahora)) {
-                throw new DomainException('El recorrido sólo se puede iniciar el día de la salida ('.$excursion->fecha_salida->format('d/m/Y').').');
+            if (! $excursion->esDiaDelRecorrido($ahora)) {
+                throw new DomainException('El recorrido sólo se puede iniciar entre el día de la salida ('.$excursion->fecha_salida->format('d/m/Y')
+                    .') y el último día del recorrido ('.$excursion->getUltimoDiaRecorrido()->format('d/m/Y').').');
             }
 
             $excursion->fecha_hora_inicio_recorrido = $ahora;

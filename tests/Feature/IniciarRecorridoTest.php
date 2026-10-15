@@ -16,6 +16,7 @@ use DomainException;
 use Filament\Actions\Testing\TestAction;
 use Filament\Notifications\Notification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -92,6 +93,19 @@ class IniciarRecorridoTest extends TestCase
             ->assertTableColumnFormattedStateSet('fecha_hora_inicio_recorrido', '19/10/2026 08:30', $this->excursionDeHoy);
     }
 
+    // La acción mira la duración del recorrido en cada fila: el recorrido se trae una sola vez con la tabla.
+    public function test_el_listado_no_consulta_el_recorrido_por_cada_excursion(): void
+    {
+        $this->actingAs($this->usuarioGuia);
+
+        DB::enableQueryLog();
+        Livewire::test(ListExcursiones::class);
+        $consultas = array_column(DB::getQueryLog(), 'query');
+        DB::disableQueryLog();
+
+        $this->assertCount(1, array_filter($consultas, fn (string $consulta) => str_contains($consulta, 'from "recorrido"')));
+    }
+
     // Nada en el diseño lo prohíbe: la de hoy no tiene reservas.
     public function test_se_puede_iniciar_una_excursion_sin_integrantes_confirmados(): void
     {
@@ -160,28 +174,45 @@ class IniciarRecorridoTest extends TestCase
         $this->paginaIntegrantes($this->excursionProxima)->assertActionHidden('iniciarRecorrido');
     }
 
-    public function test_despues_del_dia_de_salida_no_muestra_la_accion(): void
+    public function test_despues_del_ultimo_dia_del_recorrido_no_muestra_la_accion(): void
     {
         $this->listado()->assertTableActionHidden('iniciarRecorrido', $this->excursionPasada);
     }
 
     public function test_antes_del_dia_de_salida_no_se_registra(): void
     {
-        $this->assertNoSeInicia($this->excursionProxima, 'El recorrido sólo se puede iniciar el día de la salida (26/10/2026).');
+        $this->assertNoSeInicia($this->excursionProxima,
+            'El recorrido sólo se puede iniciar entre el día de la salida (26/10/2026) y el último día del recorrido (29/10/2026).');
     }
 
-    public function test_despues_del_dia_de_salida_no_se_registra(): void
+    // La del lunes pasado: su recorrido de 4 días terminó el jueves 15.
+    public function test_despues_del_ultimo_dia_del_recorrido_no_se_registra(): void
     {
-        $this->assertNoSeInicia($this->excursionPasada, 'El recorrido sólo se puede iniciar el día de la salida (12/10/2026).');
+        $this->assertNoSeInicia($this->excursionPasada,
+            'El recorrido sólo se puede iniciar entre el día de la salida (12/10/2026) y el último día del recorrido (15/10/2026).');
     }
 
-    // La confirmación se abrió el lunes a la noche y el guía confirma pasada la medianoche: ya es martes.
-    public function test_si_confirma_pasada_la_medianoche_del_dia_de_salida_no_se_registra(): void
+    // Si el guía se olvidó de iniciarlo el lunes, lo puede hacer hasta el último día: si no, no se podrían reportar las
+    // etapas (CU-12) y las reservas nunca pasarían a «Finalizada».
+    public function test_el_guia_lo_puede_iniciar_hasta_el_ultimo_dia_del_recorrido(): void
     {
-        $this->travelTo('2026-10-19 23:58:00');
+        $this->travelTo('2026-10-22 23:59:00');
+
+        $this->listado()
+            ->assertTableActionVisible('iniciarRecorrido', $this->excursionDeHoy)
+            ->callAction($this->accion($this->excursionDeHoy))
+            ->assertNotified('Recorrido iniciado');
+
+        $this->assertSame('2026-10-22 23:59:00', $this->excursionDeHoy->fresh()->fecha_hora_inicio_recorrido->format('Y-m-d H:i:s'));
+    }
+
+    // La confirmación se abrió el último día a la noche y el guía confirma pasada la medianoche: el recorrido ya terminó.
+    public function test_si_confirma_pasada_la_medianoche_del_ultimo_dia_no_se_registra(): void
+    {
+        $this->travelTo('2026-10-22 23:58:00');
         $listado = $this->listado()->mountAction($this->accion($this->excursionDeHoy));
 
-        $this->travelTo('2026-10-20 00:01:00');
+        $this->travelTo('2026-10-23 00:01:00');
         $listado->callMountedAction()->assertNotNotified('Recorrido iniciado');
 
         $this->assertNull($this->excursionDeHoy->fresh()->fecha_hora_inicio_recorrido);
@@ -293,20 +324,33 @@ class IniciarRecorridoTest extends TestCase
         $this->assertTrue($this->excursionDeHoy->recorridoIniciado());
     }
 
-    public function test_es_dia_de_salida_a_cualquier_hora_de_ese_dia(): void
+    // El día de salida cuenta como el primero: 4 días desde el lunes 19 terminan el jueves 22.
+    public function test_el_ultimo_dia_del_recorrido_sale_de_su_duracion(): void
     {
-        $this->assertTrue($this->excursionDeHoy->esDiaDeSalida('2026-10-19 00:00:00'));
-        $this->assertTrue($this->excursionDeHoy->esDiaDeSalida('2026-10-19 23:59:59'));
-        $this->assertTrue($this->excursionDeHoy->esDiaDeSalida(now()));
+        $this->assertSame('2026-10-22', $this->excursionDeHoy->getUltimoDiaRecorrido()->format('Y-m-d'));
+
+        $recorridoCorto = Recorrido::create(['nombre' => 'Camino Corto', 'duracion_dias' => 2, 'cantidad_campings' => 0]);
+        $excursionCorta = $this->crearExcursion($this->crearPaquete($recorridoCorto, 'Camino Inca de 2 días'), '2026-10-19', $this->usuarioGuia);
+
+        $this->assertSame('2026-10-20', $excursionCorta->getUltimoDiaRecorrido()->format('Y-m-d'));
+        $this->assertSame('2026-10-19', $excursionCorta->fecha_salida->format('Y-m-d'));
     }
 
-    public function test_no_es_dia_de_salida_el_dia_anterior_ni_el_siguiente(): void
+    public function test_es_dia_del_recorrido_a_cualquier_hora_del_primero_al_ultimo_dia(): void
     {
-        $this->assertFalse($this->excursionDeHoy->esDiaDeSalida('2026-10-18 23:59:59'));
-        $this->assertFalse($this->excursionDeHoy->esDiaDeSalida('2026-10-20 00:00:00'));
+        $this->assertTrue($this->excursionDeHoy->esDiaDelRecorrido('2026-10-19 00:00:00'));
+        $this->assertTrue($this->excursionDeHoy->esDiaDelRecorrido(now()));
+        $this->assertTrue($this->excursionDeHoy->esDiaDelRecorrido('2026-10-21 12:00:00'));
+        $this->assertTrue($this->excursionDeHoy->esDiaDelRecorrido('2026-10-22 23:59:59'));
     }
 
-    public function test_admite_el_inicio_solo_el_dia_de_salida_y_sin_iniciar(): void
+    public function test_no_es_dia_del_recorrido_el_dia_anterior_a_la_salida_ni_el_siguiente_al_ultimo(): void
+    {
+        $this->assertFalse($this->excursionDeHoy->esDiaDelRecorrido('2026-10-18 23:59:59'));
+        $this->assertFalse($this->excursionDeHoy->esDiaDelRecorrido('2026-10-23 00:00:00'));
+    }
+
+    public function test_admite_el_inicio_solo_en_los_dias_del_recorrido_y_sin_iniciar(): void
     {
         $this->assertTrue($this->excursionDeHoy->admiteInicioRecorrido(now()));
         $this->assertFalse($this->excursionProxima->admiteInicioRecorrido(now()));
@@ -350,7 +394,7 @@ class IniciarRecorridoTest extends TestCase
     {
         try {
             $excursion->iniciarRecorrido();
-            $this->fail('Tenía que avisar que no es el día de la salida.');
+            $this->fail('Tenía que avisar que no es un día del recorrido.');
         } catch (DomainException $excepcion) {
             $this->assertSame($aviso, $excepcion->getMessage());
         }

@@ -15,9 +15,10 @@ class ExcursionesTable
     public static function configure(Table $table): Table
     {
         return $table
-            // La columna de integrantes los cuenta por reserva: se traen con la excursión para no consultar por cada fila.
+            // La columna de integrantes los cuenta por reserva, y la acción de Iniciar Recorrido (CU-11) mira la duración del
+            // recorrido: se traen con la excursión para no consultar por cada fila.
             // Filament pasa la consulta por el nombre del parámetro: tiene que llamarse $query.
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['paquete', 'reservasConfirmadas.excursionistas']))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['paquete.recorrido', 'reservasConfirmadas.excursionistas']))
             // Primero las salidas de hoy en adelante, de la más cercana a la más lejana; después las pasadas, de la más
             // reciente a la más vieja. El primer CASE separa los dos grupos; los otros dos ordenan cada uno.
             ->defaultSort(fn (Builder $query) => $query
