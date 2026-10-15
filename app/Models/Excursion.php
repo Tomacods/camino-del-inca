@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoPaquete;
 use App\Enums\EstadoReserva;
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -207,6 +208,62 @@ class Excursion extends Model
     public function contarIntegrantesConfirmados(): int
     {
         return $this->getReservasConfirmadas()->sum(fn (Reserva $reserva) => $reserva->getExcursionistas()->count());
+    }
+
+    /* ------------------------- CU-11 Iniciar recorrido ------------------------ */
+
+    // También la usa Reportar Etapa (CU-12): no se puede reportar una etapa de un recorrido que todavía no empezó.
+    public function recorridoIniciado(): bool
+    {
+        return $this->fecha_hora_inicio_recorrido !== null;
+    }
+
+    // Un recorrido de 4 días que sale el lunes termina el jueves: el día de salida cuenta como el primero.
+    public function getUltimoDiaRecorrido(): Carbon
+    {
+        return $this->fecha_salida->copy()->addDays($this->paquete->recorrido->duracion_dias - 1);
+    }
+
+    // «El día correspondiente» es cualquiera de los días del recorrido, no sólo el de la salida: si el guía se olvida de
+    // iniciarlo el lunes, lo puede hacer después y la excursión no queda sin poder reportar etapas (CU-12). Se comparan
+    // días, no horas, como en cumpleAnticipacionMinima(): vale cualquier hora del primero y del último día.
+    public function esDiaDelRecorrido($fecha): bool
+    {
+        $dia = Carbon::parse($fecha)->startOfDay();
+
+        return $dia->betweenIncluded($this->fecha_salida, $this->getUltimoDiaRecorrido());
+    }
+
+    // Para mostrar u ocultar la acción en el panel. La misma regla que controla iniciarRecorrido() antes de registrar.
+    public function admiteInicioRecorrido($fecha): bool
+    {
+        return ! $this->recorridoIniciado() && $this->esDiaDelRecorrido($fecha);
+    }
+
+    // Paso 4, A1 y A2. La fila se bloquea hasta el final de la transacción: si el guía toca dos veces o tiene la salida
+    // abierta en dos pestañas, el segundo pedido espera al primero, encuentra el recorrido iniciado y no pisa la hora.
+    // Si no se puede iniciar, lanza DomainException con el aviso para el guía, como iniciarValidacionPermisos() de CU-04.
+    public function iniciarRecorrido(): void
+    {
+        DB::transaction(function () {
+            $excursion = Excursion::lockForUpdate()->findOrFail($this->id_excursion);
+            $ahora = now();
+
+            if ($excursion->recorridoIniciado()) {
+                throw new DomainException('El recorrido ya se inició el '.$excursion->fecha_hora_inicio_recorrido->format('d/m/Y').' a las '
+                    .$excursion->fecha_hora_inicio_recorrido->format('H:i').'.');
+            }
+
+            if (! $excursion->esDiaDelRecorrido($ahora)) {
+                throw new DomainException('El recorrido sólo se puede iniciar entre el día de la salida ('.$excursion->fecha_salida->format('d/m/Y')
+                    .') y el último día del recorrido ('.$excursion->getUltimoDiaRecorrido()->format('d/m/Y').').');
+            }
+
+            $excursion->fecha_hora_inicio_recorrido = $ahora;
+            $excursion->save();
+
+            $this->fecha_hora_inicio_recorrido = $excursion->fecha_hora_inicio_recorrido;
+        });
     }
 
     /* ------------------------------ CU-20 Modificar ------------------------------- */

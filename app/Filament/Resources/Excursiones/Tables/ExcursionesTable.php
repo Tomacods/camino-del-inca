@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Excursiones\Tables;
 
+use App\Filament\Resources\Excursiones\Actions\IniciarRecorrido;
 use App\Filament\Resources\Excursiones\ExcursionResource;
 use App\Filament\Resources\Excursiones\Pages\ListarIntegrantesExcursion;
 use App\Models\Excursion;
@@ -14,9 +15,10 @@ class ExcursionesTable
     public static function configure(Table $table): Table
     {
         return $table
-            // La columna de integrantes los cuenta por reserva: se traen con la excursión para no consultar por cada fila.
+            // La columna de integrantes los cuenta por reserva, y la acción de Iniciar Recorrido (CU-11) mira la duración del
+            // recorrido: se traen con la excursión para no consultar por cada fila.
             // Filament pasa la consulta por el nombre del parámetro: tiene que llamarse $query.
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['paquete', 'reservasConfirmadas.excursionistas']))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['paquete.recorrido', 'reservasConfirmadas.excursionistas']))
             // Primero las salidas de hoy en adelante, de la más cercana a la más lejana; después las pasadas, de la más
             // reciente a la más vieja. El primer CASE separa los dos grupos; los otros dos ordenan cada uno.
             ->defaultSort(fn (Builder $query) => $query
@@ -35,11 +37,16 @@ class ExcursionesTable
                 TextColumn::make('integrantes')
                     ->label('Integrantes confirmados')
                     ->state(fn (Excursion $record) => $record->contarIntegrantesConfirmados()),
+                TextColumn::make('fecha_hora_inicio_recorrido')
+                    ->label('Inicio del recorrido')
+                    ->dateTime('d/m/Y H:i')
+                    ->placeholder('—'),
             ])
             ->recordUrl(fn (Excursion $record) => ExcursionResource::getUrl('integrantes', ['record' => $record]))
-            // Acá se van a sumar las acciones de Iniciar Recorrido (CU-11) y Reportar Etapa (CU-12).
+            // Acá se va a sumar la acción de Reportar Etapa (CU-12).
             ->recordActions([
                 ListarIntegrantesExcursion::accionListarIntegrantes(),
+                IniciarRecorrido::accionIniciarRecorrido(),
             ])
             // A2: el guía todavía no tiene excursiones a su cargo.
             ->emptyStateHeading('Todavía no tenés excursiones asignadas')

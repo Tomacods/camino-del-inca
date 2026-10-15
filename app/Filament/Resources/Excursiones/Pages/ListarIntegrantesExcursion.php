@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Excursiones\Pages;
 
 use App\Enums\EstadoPermiso;
+use App\Filament\Resources\Excursiones\Actions\IniciarRecorrido;
 use App\Filament\Resources\Excursiones\ExcursionResource;
 use App\Models\Excursion;
 use App\Models\Excursionista;
@@ -82,6 +83,14 @@ class ListarIntegrantesExcursion extends Page
                     ->all(),
             ])
             ->all();
+    }
+
+    // Iniciar Recorrido (CU-11): el guía suele mirar los integrantes justo antes de salir.
+    protected function getHeaderActions(): array
+    {
+        return [
+            IniciarRecorrido::accionIniciarRecorrido(),
+        ];
     }
 
     public function getTitle(): string|Htmlable
