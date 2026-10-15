@@ -150,11 +150,10 @@ new #[Title('Paquetes')] class extends Component
                         </ul>
                     @endif
 
-                    {{-- El detalle es el CU-06, que todavía no tiene pantalla. --}}
+                    {{-- CU-05, flujo alternativo A2: seleccionar el paquete lleva a Consultar Paquete (CU-06). --}}
                     <div class="mt-auto pt-6">
-                        <x-boton variante="secundario" disabled class="w-full flex-col">
+                        <x-boton variante="secundario" href="/paquetes/{{ $paquete['id_paquete'] }}" class="w-full">
                             Ver el paquete
-                            <span class="text-sm">Disponible próximamente</span>
                         </x-boton>
                     </div>
                 </x-tarjeta>

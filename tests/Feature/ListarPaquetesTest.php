@@ -14,7 +14,7 @@ use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-// CU-05 Listar Paquetes: curso normal (pasos 1 a 4), flujos alternativos A1, A3 y A4, y reglas de negocio del listado.
+// CU-05 Listar Paquetes: curso normal (pasos 1 a 4), flujos alternativos A1 a A4, y reglas de negocio del listado.
 class ListarPaquetesTest extends TestCase
 {
     use RefreshDatabase;
@@ -99,6 +99,14 @@ class ListarPaquetesTest extends TestCase
 
         $this->get('/paquetes')
             ->assertSee('href="/reservar/'.$paquete->id_paquete.'/2027-01-04"', false);
+    }
+
+    // Flujo alternativo A2.
+    public function test_ver_el_paquete_lleva_a_su_detalle(): void
+    {
+        $paquete = $this->crearPaquete('Camino Inca Clásico');
+
+        $this->get('/paquetes')->assertSee('href="/paquetes/'.$paquete->id_paquete.'"', false);
     }
 
     public function test_avisa_cuando_no_hay_paquetes_activos(): void

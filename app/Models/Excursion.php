@@ -261,4 +261,16 @@ class Excursion extends Model
         return self::getExcursionesDisponibles($idPaquete)
             ->contains(fn (Excursion $excursion) => $excursion->getFechaSalida()->isSameDay($fecha));
     }
+
+    /* ------------------------ CU-06 Consultar paquete ------------------------ */
+
+    // Lo que muestra el detalle del paquete de cada salida disponible.
+    public function getDetalle(): array
+    {
+        return [
+            'fecha_salida' => $this->getFechaSalida(),
+            'cupo_disponible' => $this->obtenerCupoDisponible(),
+            'guia' => $this->guia->getNombreCompleto(),
+        ];
+    }
 }
