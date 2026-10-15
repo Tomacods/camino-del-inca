@@ -236,4 +236,29 @@ class Excursion extends Model
             ->filter(fn ($excursion) => $excursion->cupo_disponible >= $cantidad)
             ->values();
     }
+
+    /* ------------------------- CU-05 Listar paquetes ------------------------- */
+
+    // También para CU-06: una salida está disponible si todavía no salió y le queda al menos un lugar.
+    public static function getExcursionesDisponibles(int $idPaquete): Collection
+    {
+        return self::buscarFuturas($idPaquete)
+            ->filter(fn (Excursion $excursion) => $excursion->obtenerCupoDisponible() > 0)
+            ->values();
+    }
+
+    public static function buscarFuturas(int $idPaquete): Collection
+    {
+        return self::where('id_paquete', $idPaquete)
+            ->whereDate('fecha_salida', '>', today())
+            ->orderBy('fecha_salida')
+            ->get();
+    }
+
+    // Búsqueda por fecha: si el paquete tiene una salida disponible ese día.
+    public static function tieneFechaSalida(int $idPaquete, Carbon $fecha): bool
+    {
+        return self::getExcursionesDisponibles($idPaquete)
+            ->contains(fn (Excursion $excursion) => $excursion->getFechaSalida()->isSameDay($fecha));
+    }
 }
