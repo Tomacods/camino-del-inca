@@ -254,4 +254,11 @@ class Excursion extends Model
             ->orderBy('fecha_salida')
             ->get();
     }
+
+    // Búsqueda por fecha: si el paquete tiene una salida disponible ese día.
+    public static function tieneFechaSalida(int $idPaquete, Carbon $fecha): bool
+    {
+        return self::getExcursionesDisponibles($idPaquete)
+            ->contains(fn (Excursion $excursion) => $excursion->getFechaSalida()->isSameDay($fecha));
+    }
 }

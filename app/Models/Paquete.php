@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 class Paquete extends Model
 {
@@ -95,6 +97,26 @@ class Paquete extends Model
     public static function buscarActivos(): Builder
     {
         return self::where('estado', EstadoPaquete::Activo);
+    }
+
+    // Pasos 3 y 4: entre los paquetes del listado, los que coinciden con el criterio. El componente ya validó el formato
+    // y pasa una fecha de salida o un texto para buscar en el nombre.
+    public static function buscarPaquetes(Carbon|string $criterio): Collection
+    {
+        return self::listarPaquetes()
+            ->filter(fn (Paquete $paquete) => $paquete->coincideConCriterio($criterio))
+            ->values();
+    }
+
+    // El nombre se compara sin mayúsculas ni tildes: «clasico» encuentra «Camino Inca Clásico». Una fecha coincide si el
+    // paquete tiene una salida disponible ese día, es decir, una de las que muestra el listado.
+    public function coincideConCriterio(Carbon|string $criterio): bool
+    {
+        if ($criterio instanceof Carbon) {
+            return Excursion::tieneFechaSalida($this->id_paquete, $criterio);
+        }
+
+        return Str::contains(Str::lower(Str::ascii($this->nombre)), Str::lower(Str::ascii($criterio)));
     }
 
     // Lo que muestra cada paquete en el listado del portal.

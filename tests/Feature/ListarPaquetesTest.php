@@ -11,9 +11,10 @@ use App\Models\Recorrido;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Livewire\Livewire;
 use Tests\TestCase;
 
-// CU-05 Listar Paquetes: curso normal (pasos 1 y 2), flujo alternativo A3 y reglas de negocio del listado.
+// CU-05 Listar Paquetes: curso normal (pasos 1 a 4), flujos alternativos A1, A3 y A4, y reglas de negocio del listado.
 class ListarPaquetesTest extends TestCase
 {
     use RefreshDatabase;
@@ -103,6 +104,92 @@ class ListarPaquetesTest extends TestCase
     public function test_avisa_cuando_no_hay_paquetes_activos(): void
     {
         $this->get('/paquetes')->assertSee('Por ahora no hay paquetes disponibles');
+    }
+
+    /* ------------------------------ Búsqueda ------------------------------ */
+
+    public function test_busca_por_nombre_sin_importar_mayusculas_ni_tildes(): void
+    {
+        $this->crearPaquete('Camino Inca Clásico');
+        $this->crearPaquete('Camino Inca Corto');
+
+        $this->buscar('CLASICO')
+            ->assertHasNoErrors()
+            ->assertSee('Camino Inca Clásico')
+            ->assertDontSee('Camino Inca Corto');
+    }
+
+    public function test_busca_por_fecha_de_salida(): void
+    {
+        $clasico = $this->crearPaquete('Camino Inca Clásico');
+        $corto = $this->crearPaquete('Camino Inca Corto');
+        $this->crearExcursion($clasico, '2027-01-04');
+        $this->crearExcursion($corto, '2027-01-11');
+
+        $this->buscar('04/01/2027')
+            ->assertHasNoErrors()
+            ->assertSee('Camino Inca Clásico')
+            ->assertDontSee('Camino Inca Corto');
+    }
+
+    public function test_una_fecha_sin_cupo_no_coincide(): void
+    {
+        $paquete = $this->crearPaquete('Camino Inca Clásico');
+        $this->crearExcursion($paquete, '2027-02-01', plazasRetenidas: 12);
+
+        $this->buscar('01/02/2027')->assertSee('No encontramos paquetes para «01/02/2027»');
+    }
+
+    public function test_sin_criterio_muestra_todos_los_paquetes(): void
+    {
+        $this->crearPaquete('Camino Inca Clásico');
+        $this->crearPaquete('Camino Inca Corto');
+
+        $this->buscar('   ')
+            ->assertHasNoErrors()
+            ->assertSee('Camino Inca Clásico')
+            ->assertSee('Camino Inca Corto');
+    }
+
+    // Flujo alternativo A1.
+    public function test_avisa_cuando_ningun_paquete_coincide(): void
+    {
+        $this->crearPaquete('Camino Inca Clásico');
+
+        $this->buscar('Salkantay')
+            ->assertSee('No encontramos paquetes para «Salkantay»')
+            ->assertDontSee('Camino Inca Clásico');
+    }
+
+    // Flujo alternativo A4: el error se informa y el listado queda como estaba.
+    public function test_rechaza_una_fecha_con_formato_invalido(): void
+    {
+        $this->crearPaquete('Camino Inca Clásico');
+
+        $this->buscar('31/02/2027')
+            ->assertHasErrors(['criterio' => 'date_format'])
+            ->assertSee('Camino Inca Clásico');
+
+        $this->buscar('2027-01-04')->assertHasErrors(['criterio' => 'date_format']);
+    }
+
+    public function test_ver_todos_vuelve_al_listado_completo(): void
+    {
+        $this->crearPaquete('Camino Inca Clásico');
+        $this->crearPaquete('Camino Inca Corto');
+
+        $this->buscar('Clásico')
+            ->call('verTodos')
+            ->assertSet('criterio', '')
+            ->assertSee('Camino Inca Corto');
+    }
+
+    // Escribe el criterio y toca «Buscar», como lo haría el cliente.
+    private function buscar(string $criterio)
+    {
+        return Livewire::test('listar-paquetes')
+            ->set('criterio', $criterio)
+            ->call('buscarPaquetes');
     }
 
     private function crearPaquete(
