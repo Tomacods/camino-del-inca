@@ -34,7 +34,7 @@
                {{ $attributes->except('class')->merge([
                    'class' => 'block min-h-14 w-full rounded-xl border px-4 py-3 text-[17px] text-texto '
                        .'placeholder:text-texto-secundario transition-[border-color,box-shadow] duration-150 ease-out '
-                       .'focus:border-accion focus:shadow-[0_0_0_4px_rgb(0_113_227/0.25)] focus:outline-none '
+                       .'focus:border-accion focus:shadow-[0_0_0_4px_rgb(0_113_227/0.25)] focus:outline-hidden '
                        .($valido && ! $hayError ? 'pr-12 ' : '').$estado,
                ]) }}>
 
@@ -46,13 +46,16 @@
         @endif
     </div>
 
-    @error($nombre)
-        <p id="{{ $nombre }}-error" class="mt-2 flex items-start gap-1.5 text-sm text-error">
-            <svg class="mt-0.5 size-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                <circle cx="8" cy="8" r="6.25" />
-                <path d="M8 4.75v3.75M8 10.75v.5" stroke-linecap="round" />
-            </svg>
-            {{ $message }}
-        </p>
-    @enderror
+    {{-- La zona está siempre, aunque no haya error: así el lector de pantalla anuncia el error cuando aparece. --}}
+    <div aria-live="polite">
+        @error($nombre)
+            <p id="{{ $nombre }}-error" class="mt-2 flex items-start gap-1.5 text-sm text-error">
+                <svg class="mt-0.5 size-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                    <circle cx="8" cy="8" r="6.25" />
+                    <path d="M8 4.75v3.75M8 10.75v.5" stroke-linecap="round" />
+                </svg>
+                {{ $message }}
+            </p>
+        @enderror
+    </div>
 </div>

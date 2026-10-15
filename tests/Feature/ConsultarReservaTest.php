@@ -67,7 +67,7 @@ class ConsultarReservaTest extends TestCase
         $this->consultarReserva('000125-9')
             ->assertSee(TipoPago::Sena->value)
             ->assertSee('Tarjeta de crédito')
-            ->assertSee('USD 650');
+            ->assertSee('USD 650,00');
     }
 
     public function test_las_opciones_con_pantalla_se_muestran_como_enlaces(): void

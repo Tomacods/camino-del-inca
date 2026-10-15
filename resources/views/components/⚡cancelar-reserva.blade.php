@@ -3,11 +3,12 @@
 use App\Models\Reserva;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
-new class extends Component
+new #[Title('Cancelar reserva')] class extends Component
 {
     // #[Locked]: el navegador no puede modificar estas propiedades
     #[Locked]
@@ -109,7 +110,7 @@ public function cancelarOperacion()
                     <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Salida</dt><dd class="tabular-nums">{{ $this->reserva->excursion->getFechaSalida()->format('d/m/Y') }}</dd></div>
                     <div class="flex justify-between gap-4 py-3">
                         <dt class="font-semibold">Monto a reembolsar</dt>
-                        <dd class="font-semibold tabular-nums {{ $montoReembolso > 0 ? 'text-accion' : 'text-texto-secundario' }}">USD {{ number_format($montoReembolso, 0, ',', '.') }}</dd>
+                        <dd class="font-semibold tabular-nums {{ $montoReembolso > 0 ? 'text-accion' : 'text-texto-secundario' }}">USD {{ number_format($montoReembolso, 2, ',', '.') }}</dd>
                     </div>
                 </dl>
 
@@ -120,14 +121,19 @@ public function cancelarOperacion()
                 @endif
 
                 <div class="mt-5 flex flex-wrap gap-3">
-                    <x-boton wire:click="confirmar">Sí, cancelar reserva</x-boton>
+                    {{-- Mientras se procesa queda deshabilitado, para que no se cancele dos veces. --}}
+                    <x-boton wire:click="confirmar" wire:loading.attr="disabled" wire:target="confirmar">
+                        <span wire:loading.remove wire:target="confirmar">Sí, cancelar reserva</span>
+                        <span wire:loading wire:target="confirmar">Cancelando la reserva…</span>
+                    </x-boton>
                     <x-boton variante="secundario" wire:click="cancelarOperacion">No, me arrepentí</x-boton>
                 </div>
             </x-tarjeta>
         @endif
 
         @if ($paso === 3)
-            <x-aviso titulo="¡Reserva cancelada con éxito!" />
+            {{-- Recibe el foco al aparecer, para que el lector de pantalla anuncie cómo terminó la operación. --}}
+            <x-aviso titulo="¡Reserva cancelada con éxito!" tabindex="-1" x-init="$el.focus()" />
 
             <div>
                 <x-boton wire:click="cancelarOperacion">Volver a mi reserva</x-boton>
