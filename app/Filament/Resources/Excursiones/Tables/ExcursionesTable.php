@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Excursiones\Tables;
 
+use App\Filament\Resources\Excursiones\Actions\IniciarRecorrido;
 use App\Filament\Resources\Excursiones\ExcursionResource;
 use App\Filament\Resources\Excursiones\Pages\ListarIntegrantesExcursion;
 use App\Models\Excursion;
@@ -35,11 +36,16 @@ class ExcursionesTable
                 TextColumn::make('integrantes')
                     ->label('Integrantes confirmados')
                     ->state(fn (Excursion $record) => $record->contarIntegrantesConfirmados()),
+                TextColumn::make('fecha_hora_inicio_recorrido')
+                    ->label('Inicio del recorrido')
+                    ->dateTime('d/m/Y H:i')
+                    ->placeholder('—'),
             ])
             ->recordUrl(fn (Excursion $record) => ExcursionResource::getUrl('integrantes', ['record' => $record]))
-            // Acá se van a sumar las acciones de Iniciar Recorrido (CU-11) y Reportar Etapa (CU-12).
+            // Acá se va a sumar la acción de Reportar Etapa (CU-12).
             ->recordActions([
                 ListarIntegrantesExcursion::accionListarIntegrantes(),
+                IniciarRecorrido::accionIniciarRecorrido(),
             ])
             // A2: el guía todavía no tiene excursiones a su cargo.
             ->emptyStateHeading('Todavía no tenés excursiones asignadas')

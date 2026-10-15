@@ -13,7 +13,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-// Las excursiones del guía: Listar Integrantes (CU-10) y, más adelante, Iniciar Recorrido (CU-11) y Reportar Etapa
+// Las excursiones del guía: Listar Integrantes (CU-10), Iniciar Recorrido (CU-11) y, más adelante, Reportar Etapa
 // (CU-12).
 class ExcursionResource extends Resource
 {
