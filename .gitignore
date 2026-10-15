@@ -37,3 +37,10 @@ Thumbs.db
 /database/*.sqlite
 
 /.claude/settings.local.json
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+
+# Skills de Claude Code: son solo de Tomás, no se suben al repo
+/.claude/skills/
+# Archivos de trabajo de la skill Taste
+/.taste-skill/

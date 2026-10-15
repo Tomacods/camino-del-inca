@@ -40,8 +40,6 @@ Reglas:
   oscuro del mismo tono (`bg-ambar-fondo text-ambar`), así se leen bien.
 - Las tarjetas usan la sombra `shadow-tarjeta` y bordes redondeados de 18 px (`rounded-[18px]`).
 - Para montos y fechas en columnas se agrega `tabular-nums`, así los números quedan alineados.
-- `borde`, `inca` y `peligro` son los nombres anteriores. Siguen funcionando (apuntan a `divisor`, `accion` y `error`)
-  para no romper las pantallas de Mi reserva; cuando esas pantallas pasen a los componentes, se quitan de `app.css`.
 
 ## Tipografía
 
