@@ -55,7 +55,7 @@ class CancelarReservaTest extends TestCase
             ->assertSet('paso', 2)
             ->assertSee('Revisá cuánto se te devuelve.')
             ->assertSee('Confirmar cancelación')
-            ->assertSee('USD 375')
+            ->assertSee('USD 375,00')
             ->assertSee('Te corresponde un reembolso del 50 %.')
             ->call('confirmar')
             ->assertSet('paso', 3)
@@ -74,7 +74,7 @@ class CancelarReservaTest extends TestCase
         $this->darAcceso();
 
         $this->abrirPantalla()
-            ->assertSee('USD 0')
+            ->assertSee('USD 0,00')
             ->assertSee('Faltan 30 días o menos. No genera devolución.')
             ->call('confirmar')
             ->assertSee('¡Reserva cancelada con éxito!');

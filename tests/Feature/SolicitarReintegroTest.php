@@ -56,11 +56,11 @@ class SolicitarReintegroTest extends TestCase
             ->assertSet('paso', 2)
             ->assertSee('Te devolvemos todo lo abonado.')
             ->assertSee('Confirmar reintegro')
-            ->assertSee('USD 750')
+            ->assertSee('USD 750,00')
             ->call('confirmar')
             ->assertSet('paso', 3)
             ->assertSee('Reserva cancelada con reintegro del 100 %')
-            ->assertSee('Registramos el reintegro de USD 750.')
+            ->assertSee('Registramos el reintegro de USD 750,00.')
             ->assertDontSee('Te devolvemos todo lo abonado.');
 
         $reserva = $this->reserva->fresh();
