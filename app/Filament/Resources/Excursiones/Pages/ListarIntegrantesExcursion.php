@@ -44,10 +44,14 @@ class ListarIntegrantesExcursion extends Page
         return ExcursionResource::canViewAny();
     }
 
+    // Sólo el ícono, con el texto en el tooltip: tocar la fila ya abre esta página, y así la tabla de «Mis excursiones»
+    // deja más lugar para la acción de Reportar Etapa (CU-12).
     public static function accionListarIntegrantes(): Action
     {
         return Action::make('listarIntegrantes')
             ->label('Ver integrantes')
+            ->iconButton()
+            ->tooltip('Ver integrantes')
             ->icon(Heroicon::OutlinedUserGroup)
             ->url(fn (Excursion $record) => ExcursionResource::getUrl('integrantes', ['record' => $record]));
     }
