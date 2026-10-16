@@ -34,35 +34,14 @@ new class extends Component
             return;
         }
 
-        $this->buscar();
-    }
-
-    public function buscar(): void
-    {
-        $this->validate([
-            'correo' => 'required|email',
-            'numeroReserva' => ['required', 'regex:/^\d{6}-\d$/'],
-        ], [
-            'correo.required' => 'Ingresá tu correo electrónico.',
-            'correo.email' => 'El correo no tiene un formato válido.',
-            'numeroReserva.required' => 'Ingresá el número de reserva.',
-            'numeroReserva.regex' => 'El número de reserva no tiene un formato válido.',
-        ]);
-
-        $this->mensajeError = '';
-
-        if ($this->reserva === null) {
-            $this->addError('numeroReserva', 'No encontramos una reserva con esos datos.');
-            return;
-        }
-
         try {
             $this->reserva->iniciarReprogramacion();
             $this->paso = 2;
         } catch (\DomainException $e) {
-            $this->mensajeError = $e->getMessage();   // paso 1: no hay lista a la cual volver
+            $this->mensajeError = $e->getMessage();
         }
     }
+
 
     public function elegir(string $fecha): void
     {
@@ -152,8 +131,11 @@ new class extends Component
 };
 ?>
 <div>
-    <h1 class="text-3xl font-semibold sm:text-4xl">
-        Reprogramar la reserva. <span class="text-texto-secundario">Elegí otra fecha de salida.</span>
+    <h1 class="text-4xl font-semibold sm:text-5xl">
+        Reprogramar la reserva.
+        @if ($paso === 2)
+            <span class="text-texto-secundario">Elegí otra fecha de salida.</span>
+        @endif
     </h1>
 
     <div class="mt-8 grid items-start gap-5 md:grid-cols-[320px_1fr]">
@@ -202,7 +184,7 @@ new class extends Component
                                             {{ $excursion->cupo_disponible }} lugares · Guía {{ $excursion->guia->nombre }} {{ $excursion->guia->apellido }}
                                         </p>
                                     </div>
-                                    <x-boton wire:click="elegir('{{ $excursion->fecha_salida->toDateString() }}')">Elegir</x-boton>
+                                    <x-boton variante="secundario" wire:click="elegir('{{ $excursion->fecha_salida->toDateString() }}')">Elegir</x-boton>
                                 </li>
                             @endforeach
                         </ul>

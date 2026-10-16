@@ -605,7 +605,7 @@ class Reserva extends Model
         return $this->excursionistas->count();
     }
 
-    // Solo calcula: no asigna ni guarda. Lo usan fijarFechasLimite y el resumen de CU-20.
+    // Solo calcula: no asigna ni guarda. Lo usan fijarFechasLimite y los resúmenes de CU-19 y CU-20.
     public static function calcularFechaLimite($fechaSalida): Carbon
     {
         return Carbon::parse($fechaSalida)
@@ -613,7 +613,7 @@ class Reserva extends Model
             ->endOfDay();
     }
 
-    private function armarResumenCambio(Collection $habilitadas, Carbon $fechaElegida)
+    private function armarResumenCambio(Collection $habilitadas, Carbon $fechaElegida): array
     {
         $destino = $habilitadas->first(
             fn ($excursion) => $excursion->fecha_salida->isSameDay($fechaElegida)
@@ -631,7 +631,6 @@ class Reserva extends Model
             'fecha_limite' => $fechaLimite,
             'fecha_limite_saldo' => $this->estado_saldo === EstadoSaldo::Adeudado ? $fechaLimite : null,
         ];
-
     }
 
     public function elegirExcursionDestino(Carbon $fechaElegida): array
@@ -694,7 +693,7 @@ class Reserva extends Model
         );
     }
 
-    /* ----------------------------- CU-19 Solicitar Reprogramacion Por Falta de Permisos ---------------------------- */
+    /* ----------------------------- CU-19 Solicitar Reprogramación Por Falta de Permisos ---------------------------- */
 
     public function iniciarReprogramacion(): Collection
     {
