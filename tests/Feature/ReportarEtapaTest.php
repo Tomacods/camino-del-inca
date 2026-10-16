@@ -334,7 +334,7 @@ class ReportarEtapaTest extends TestCase
     public function test_el_mismo_reporte_dos_veces_no_avanza_dos_etapas(): void
     {
         $idPiscacucho = $this->etapas[1]->id_etapa;
-        $this->excursionEnCurso->reportarEtapa($idPiscacucho);
+        $this->excursionEnCurso->actualizarEtapaActual($idPiscacucho);
 
         $this->assertNoSeReporta($this->excursionEnCurso->fresh(), $idPiscacucho,
             'La etapa «Piscacucho» ya se reportó. La siguiente es «Wayllabamba».');
@@ -352,7 +352,7 @@ class ReportarEtapaTest extends TestCase
     {
         $listado = $this->listado()->mountAction($this->accion($this->excursionEnCurso));
 
-        $this->excursionEnCurso->reportarEtapa($this->etapas[1]->id_etapa);
+        $this->excursionEnCurso->actualizarEtapaActual($this->etapas[1]->id_etapa);
 
         $listado->callMountedAction()
             ->assertNotified(Notification::make()
@@ -374,7 +374,7 @@ class ReportarEtapaTest extends TestCase
         $otraPestana->callMountedAction()->assertNotNotified('Recorrido finalizado');
 
         try {
-            $this->excursionEnCurso->fresh()->reportarEtapa($this->etapas[4]->id_etapa);
+            $this->excursionEnCurso->fresh()->actualizarEtapaActual($this->etapas[4]->id_etapa);
             $this->fail('Tenía que avisar que el recorrido ya terminó.');
         } catch (DomainException) {
         }
@@ -515,9 +515,9 @@ class ReportarEtapaTest extends TestCase
         $this->assertFalse($this->excursionEnCurso->admiteReporteEtapa());
     }
 
-    public function test_reportar_etapa_actualiza_la_misma_instancia(): void
+    public function test_actualizar_etapa_actual_actualiza_la_misma_instancia(): void
     {
-        $reservasFinalizadas = $this->excursionEnCurso->reportarEtapa($this->etapas[1]->id_etapa);
+        $reservasFinalizadas = $this->excursionEnCurso->actualizarEtapaActual($this->etapas[1]->id_etapa);
 
         $this->assertCount(0, $reservasFinalizadas);
         $this->assertSame($this->etapas[1]->id_etapa, $this->excursionEnCurso->id_etapa_actual);
@@ -528,7 +528,7 @@ class ReportarEtapaTest extends TestCase
     {
         $this->reportarHasta(3);
 
-        $reservasFinalizadas = $this->excursionEnCurso->fresh()->reportarEtapa($this->etapas[4]->id_etapa);
+        $reservasFinalizadas = $this->excursionEnCurso->fresh()->actualizarEtapaActual($this->etapas[4]->id_etapa);
 
         $this->assertSame(['000124-7', '000125-9'], $reservasFinalizadas->pluck('numero_reserva')->all());
     }
@@ -581,14 +581,14 @@ class ReportarEtapaTest extends TestCase
     private function reportarHasta(int $orden): void
     {
         for ($ordenEtapa = 1; $ordenEtapa <= $orden; $ordenEtapa++) {
-            $this->excursionEnCurso->reportarEtapa($this->etapas[$ordenEtapa]->id_etapa);
+            $this->excursionEnCurso->actualizarEtapaActual($this->etapas[$ordenEtapa]->id_etapa);
         }
     }
 
     private function assertNoSeReporta(Excursion $excursion, int $idEtapa, string $aviso): void
     {
         try {
-            $excursion->reportarEtapa($idEtapa);
+            $excursion->actualizarEtapaActual($idEtapa);
             $this->fail('Tenía que avisar que no se puede reportar esa etapa.');
         } catch (DomainException $excepcion) {
             $this->assertSame($aviso, $excepcion->getMessage());

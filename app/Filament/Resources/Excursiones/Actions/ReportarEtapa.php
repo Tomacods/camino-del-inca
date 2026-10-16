@@ -33,7 +33,7 @@ class ReportarEtapa
             ->modalDescription(fn (Excursion $record) => self::describirReporte($record))
             ->modalContent(fn (Excursion $record) => self::mostrarEtapas($record))
             // La etapa que el guía ve en la confirmación viaja con el pedido: si cuando llega ya no es la siguiente, no se
-            // reporta otra en su lugar (ver Excursion::reportarEtapa()).
+            // reporta otra en su lugar (ver Excursion::actualizarEtapaActual()).
             ->schema([
                 Hidden::make('id_etapa'),
             ])
@@ -77,7 +77,7 @@ class ReportarEtapa
     private static function reportarEtapa(Excursion $record, int $idEtapa): void
     {
         try {
-            $reservasFinalizadas = $record->reportarEtapa($idEtapa);
+            $reservasFinalizadas = $record->actualizarEtapaActual($idEtapa);
         } catch (DomainException $excepcion) {
             Notification::make()
                 ->title('No se reportó la etapa')

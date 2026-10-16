@@ -329,8 +329,9 @@ class Excursion extends Model
     // Con la etapa final, las reservas cambian en la misma transacción: o queda todo o no queda nada. Devuelve las
     // reservas que pasaron a «Finalizada» (ninguna, si no era la final), para que quien la llamó invoque Notificar
     // Cliente (CU-13) después de la transacción. Si no se puede reportar, lanza DomainException con el aviso para el guía.
-    // El DS-12 tiene reportarEtapa() sin parámetros: la etapa se agrega para no avanzar dos con dos pedidos iguales.
-    public function reportarEtapa(int $idEtapa): Collection
+    // El DS-12 tiene actualizarEtapaActual() sin parámetros: la etapa se agrega para no avanzar dos con dos pedidos
+    // iguales.
+    public function actualizarEtapaActual(int $idEtapa): Collection
     {
         return DB::transaction(function () use ($idEtapa) {
             $excursion = Excursion::lockForUpdate()->findOrFail($this->id_excursion);
@@ -351,7 +352,7 @@ class Excursion extends Model
                     : 'Las etapas se reportan en orden: la siguiente es «'.$siguiente->nombre.'».');
             }
 
-            $excursion->actualizarEtapaActual($siguiente);
+            $excursion->setEtapaActual($siguiente);
 
             $reservasFinalizadas = $excursion->esEtapaFinal() ? $excursion->finalizarReservasConfirmadas() : new Collection;
 
@@ -362,7 +363,7 @@ class Excursion extends Model
         });
     }
 
-    private function actualizarEtapaActual(Etapa $etapa): void
+    private function setEtapaActual(Etapa $etapa): void
     {
         $this->etapaActual()->associate($etapa);
         $this->save();
