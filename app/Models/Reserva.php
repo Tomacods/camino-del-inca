@@ -474,6 +474,20 @@ class Reserva extends Model
         }
     }
 
+    /* -------------------------- CU-12 Reportar etapa -------------------------- */
+
+    // A2 4.3. Sólo termina el viaje una reserva «Confirmada»: las demás no viajaron. Lo controla también acá, y no sólo
+    // la excursión que elige las confirmadas, para que una reserva cancelada nunca pase a «Finalizada».
+    public function finalizarReserva(): void
+    {
+        if (! $this->validarEstado([EstadoReserva::Confirmada])) {
+            throw new DomainException('La reserva '.$this->numero_reserva.' está en «'.$this->estado->value.'»: sólo se finaliza una reserva «Confirmada».');
+        }
+
+        $this->estado = EstadoReserva::Finalizada;
+        $this->save();
+    }
+
     /* ----------------------------- CU-21 Cancelar ----------------------------- */
 
     public function calcularReembolso(Carbon $fecha_actual): float

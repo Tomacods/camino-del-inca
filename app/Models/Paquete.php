@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EstadoPaquete;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -62,6 +63,13 @@ class Paquete extends Model
         return (float) $this->precio_base * $cantidadIntegrantes
             + $nochesExtra * $cantidadIntegrantes * (float) $this->costo_noche_extra_cusco
             + $equiposCamping * (float) $this->costo_equipo_camping;
+    }
+
+    /* -------------------------- CU-12 Reportar etapa -------------------------- */
+
+    public function getEtapas(): Collection
+    {
+        return $this->recorrido->getEtapas();
     }
 
     /* ------------------------- CU-13 Notificar cliente ------------------------ */

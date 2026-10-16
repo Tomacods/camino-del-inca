@@ -266,6 +266,119 @@ class Excursion extends Model
         });
     }
 
+    /* -------------------------- CU-12 Reportar etapa -------------------------- */
+
+    // Las etapas planificadas del recorrido del paquete, en orden.
+    public function getEtapas(): Collection
+    {
+        return $this->paquete->getEtapas();
+    }
+
+    // La última etapa reportada. Nula hasta que el guía reporta la primera.
+    public function getEtapaActual(): ?Etapa
+    {
+        return $this->etapaActual;
+    }
+
+    // Las etapas se reportan de a una y en el orden fijo del recorrido (regla de negocio): la siguiente es la primera con
+    // un orden mayor que el de la actual, o la primera del recorrido si todavía no se reportó ninguna. Es nula cuando la
+    // etapa actual es la final.
+    public function obtenerSiguienteEtapa(): ?Etapa
+    {
+        $ordenActual = $this->getEtapaActual()?->orden ?? 0;
+
+        return $this->getEtapas()->first(fn (Etapa $etapa) => $etapa->orden > $ordenActual);
+    }
+
+    // La etapa actual es la última del recorrido: el viaje terminó.
+    public function esEtapaFinal(): bool
+    {
+        return $this->getEtapaActual() !== null && $this->obtenerSiguienteEtapa() === null;
+    }
+
+    // Para adelantar en la confirmación que reportar la siguiente termina el viaje (A2).
+    public function esSiguienteEtapaFinal(): bool
+    {
+        $siguiente = $this->obtenerSiguienteEtapa();
+
+        return $siguiente !== null && $siguiente->is($this->getEtapas()->last());
+    }
+
+    // Paso 2: las etapas planificadas, la última reportada y la siguiente, para mostrarlas antes de reportar.
+    public function recuperarEtapaActual(): array
+    {
+        return [
+            'etapas' => $this->getEtapas(),
+            'etapa_actual' => $this->getEtapaActual(),
+            'siguiente' => $this->obtenerSiguienteEtapa(),
+        ];
+    }
+
+    // Para mostrar u ocultar la acción en el panel: la precondición del caso de uso. No hay un plazo en días, a diferencia
+    // de iniciarRecorrido(): si el guía reporta tarde la etapa final, las reservas igual llegan a «Finalizada» y el
+    // cliente puede valorar (CU-23).
+    public function admiteReporteEtapa(): bool
+    {
+        return $this->recorridoIniciado() && $this->obtenerSiguienteEtapa() !== null;
+    }
+
+    // Pasos 3 y 4, A1 y A2. Recibe la etapa que el guía vio en la confirmación y la registra sólo si sigue siendo la
+    // siguiente. La fila se bloquea hasta el final de la transacción: si el guía toca dos veces, tiene la excursión abierta
+    // en dos pestañas o reintenta después de un corte de conexión (A3) cuando el primer pedido sí había llegado, el
+    // segundo espera al primero, encuentra esa etapa ya reportada y no avanza otra.
+    // Con la etapa final, las reservas cambian en la misma transacción: o queda todo o no queda nada. Devuelve las
+    // reservas que pasaron a «Finalizada» (ninguna, si no era la final), para que quien la llamó invoque Notificar
+    // Cliente (CU-13) después de la transacción. Si no se puede reportar, lanza DomainException con el aviso para el guía.
+    // El DS-12 tiene reportarEtapa() sin parámetros: la etapa se agrega para no avanzar dos con dos pedidos iguales.
+    public function reportarEtapa(int $idEtapa): Collection
+    {
+        return DB::transaction(function () use ($idEtapa) {
+            $excursion = Excursion::lockForUpdate()->findOrFail($this->id_excursion);
+
+            if (! $excursion->recorridoIniciado()) {
+                throw new DomainException('El recorrido todavía no se inició: primero tenés que iniciarlo.');
+            }
+
+            $siguiente = $excursion->obtenerSiguienteEtapa();
+
+            if ($siguiente === null) {
+                throw new DomainException('El recorrido ya terminó: la etapa final, «'.$excursion->getEtapaActual()?->nombre.'», ya se reportó.');
+            }
+
+            if ($siguiente->id_etapa !== $idEtapa) {
+                throw new DomainException($idEtapa === (int) $excursion->id_etapa_actual
+                    ? 'La etapa «'.$excursion->getEtapaActual()->nombre.'» ya se reportó. La siguiente es «'.$siguiente->nombre.'».'
+                    : 'Las etapas se reportan en orden: la siguiente es «'.$siguiente->nombre.'».');
+            }
+
+            $excursion->actualizarEtapaActual($siguiente);
+
+            $reservasFinalizadas = $excursion->esEtapaFinal() ? $excursion->finalizarReservasConfirmadas() : new Collection;
+
+            $this->id_etapa_actual = $excursion->id_etapa_actual;
+            $this->setRelation('etapaActual', $siguiente);
+
+            return $reservasFinalizadas;
+        });
+    }
+
+    private function actualizarEtapaActual(Etapa $etapa): void
+    {
+        $this->etapaActual()->associate($etapa);
+        $this->save();
+    }
+
+    // A2 4.3: sólo las «Confirmada»; una «Pendiente» o «Sin Permiso» que haya quedado no viajó y no cambia. Se bloquean
+    // para que, si el cliente la cancela (CU-21) en el mismo momento, una de las dos operaciones espere a la otra.
+    private function finalizarReservasConfirmadas(): Collection
+    {
+        $reservas = $this->reservasConfirmadas()->lockForUpdate()->get();
+
+        $reservas->each(fn (Reserva $reserva) => $reserva->finalizarReserva());
+
+        return $reservas;
+    }
+
     /* ------------------------------ CU-20 Modificar ------------------------------- */
 
     public function getDatosExcursion(): self
