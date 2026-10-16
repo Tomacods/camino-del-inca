@@ -325,6 +325,30 @@ class ReportarEtapaTest extends TestCase
         $this->assertSame('Machu Picchu', $this->excursionEnCurso->fresh()->etapaActual->nombre);
     }
 
+    // La página de integrantes (CU-10) lista sólo las reservas «Confirmada». Después de la final ya no queda ninguna, y el
+    // aviso tiene que decir que la excursión terminó, no que todavía no tiene integrantes.
+    public function test_despues_de_la_etapa_final_la_pagina_de_integrantes_avisa_que_termino(): void
+    {
+        $this->reportarHasta(3);
+
+        $this->paginaIntegrantes($this->excursionEnCurso)
+            ->assertDontSee('Esta excursión terminó')
+            ->callAction('reportarEtapa')
+            ->assertNotified('Recorrido finalizado');
+
+        $this->paginaIntegrantes($this->excursionEnCurso)
+            ->assertSee('Esta excursión terminó: sus reservas pasaron a «Finalizada».')
+            ->assertDontSee('todavía no tiene integrantes confirmados');
+    }
+
+    // Una excursión que no terminó y no tiene reservas confirmadas sigue con el aviso de siempre.
+    public function test_sin_reservas_confirmadas_y_sin_terminar_el_aviso_no_cambia(): void
+    {
+        $this->paginaIntegrantes($this->excursionSinIniciar)
+            ->assertSee('Esta excursión todavía no tiene integrantes confirmados')
+            ->assertDontSee('Esta excursión terminó');
+    }
+
     // A8 de CU-13: el correo se invoca después de la transacción. Si no sale, las reservas quedan «Finalizada» igual y
     // el aviso lo dice.
     public function test_un_correo_que_no_se_puede_enviar_no_deshace_la_finalizacion(): void

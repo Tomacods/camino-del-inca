@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Excursiones\Pages;
 
 use App\Enums\EstadoPermiso;
+use App\Enums\EstadoReserva;
 use App\Filament\Resources\Excursiones\Actions\IniciarRecorrido;
 use App\Filament\Resources\Excursiones\Actions\ReportarEtapa;
 use App\Filament\Resources\Excursiones\ExcursionResource;
@@ -38,6 +39,10 @@ class ListarIntegrantesExcursion extends Page
     #[Locked]
     public array $reservas = [];
 
+    // Si ya se reportó la etapa final (CU-12): sus reservas confirmadas pasaron a «Finalizada» y la página no las lista.
+    #[Locked]
+    public bool $recorridoTerminado = false;
+
     // Como canViewAny() de ExcursionResource: el administrador no entra ni escribiendo la dirección a mano.
     public static function canAccess(array $parameters = []): bool
     {
@@ -68,8 +73,8 @@ class ListarIntegrantesExcursion extends Page
         $this->seleccionarExcursion($this->record->id_paquete, $this->record->fecha_salida->format('Y-m-d'));
     }
 
-    // Busca la excursión y guarda el encabezado y las reservas confirmadas con sus integrantes. No es pública: la excursión
-    // es la de la dirección, y desde el navegador no se puede cambiar.
+    // Busca la excursión y guarda el encabezado, las reservas confirmadas con sus integrantes y si el recorrido terminó. No
+    // es pública: la excursión es la de la dirección, y desde el navegador no se puede cambiar.
     protected function seleccionarExcursion(int $idPaquete, string $fechaSalida): void
     {
         $excursion = Excursion::seleccionarExcursion($idPaquete, $fechaSalida);
@@ -79,6 +84,7 @@ class ListarIntegrantesExcursion extends Page
         }
 
         $this->datosExcursion = $excursion->getEncabezado();
+        $this->recorridoTerminado = $excursion->esEtapaFinal();
 
         $this->reservas = $excursion->getReservasConfirmadas()
             ->map(fn (Reserva $reserva) => [
@@ -128,8 +134,10 @@ class ListarIntegrantesExcursion extends Page
                         ->state($this->datosExcursion['integrantes']),
                 ]),
 
-            // A1
-            Callout::make('Esta excursión todavía no tiene integrantes confirmados')
+            // A1. Si el recorrido terminó, no es que todavía no haya integrantes: sus reservas ya no están «Confirmada».
+            Callout::make($this->recorridoTerminado
+                ? 'Esta excursión terminó: sus reservas pasaron a «'.EstadoReserva::Finalizada->value.'».'
+                : 'Esta excursión todavía no tiene integrantes confirmados')
                 ->info()
                 ->visible($this->reservas === []),
 
