@@ -253,6 +253,18 @@ class ModificarReservaTest extends TestCase
         $this->assertNoCambio(EstadoReserva::Confirmada);
     }
 
+    public function test_al_confirmar_no_se_cambia_a_una_salida_que_ya_no_cumple_la_anticipacion(): void
+    {
+        try {
+            $this->reserva->modificarExcursion($this->menosDeTresMeses);
+            $this->fail('Se cambió a una salida a menos de 3 meses.');
+        } catch (DomainException $excepcion) {
+            $this->assertSame('La excursión elegida ya no cumple la anticipación mínima.', $excepcion->getMessage());
+        }
+
+        $this->assertNoCambio(EstadoReserva::Confirmada);
+    }
+
     /* --------------------------------- Pantalla -------------------------------- */
 
     public function test_sin_acceso_en_la_sesion_vuelve_a_mi_reserva(): void
