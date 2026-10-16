@@ -382,8 +382,10 @@ class Excursion extends Model
         $this->save();
     }
 
-    // A2 4.3: sólo las «Confirmada»; una «Pendiente» o «Sin Permiso» que haya quedado no viajó y no cambia. Se bloquean
-    // para que, si el cliente la cancela (CU-21) en el mismo momento, una de las dos operaciones espere a la otra.
+    // A2 4.3: sólo las «Confirmada»; una «Pendiente» o «Sin Permiso» que haya quedado no viajó y no cambia. Se leen con
+    // bloqueo: si en ese momento se está guardando una cancelación (CU-21), la lectura la espera y esa reserva, ya
+    // «Cancelada», no se finaliza. Al revés no alcanza: una cancelación que leyó la reserva «Confirmada» antes y la guarda
+    // mientras tanto sólo espera a que termine esta transacción, y después la pisa. Eso lo tiene que controlar CU-21.
     private function finalizarReservasConfirmadas(): Collection
     {
         $reservas = $this->reservasConfirmadas()->lockForUpdate()->get();
