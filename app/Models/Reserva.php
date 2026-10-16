@@ -721,6 +721,7 @@ class Reserva extends Model
             $destino
         );
     }
+
     /* ------------------------- CU-13 Notificar cliente ------------------------ */
 
     // Paso 1: lo invoca otro caso de uso, después de guardar su cambio de estado y fuera de su transacción. Devuelve si

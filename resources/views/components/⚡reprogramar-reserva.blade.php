@@ -5,9 +5,10 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new class extends Component
+new #[Title('Reprogramar reserva')] class extends Component
 {
     #[Locked]
     public string $correo = '';
@@ -41,7 +42,6 @@ new class extends Component
             $this->mensajeError = $e->getMessage();
         }
     }
-
 
     public function elegir(string $fecha): void
     {
@@ -233,7 +233,11 @@ new class extends Component
                     </x-aviso>
 
                     <div class="mt-5 flex flex-wrap gap-3">
-                        <x-boton wire:click="confirmar">Confirmar cambio</x-boton>
+                        {{-- Mientras se procesa queda deshabilitado, para que no se confirme dos veces. --}}
+                        <x-boton wire:click="confirmar" wire:loading.attr="disabled" wire:target="confirmar">
+                            <span wire:loading.remove wire:target="confirmar">Confirmar cambio</span>
+                            <span wire:loading wire:target="confirmar">Reprogramando la reserva…</span>
+                        </x-boton>
                         <x-boton variante="secundario" wire:click="volverALista">Volver</x-boton>
                     </div>
                 </x-tarjeta>
@@ -241,7 +245,8 @@ new class extends Component
 
             {{-- PASO 4: éxito --}}
             @if ($paso === 4)
-                <x-aviso titulo="¡Reserva reprogramada!">
+                {{-- Recibe el foco al aparecer, para que el lector de pantalla anuncie cómo terminó la operación. --}}
+                <x-aviso titulo="¡Reserva reprogramada!" tabindex="-1" x-init="$el.focus()">
                     La reserva fue reprogramada y queda pendiente de validación de permisos.
                 </x-aviso>
 
