@@ -34,4 +34,16 @@ class Devolucion extends Model
     {
         return $this->belongsTo(Reserva::class, 'id_reserva', 'id_reserva');
     }
+
+    /* ------------------------- CU-13 Notificar cliente ------------------------ */
+
+    // El monto llega como texto ('120.00') por el cast decimal:2: se pasa a número para el correo.
+    public function getDatos(): array
+    {
+        return [
+            'monto' => (float) $this->monto,
+            'fecha' => $this->fecha,
+            'motivo' => $this->motivo,
+        ];
+    }
 }

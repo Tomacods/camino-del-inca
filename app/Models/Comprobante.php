@@ -47,4 +47,14 @@ class Comprobante extends Model
             'fecha_emision' => $fechaEmision,
         ]);
     }
+
+    /* ------------------------- CU-13 Notificar cliente ------------------------ */
+
+    public function getDatos(): array
+    {
+        return [
+            'numero_comprobante' => $this->numero_comprobante,
+            'fecha_emision' => $this->fecha_emision,
+        ];
+    }
 }

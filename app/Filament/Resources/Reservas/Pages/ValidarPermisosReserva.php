@@ -179,12 +179,18 @@ class ValidarPermisosReserva extends Page
             return;
         }
 
-        // Paso 6 y A1: acá se invoca Notificar Cliente (CU-13) con el tipo «Permisos Obtenidos» o «Permisos Rechazados»,
-        // según el estado final de la reserva, cuando exista.
+        // Paso 6 y A1: Notificar Cliente (CU-13), con el tipo que corresponde al resultado. La validación ya se guardó: si
+        // el correo no se puede encolar, se avisa y la reserva queda como está (A8 de CU-13). Encolado, el correo sale
+        // después, desde la cola, que lo reintenta si el servicio de correo falla: por eso el aviso dice «se enviará».
+        $tipoNotificacion = $reserva->getTipoNotificacionValidacion();
+        $correoEncolado = Reserva::notificarCliente($tipoNotificacion, $reserva->numero_reserva);
 
         Notification::make()
             ->title('Reserva '.$reserva->numero_reserva.' en «'.$reserva->estado->value.'».')
-            ->success()
+            ->body($correoEncolado
+                ? 'El correo «'.$tipoNotificacion->value.'» se enviará a '.$reserva->correo_electronico.'.'
+                : 'No se pudo enviar el correo «'.$tipoNotificacion->value.'» a '.$reserva->correo_electronico.': quedó anotado en el registro.')
+            ->status($correoEncolado ? 'success' : 'warning')
             ->send();
 
         $this->redirect(ReservaResource::getUrl('view', ['record' => $reserva]));

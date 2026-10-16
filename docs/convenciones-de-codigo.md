@@ -28,8 +28,10 @@ La arquitectura es Modelo–Vista–Controlador, sin capa de servicios:
   información): la excursión calcula su cupo disponible y retiene y libera plazas; la reserva resuelve sus cambios de
   estado, sus fechas límite, su saldo y sus devoluciones; el paquete calcula el monto de la reserva.
 - **Controladores y componentes Livewire** — reciben lo que hace el usuario, validan el formato de los datos y
-  coordinan a los modelos. No tienen reglas de negocio. Desde acá se envían los correos. A Mercado Pago no lo llaman:
-  le habla el modelo `Pago`, con el SDK, como en el DS-15 y en el Documento de Arquitectura.
+  coordinan a los modelos. No tienen reglas de negocio. Los correos los piden desde acá, pero no los arman: llaman a
+  `Reserva::notificarCliente()` (CU-13), que junta los datos, arma el mensaje y lo deja en la cola, como en el DS-13.
+  Así los ocho casos de uso que notifican, incluidas las tareas programadas, comparten el mismo mecanismo. A Mercado
+  Pago no lo llaman: le habla el modelo `Pago`, con el SDK, como en el DS-15 y en el Documento de Arquitectura.
 - **Vistas** — sólo muestran. No consultan la base ni calculan.
 - **Panel (`app/Filament`)** — pantallas del administrador y del guía.
 - **Tareas (`app/Jobs`)** — lo que corre en la cola, fuera del pedido del cliente: por ejemplo, liberar el cupo
@@ -94,6 +96,9 @@ Tres tablas no tienen una clave propia de ese tipo:
 Las nueve enumeraciones del [esquema](esquema-base-de-datos.md#enumeraciones) son enums de PHP en `app/Enums`, con los
 valores exactos del esquema: `Rol`, `EstadoPaquete`, `TipoServicio`, `EstadoReserva`, `EstadoSaldo`, `EstadoPermiso`,
 `TipoPago`, `MotivoDevolucion` y `CategoriaValoracion`.
+
+Hay un décimo enum que no es una columna: `TipoNotificacion`, con los ocho tipos de Notificar Cliente (CU-13) de la
+regla de negocio del Doc 3. Lo pasa el caso de uso que invoca la notificación y no se guarda en la base.
 
 - Los valores **siempre se escriben con el enum**, nunca como texto suelto: `EstadoReserva::SinPermiso`, no
   `'Sin Permiso'`. Vale para modelos, *seeders*, pruebas, componentes, vistas y Filament.

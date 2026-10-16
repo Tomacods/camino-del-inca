@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\EstadoPaquete;
 use App\Enums\EstadoReserva;
+use DomainException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -156,6 +158,112 @@ class Excursion extends Model
     public function agregarReserva(Reserva $reserva): void
     {
         $this->reservas()->save($reserva);
+    }
+
+    /* ------------------------ CU-10 Listar integrantes ------------------------ */
+
+    // Las excursiones a cargo de un guía: en el panel, cada guía ve sólo las suyas.
+    public function scopeDeGuia(Builder $consulta, int $idGuia): Builder
+    {
+        return $consulta->where('id_guia', $idGuia);
+    }
+
+    // El guía ve sólo los integrantes de las reservas confirmadas: las que están pendientes o sin permiso todavía pueden
+    // no viajar. Ordenadas por número, para mostrar los integrantes agrupados por reserva.
+    public function reservasConfirmadas(): HasMany
+    {
+        return $this->reservas()->where('estado', EstadoReserva::Confirmada)->orderBy('numero_reserva');
+    }
+
+    // Busca la excursión por el paquete y la fecha de salida, que la identifican. Trae de una vez el paquete, el guía y las
+    // reservas confirmadas con sus integrantes, así mostrarla no consulta la base por cada reserva.
+    public static function seleccionarExcursion(int $idPaquete, string $fechaSalida): ?self
+    {
+        return self::buscarPorFechaSalida($idPaquete, $fechaSalida)?->load([
+            'paquete',
+            'guia',
+            'reservasConfirmadas.excursionistas' => fn ($consulta) => $consulta->orderBy('apellido')->orderBy('nombre'),
+        ]);
+    }
+
+    // El encabezado de la página de integrantes. No se llama getDatosExcursion() porque ese nombre lo usan CU-20 y CU-13
+    // para traer la excursión con el paquete y el guía.
+    public function getEncabezado(): array
+    {
+        return [
+            'paquete' => $this->paquete->nombre,
+            'fecha_salida' => $this->getFechaSalida(),
+            'guia' => $this->guia->getNombreCompleto(),
+            'cupo' => $this->cupo,
+            'integrantes' => $this->contarIntegrantesConfirmados(),
+        ];
+    }
+
+    public function getReservasConfirmadas(): Collection
+    {
+        return $this->reservasConfirmadas;
+    }
+
+    // La cantidad que muestra «Mis excursiones»: los mismos integrantes que lista la página de la excursión.
+    public function contarIntegrantesConfirmados(): int
+    {
+        return $this->getReservasConfirmadas()->sum(fn (Reserva $reserva) => $reserva->getExcursionistas()->count());
+    }
+
+    /* ------------------------- CU-11 Iniciar recorrido ------------------------ */
+
+    // También la usa Reportar Etapa (CU-12): no se puede reportar una etapa de un recorrido que todavía no empezó.
+    public function recorridoIniciado(): bool
+    {
+        return $this->fecha_hora_inicio_recorrido !== null;
+    }
+
+    // Un recorrido de 4 días que sale el lunes termina el jueves: el día de salida cuenta como el primero.
+    public function getUltimoDiaRecorrido(): Carbon
+    {
+        return $this->fecha_salida->copy()->addDays($this->paquete->recorrido->duracion_dias - 1);
+    }
+
+    // «El día correspondiente» es cualquiera de los días del recorrido, no sólo el de la salida: si el guía se olvida de
+    // iniciarlo el lunes, lo puede hacer después y la excursión no queda sin poder reportar etapas (CU-12). Se comparan
+    // días, no horas, como en cumpleAnticipacionMinima(): vale cualquier hora del primero y del último día.
+    public function esDiaDelRecorrido($fecha): bool
+    {
+        $dia = Carbon::parse($fecha)->startOfDay();
+
+        return $dia->betweenIncluded($this->fecha_salida, $this->getUltimoDiaRecorrido());
+    }
+
+    // Para mostrar u ocultar la acción en el panel. La misma regla que controla iniciarRecorrido() antes de registrar.
+    public function admiteInicioRecorrido($fecha): bool
+    {
+        return ! $this->recorridoIniciado() && $this->esDiaDelRecorrido($fecha);
+    }
+
+    // Paso 4, A1 y A2. La fila se bloquea hasta el final de la transacción: si el guía toca dos veces o tiene la salida
+    // abierta en dos pestañas, el segundo pedido espera al primero, encuentra el recorrido iniciado y no pisa la hora.
+    // Si no se puede iniciar, lanza DomainException con el aviso para el guía, como iniciarValidacionPermisos() de CU-04.
+    public function iniciarRecorrido(): void
+    {
+        DB::transaction(function () {
+            $excursion = Excursion::lockForUpdate()->findOrFail($this->id_excursion);
+            $ahora = now();
+
+            if ($excursion->recorridoIniciado()) {
+                throw new DomainException('El recorrido ya se inició el '.$excursion->fecha_hora_inicio_recorrido->format('d/m/Y').' a las '
+                    .$excursion->fecha_hora_inicio_recorrido->format('H:i').'.');
+            }
+
+            if (! $excursion->esDiaDelRecorrido($ahora)) {
+                throw new DomainException('El recorrido sólo se puede iniciar entre el día de la salida ('.$excursion->fecha_salida->format('d/m/Y')
+                    .') y el último día del recorrido ('.$excursion->getUltimoDiaRecorrido()->format('d/m/Y').').');
+            }
+
+            $excursion->fecha_hora_inicio_recorrido = $ahora;
+            $excursion->save();
+
+            $this->fecha_hora_inicio_recorrido = $excursion->fecha_hora_inicio_recorrido;
+        });
     }
 
     /* ------------------------------ CU-20 Modificar ------------------------------- */
