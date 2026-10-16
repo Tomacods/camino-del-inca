@@ -128,6 +128,30 @@ class ReportarEtapaTest extends TestCase
             ->assertTableColumnStateSet('etapaActual.nombre', 'Wayllabamba', $this->excursionEnCurso);
     }
 
+    // Paso 1: la salida en curso va primera aunque haya salido hace dos días. Una que ya reportó la etapa final vuelve con
+    // las pasadas.
+    public function test_la_salida_en_curso_aparece_antes_que_las_futuras(): void
+    {
+        $this->reportarHasta(2);
+        $futura = $this->crearExcursion('2026-10-26', $this->usuarioGuia);
+        $terminada = $this->crearExcursion('2026-10-12', $this->usuarioGuia, '2026-10-12 07:00:00');
+        $terminada->update(['id_etapa_actual' => $this->etapas[4]->id_etapa]);
+
+        $this->travelTo('2026-10-21 09:00:00');
+
+        $this->listado()->assertCanSeeTableRecords([$this->excursionEnCurso, $futura, $this->excursionSinIniciar, $terminada], inOrder: true);
+    }
+
+    // Recién iniciada, sin ninguna etapa reportada, también está en curso.
+    public function test_la_salida_iniciada_sin_etapas_reportadas_aparece_antes_que_las_futuras(): void
+    {
+        $futura = $this->crearExcursion('2026-10-26', $this->usuarioGuia);
+
+        $this->travelTo('2026-10-21 09:00:00');
+
+        $this->listado()->assertCanSeeTableRecords([$this->excursionEnCurso, $futura, $this->excursionSinIniciar], inOrder: true);
+    }
+
     public function test_el_guia_reporta_desde_la_pagina_de_integrantes(): void
     {
         $this->paginaIntegrantes($this->excursionEnCurso)

@@ -322,6 +322,19 @@ class Excursion extends Model
         return $this->recorridoIniciado() && $this->obtenerSiguienteEtapa() !== null;
     }
 
+    // Paso 1: el guía elige la excursión en curso, así que «Mis excursiones» la muestra primera. Es la misma regla que
+    // admiteReporteEtapa(), escrita en SQL para ordenar: el recorrido se inició y falta la etapa final, porque todavía no
+    // se reportó ninguna o porque hay una etapa del mismo recorrido con un orden mayor que la actual. Con EXISTS y sin
+    // funciones propias de un motor, anda igual en PostgreSQL y en SQLite (las pruebas).
+    public function scopeEnCursoPrimero(Builder $consulta): Builder
+    {
+        return $consulta->orderByRaw('CASE WHEN excursion.fecha_hora_inicio_recorrido IS NOT NULL AND ('
+            .'excursion.id_etapa_actual IS NULL OR EXISTS ('
+            .'SELECT 1 FROM etapa AS actual JOIN etapa AS posterior ON posterior.id_recorrido = actual.id_recorrido '
+            .'WHERE actual.id_etapa = excursion.id_etapa_actual AND posterior.orden > actual.orden'
+            .')) THEN 0 ELSE 1 END');
+    }
+
     // Pasos 3 y 4, A1 y A2. Recibe la etapa que el guía vio en la confirmación y la registra sólo si sigue siendo la
     // siguiente. La fila se bloquea hasta el final de la transacción: si el guía toca dos veces, tiene la excursión abierta
     // en dos pestañas o reintenta después de un corte de conexión (A3) cuando el primer pedido sí había llegado, el
