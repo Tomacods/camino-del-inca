@@ -72,8 +72,8 @@ class ReportarEtapa
     // Pasos 3 a 5, A1 y A2. La excursión llega de la consulta del recurso, que sólo tiene las del guía: la de otro guía no
     // se encuentra. Antes de llegar acá, Filament vuelve a leer la excursión y a evaluar visible(); aun así, dos pedidos
     // casi juntos pueden pasar los dos ese control, y por eso la excursión valida otra vez con la fila bloqueada.
-    // A3 (se corta la conexión) lo resuelve el navegador: el pedido no llega o la respuesta no vuelve, la confirmación
-    // sigue abierta y el guía puede volver a enviarla; si el primero había llegado, el segundo recibe el aviso.
+    // A3 (se corta la conexión) no pasa por acá: el pedido no llega o la respuesta no vuelve. La confirmación avisa que no
+    // hay conexión y el guía reintenta recargando la página; si el primero había llegado, el segundo recibe el aviso.
     private static function reportarEtapa(Excursion $record, int $idEtapa): void
     {
         try {
