@@ -274,7 +274,7 @@ class Excursion extends Model
     }
 
     // No se revisa el estado del paquete: R-03 no deja pasar a «Inactivo» un paquete con reservas «Pendiente»,
-    // «Confirmada» o «Sin Permiso», así que el de una reserva «Confirmada» está siempre «Activo».
+    // «Confirmada» o «Sin Permiso», así que el de una reserva «Confirmada» o «Sin Permiso» está siempre «Activo».
     public static function buscarOtrasDelPaquete(int $idPaquete, Carbon $fechaOrigen, int $cantidad): Collection
     {
         $otras = self::with(['paquete', 'guia'])

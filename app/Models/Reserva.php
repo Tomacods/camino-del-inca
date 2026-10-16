@@ -605,7 +605,7 @@ class Reserva extends Model
         return $this->excursionistas->count();
     }
 
-    // Solo calcula: no asigna ni guarda. Lo usan fijarFechasLimite y el resumen de CU-20.
+    // Solo calcula: no asigna ni guarda. Lo usan fijarFechasLimite y los resúmenes de CU-19 y CU-20.
     public static function calcularFechaLimite($fechaSalida): Carbon
     {
         return Carbon::parse($fechaSalida)
@@ -613,10 +613,8 @@ class Reserva extends Model
             ->endOfDay();
     }
 
-    public function elegirExcursionDestino(Carbon $fechaElegida): array
+    private function armarResumenCambio(Collection $habilitadas, Carbon $fechaElegida): array
     {
-        $habilitadas = $this->iniciarModificacion();
-
         $destino = $habilitadas->first(
             fn ($excursion) => $excursion->fecha_salida->isSameDay($fechaElegida)
         );
@@ -635,6 +633,11 @@ class Reserva extends Model
         ];
     }
 
+    public function elegirExcursionDestino(Carbon $fechaElegida): array
+    {
+        return $this->armarResumenCambio($this->iniciarModificacion(), $fechaElegida);
+    }
+
     private function cambiarExcursion(Excursion $destino): void
     {
         $this->excursion()->associate($destino);
@@ -647,16 +650,20 @@ class Reserva extends Model
     // Cruce con CU-16: R-16 sólo cobra el saldo con la reserva «Confirmada». Si el cliente modifica con un cobro abierto
     // en Mercado Pago, ese pago queda sin registrar y la devolución es manual, con la agencia (decisión del grupo del
     // 13/09). No se bloquea la modificación porque la base no tiene dónde guardar el cobro abierto.
-    public function modificarExcursion(Excursion $destino): void
+    private function cambiarDeExcursionPendiente(EstadoReserva $estado, string $mensaje, Excursion $destino): void
     {
-        DB::transaction(function () use ($destino) {
+        DB::transaction(function () use ($destino, $estado, $mensaje) {
             $actual = self::with('excursionistas')->lockForUpdate()->findOrFail($this->id_reserva);
 
-            if (! $actual->validarEstado([EstadoReserva::Confirmada])) {
-                throw new DomainException('La reserva no admite modificación.');
+            if (! $actual->validarEstado([$estado])) {
+                throw new DomainException($mensaje);
             }
 
             $destino = Excursion::lockForUpdate()->findOrFail($destino->id_excursion);
+
+            if (! $destino->cumpleAnticipacionMinima(now())) {
+                throw new DomainException('La excursión elegida ya no cumple la anticipación mínima.');
+            }
 
             if (! $destino->tieneCupoPara($actual->getCantidadExcursionistas())) {
                 throw new DomainException('La excursión elegida ya no tiene lugar.');
@@ -675,6 +682,44 @@ class Reserva extends Model
 
         // Quien la llamó (la pantalla) ve la reserva como quedó.
         $this->refresh();
+    }
+
+    public function modificarExcursion(Excursion $destino): void
+    {
+        $this->cambiarDeExcursionPendiente(
+            EstadoReserva::Confirmada,
+            'La reserva no admite modificación.',
+            $destino
+        );
+    }
+
+    /* ----------------------------- CU-19 Solicitar Reprogramación Por Falta de Permisos ---------------------------- */
+
+    public function iniciarReprogramacion(): Collection
+    {
+        if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
+            throw new DomainException('La reserva no admite reprogramación.');
+        }
+
+        return Excursion::buscarOtrasDelPaquete(
+            $this->excursion->id_paquete,
+            $this->excursion->fecha_salida,
+            $this->getCantidadExcursionistas()
+        );
+    }
+
+    public function elegirDestino(Carbon $fechaElegida): array
+    {
+        return $this->armarResumenCambio($this->iniciarReprogramacion(), $fechaElegida);
+    }
+
+    public function reprogramar(Excursion $destino): void
+    {
+        $this->cambiarDeExcursionPendiente(
+            EstadoReserva::SinPermiso,
+            'La reserva no admite reprogramación.',
+            $destino
+        );
     }
 
     /* ------------------------- CU-13 Notificar cliente ------------------------ */
