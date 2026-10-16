@@ -54,6 +54,7 @@ public function mount(string $numeroReserva): void
 
         try {
             $this->reserva->confirmarCancelacion(Carbon::now());
+            Reserva::notificarCliente(TipoNotificacion::CancelacionReserva, $this->reserva->numero_reserva);
             $this->paso = 3;
         } catch (\Exception $e) {
             // Si el estado cambió entre un paso y otro, se muestra el aviso en vez de un error 500
