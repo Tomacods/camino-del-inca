@@ -193,7 +193,7 @@ class ModificarReservaTest extends TestCase
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('La excursión elegida ya no está disponible.');
 
-        $this->reserva->elegirExcursionDestinoModificacion(Carbon::parse('2027-03-08'));
+        $this->reserva->elegirExcursionDestino(Carbon::parse('2027-03-08'));
     }
 
     public function test_elegir_una_salida_a_menos_de_3_meses_avisa_que_no_esta_disponible(): void
@@ -201,7 +201,7 @@ class ModificarReservaTest extends TestCase
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('La excursión elegida ya no está disponible.');
 
-        $this->reserva->elegirExcursionDestinoModificacion(Carbon::parse('2027-01-11'));
+        $this->reserva->elegirExcursionDestino(Carbon::parse('2027-01-11'));
     }
 
     public function test_elegir_la_misma_salida_avisa_que_no_esta_disponible(): void
@@ -209,12 +209,12 @@ class ModificarReservaTest extends TestCase
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('La excursión elegida ya no está disponible.');
 
-        $this->reserva->elegirExcursionDestinoModificacion(Carbon::parse('2027-02-01'));
+        $this->reserva->elegirExcursionDestino(Carbon::parse('2027-02-01'));
     }
 
     public function test_el_resumen_trae_las_salidas_y_las_nuevas_fechas_limite(): void
     {
-        $cambio = $this->reserva->elegirExcursionDestinoModificacion(Carbon::parse('2027-03-01'));
+        $cambio = $this->reserva->elegirExcursionDestino(Carbon::parse('2027-03-01'));
 
         $this->assertSame($this->origen->id_excursion, $cambio['origen']->id_excursion);
         $this->assertSame($this->destino->id_excursion, $cambio['destino']->id_excursion);
@@ -229,7 +229,7 @@ class ModificarReservaTest extends TestCase
     {
         $this->reserva->update(['estado_saldo' => EstadoSaldo::Abonado]);
 
-        $cambio = $this->reserva->fresh()->elegirExcursionDestinoModificacion(Carbon::parse('2027-03-01'));
+        $cambio = $this->reserva->fresh()->elegirExcursionDestino(Carbon::parse('2027-03-01'));
 
         $this->assertNull($cambio['fecha_limite_saldo']);
         $this->assertSame('2027-02-01 23:59:59', $cambio['fecha_limite']->format('Y-m-d H:i:s'));
@@ -238,7 +238,7 @@ class ModificarReservaTest extends TestCase
     public function test_si_otra_reserva_ocupa_el_ultimo_lugar_antes_de_confirmar_el_cambio_no_se_hace(): void
     {
         $this->destino->update(['cupo' => 2]);
-        $cambio = $this->reserva->elegirExcursionDestinoModificacion(Carbon::parse('2027-03-01'));
+        $cambio = $this->reserva->elegirExcursionDestino(Carbon::parse('2027-03-01'));
 
         // Entre la elección y la confirmación, otra reserva de un integrante entra en el destino.
         $this->crearOtraReserva($this->destino, '000122-3', 'valentina.diaz@mail.com');

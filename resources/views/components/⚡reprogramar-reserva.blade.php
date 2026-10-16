@@ -76,7 +76,7 @@ new class extends Component
         }
 
         try {
-            $this->reserva->elegirExcursionDestinoRepro(Carbon::parse($fecha));
+            $this->reserva->elegirDestino(Carbon::parse($fecha));
             $this->fechaDestino = $fecha;
             $this->paso = 3;
         } catch (\DomainException $e) {
@@ -102,7 +102,7 @@ new class extends Component
         $this->mensajeError = '';
 
         try {
-            $cambio = $this->reserva->elegirExcursionDestinoRepro(Carbon::parse($this->fechaDestino));
+            $cambio = $this->reserva->elegirDestino(Carbon::parse($this->fechaDestino));
             $this->reserva->reprogramar($cambio['destino']);
             $this->paso = 4;
         } catch (\DomainException $e) {
@@ -147,7 +147,7 @@ new class extends Component
     #[Computed]
     public function resumen(): array
     {
-        return $this->reserva->elegirExcursionDestinoRepro(Carbon::parse($this->fechaDestino));
+        return $this->reserva->elegirDestino(Carbon::parse($this->fechaDestino));
     }
 };
 ?>

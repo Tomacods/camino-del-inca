@@ -308,7 +308,7 @@ class SaldoPagadoTest extends TestCase
             'cupo' => 12,
             'plazas_retenidas' => 0,
         ]);
-        $cambio = $this->reserva->elegirExcursionDestinoModificacion(Carbon::parse('2027-03-01'));
+        $cambio = $this->reserva->elegirExcursionDestino(Carbon::parse('2027-03-01'));
         $this->reserva->modificarExcursion($cambio['destino']);
         $this->mercadoPago->responder($this->pago('approved', '000125-9_Saldo'));
 

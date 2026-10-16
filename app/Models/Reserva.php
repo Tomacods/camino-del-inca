@@ -634,7 +634,7 @@ class Reserva extends Model
 
     }
 
-    public function elegirExcursionDestinoModificacion(Carbon $fechaElegida): array
+    public function elegirExcursionDestino(Carbon $fechaElegida): array
     {
         return $this->armarResumenCambio($this->iniciarModificacion(), $fechaElegida);
     }
@@ -709,7 +709,7 @@ class Reserva extends Model
         );
     }
 
-    public function elegirExcursionDestinoRepro(Carbon $fechaElegida): array
+    public function elegirDestino(Carbon $fechaElegida): array
     {
         return $this->armarResumenCambio($this->iniciarReprogramacion(), $fechaElegida);
     }
