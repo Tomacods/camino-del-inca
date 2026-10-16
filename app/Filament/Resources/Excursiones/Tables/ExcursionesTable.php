@@ -42,8 +42,11 @@ class ExcursionesTable
                     ->sortable(),
                 TextColumn::make('cupo')
                     ->label('Cupo'),
+                // La cabecera de integrantes y los nombres de etapa largos van en dos renglones: así la tabla entra en una
+                // pantalla de 1366 px sin esconder la acción de Reportar Etapa (CU-12).
                 TextColumn::make('integrantes')
                     ->label('Integrantes confirmados')
+                    ->wrapHeader()
                     ->state(fn (Excursion $record) => $record->contarIntegrantesConfirmados()),
                 TextColumn::make('fecha_hora_inicio_recorrido')
                     ->label('Inicio del recorrido')
@@ -51,6 +54,7 @@ class ExcursionesTable
                     ->placeholder('—'),
                 TextColumn::make('etapaActual.nombre')
                     ->label('Etapa actual')
+                    ->wrap()
                     ->placeholder('—'),
             ])
             ->recordUrl(fn (Excursion $record) => ExcursionResource::getUrl('integrantes', ['record' => $record]))
