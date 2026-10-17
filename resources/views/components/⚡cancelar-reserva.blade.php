@@ -1,12 +1,12 @@
 <?php
 
+use App\Enums\TipoNotificacion;
 use App\Models\Reserva;
+use Illuminate\Support\Carbon;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
-use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 new #[Title('Cancelar reserva')] class extends Component
 {
@@ -54,6 +54,7 @@ public function mount(string $numeroReserva): void
 
         try {
             $this->reserva->confirmarCancelacion(Carbon::now());
+            Reserva::notificarCliente(TipoNotificacion::CancelacionReserva, $this->reserva->numero_reserva);
             $this->paso = 3;
         } catch (\Exception $e) {
             // Si el estado cambió entre un paso y otro, se muestra el aviso en vez de un error 500
