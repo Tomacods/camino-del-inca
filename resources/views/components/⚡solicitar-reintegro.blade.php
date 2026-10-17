@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TipoNotificacion;
 use App\Models\Reserva;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Computed;
@@ -48,6 +49,7 @@ new #[Title('Solicitar reintegro')] class extends Component
             // Se vuelve a calcular: si la reserva dejó de estar «Sin Permiso» entre un paso y otro, no se cancela
             $this->montoReintegro = $this->reserva->calcularReintegro();
             $this->reserva->ejecutarCancelacionConReintegro($this->montoReintegro, Carbon::now());
+            Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, $this->reserva->numero_reserva);
             $this->paso = 3;
         } catch (\Exception $e) {
             $this->mensajeError = $e->getMessage();
