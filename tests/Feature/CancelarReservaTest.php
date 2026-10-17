@@ -11,6 +11,7 @@ use App\Enums\Rol;
 use App\Enums\TipoNotificacion;
 use App\Enums\TipoPago;
 use App\Mail\NotificacionCliente;
+use App\Models\Devolucion;
 use App\Models\Excursion;
 use App\Models\Guia;
 use App\Models\Pago;
@@ -116,6 +117,19 @@ class CancelarReservaTest extends TestCase
         $this->assertSame(EstadoReserva::SinPermiso, $this->reserva->fresh()->estado);
         $this->assertNull($this->reserva->fresh()->devolucion);
         Mail::assertNothingQueued();
+    }
+
+    public function test_si_la_confirmacion_llega_dos_veces_registra_una_sola_devolucion_y_un_solo_correo(): void
+    {
+        $this->darAcceso();
+
+        $this->abrirPantalla()
+            ->call('confirmar')
+            ->call('confirmar')
+            ->assertDontSee('SQLSTATE');
+
+        $this->assertSame(1, Devolucion::count());
+        Mail::assertQueued(NotificacionCliente::class, 1);
     }
 
     public function test_el_navegador_no_puede_cambiar_la_reserva(): void

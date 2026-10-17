@@ -1,13 +1,12 @@
 <?php
 
-use App\Models\Reserva;
 use App\Enums\TipoNotificacion;
+use App\Models\Reserva;
+use Illuminate\Support\Carbon;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
-use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 new #[Title('Cancelar reserva')] class extends Component
 {
