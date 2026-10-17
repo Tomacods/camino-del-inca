@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Reserva;
+use App\Enums\TipoNotificacion;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;

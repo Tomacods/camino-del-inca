@@ -8,7 +8,9 @@ use App\Enums\EstadoReserva;
 use App\Enums\EstadoSaldo;
 use App\Enums\MotivoDevolucion;
 use App\Enums\Rol;
+use App\Enums\TipoNotificacion;
 use App\Enums\TipoPago;
+use App\Mail\NotificacionCliente;
 use App\Models\Excursion;
 use App\Models\Guia;
 use App\Models\Pago;
@@ -18,6 +20,8 @@ use App\Models\Reserva;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -37,6 +41,7 @@ class CancelarReservaTest extends TestCase
         parent::setUp();
 
         $this->travelTo(Carbon::parse('2026-10-13 10:00:00'));
+        Mail::fake();
 
         $this->excursion = $this->crearExcursion('2027-02-01');
         $this->reserva = $this->crearReserva($this->excursion, '000125-9', EstadoReserva::Confirmada);
@@ -110,6 +115,7 @@ class CancelarReservaTest extends TestCase
 
         $this->assertSame(EstadoReserva::SinPermiso, $this->reserva->fresh()->estado);
         $this->assertNull($this->reserva->fresh()->devolucion);
+        Mail::assertNothingQueued();
     }
 
     public function test_el_navegador_no_puede_cambiar_la_reserva(): void
@@ -120,6 +126,62 @@ class CancelarReservaTest extends TestCase
         $this->expectException(CannotUpdateLockedPropertyException::class);
 
         $this->abrirPantalla()->set('numeroReserva', '000122-3');
+    }
+
+    public function test_al_confirmar_se_encola_el_correo_de_cancelacion_al_titular(): void
+    {
+        $this->darAcceso();
+
+        $this->abrirPantalla()->call('confirmar')->assertSet('paso', 3);
+
+        Mail::assertQueued(NotificacionCliente::class, 1);
+        Mail::assertQueued(NotificacionCliente::class, fn ($mail) => $mail->hasTo('federico.rios@mail.com')
+            && $mail->tipo === TipoNotificacion::CancelacionReserva);
+    }
+
+    public function test_el_correo_lleva_la_devolucion_ya_registrada(): void
+    {
+        $this->darAcceso();
+
+        $this->abrirPantalla()->call('confirmar');
+
+        // notificar() lee la devolución de la base: tiene que estar guardada antes de notificar.
+        Mail::assertQueued(NotificacionCliente::class, fn ($mail) => $mail->datos['devolucion'] !== null);
+    }
+
+    public function test_a_30_dias_o_menos_el_correo_sale_sin_devolucion(): void
+    {
+        $this->travelTo(Carbon::parse('2027-01-10 10:00:00'));
+        $this->darAcceso();
+
+        $this->abrirPantalla()->call('confirmar');
+
+        Mail::assertQueued(NotificacionCliente::class, 1);
+        Mail::assertQueued(NotificacionCliente::class, fn ($mail) => $mail->datos['devolucion'] === null);
+    }
+
+    public function test_el_asunto_del_correo_informa_el_numero_de_reserva(): void
+    {
+        $this->darAcceso();
+
+        $this->abrirPantalla()->call('confirmar');
+
+        Mail::assertQueued(NotificacionCliente::class, fn ($mail) => $mail->envelope()->subject === 'Tu reserva 000125-9 fue cancelada');
+    }
+
+    public function test_si_no_se_puede_encolar_el_correo_la_reserva_igual_queda_cancelada(): void
+    {
+        Log::spy();
+        Mail::shouldReceive('to')->once()->andThrow(new \RuntimeException('Cola caída'));
+        $this->darAcceso();
+
+        $this->abrirPantalla()
+            ->call('confirmar')
+            ->assertSet('paso', 3)
+            ->assertSee('¡Reserva cancelada con éxito!');
+
+        $this->assertSame(EstadoReserva::Cancelada, $this->reserva->fresh()->estado);
+        Log::shouldHaveReceived('error')->once();
     }
 
     private function abrirPantalla()
