@@ -70,12 +70,13 @@ Después:
    Son sólo para probar en tu PC. No hace falta crear usuarios a mano: `php artisan make:filament-user` no sirve, porque
    la tabla `usuario` no tiene las columnas que usa Filament por defecto.
 
-5. Levantar la aplicación, en tres ventanas de Git Bash:
+5. Levantar la aplicación, en cuatro ventanas de Git Bash:
 
    ```bash
-   php artisan serve        # http://127.0.0.1:8000   (panel: http://127.0.0.1:8000/admin)
-   npm run dev              # recompila los estilos mientras se trabaja
-   php artisan queue:work   # corre las tareas de la cola
+   php artisan serve           # http://127.0.0.1:8000   (panel: http://127.0.0.1:8000/admin)
+   npm run dev                 # recompila los estilos mientras se trabaja
+   php artisan queue:work      # corre las tareas de la cola
+   php artisan schedule:work   # corre las tareas programadas: CU-22 y CU-26
    ```
 
    El sitio se abre en `http://127.0.0.1:8000` y no en `localhost:8000`: en Windows, `localhost` apunta primero a la
@@ -85,19 +86,17 @@ Después:
    retenidas hasta que se levante la cola. Si cambiás el código de una tarea (`app/Jobs`), cortá `queue:work` con
    Ctrl+C y volvé a levantarlo, porque guarda el código en memoria.
 
-   Las cancelaciones automáticas (actor Temporizador) las dispara el programador de tareas de Laravel. Para probarlas
-   con su horario, levantarlo en una cuarta ventana:
+   Sin `php artisan schedule:work`, las cancelaciones automáticas (actor Temporizador) nunca se hacen: ni las de las
+   reservas confirmadas que no pagaron el saldo a tiempo (CU-22) ni las de las pendientes o sin permiso cuya fecha
+   límite de confirmación venció (CU-26). `php artisan schedule:list` muestra las tareas programadas y cuándo corre cada
+   una.
 
-   ```bash
-   php artisan schedule:work   # revisa cada minuto si toca alguna tarea programada
-   php artisan schedule:list   # muestra las tareas programadas y cuándo corre cada una
-   ```
-
-   Sin esperar a la hora, cada cancelación se corre a mano. Cancela lo que esté vencido en ese momento, en la base de
+   Para probarlas sin esperar a las 00:05, se corren a mano. Cancelan lo que esté vencido en ese momento, en la base de
    tu PC; los correos salen con `queue:work`, como los demás:
 
    ```bash
-   php artisan reservas:cancelar-por-falta-de-confirmacion   # CU-26: todos los días a las 00:05
+   php artisan reservas:cancelar-por-falta-de-pago            # CU-22
+   php artisan reservas:cancelar-por-falta-de-confirmacion   # CU-26
    ```
 
 Si al abrir el sitio aparece *Connection refused* en el puerto 5432, PostgreSQL está detenido: ver
@@ -131,8 +130,9 @@ resto del sistema funciona sin esto.
    que también tiene la lista para la presentación.
 3. Compilar los estilos una vez con `npm run build`, en lugar de dejar `npm run dev`: el servidor de Vite escucha en
    `localhost` y desde la dirección del túnel no se alcanza.
-4. Levantar `php artisan serve` y `php artisan queue:work` como siempre, y entrar **siempre por la dirección del túnel**,
-   no por `127.0.0.1:8000`: la reserva en curso queda en la sesión, y la sesión es de una sola dirección.
+4. Levantar `php artisan serve`, `php artisan queue:work` y `php artisan schedule:work` como siempre, y entrar
+   **siempre por la dirección del túnel**, no por `127.0.0.1:8000`: la reserva en curso queda en la sesión, y la sesión
+   es de una sola dirección.
 
 Para pagar se usa el comprador de prueba de la cuenta y las tarjetas de prueba de Mercado Pago: con el titular `APRO`
 el pago se aprueba; con `FUND` u `OTHE`, se rechaza. Mercado Pago cobra en pesos el equivalente de los dólares, con su

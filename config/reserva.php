@@ -108,6 +108,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Hora de la verificación de saldos vencidos
+    |--------------------------------------------------------------------------
+    |
+    | Hora del día (HH:MM) en que el Temporizador cancela las reservas
+    | confirmadas que no pagaron el saldo antes de la fecha límite. La fecha
+    | vence a las 23:59:59, así que corre apenas pasada la medianoche (CU-22
+    | Cancelar Reserva por Falta de Pago de Saldo).
+    |
+    */
+
+    'hora_verificacion_saldos_vencidos' => '00:05',
+
+    /*
+    |--------------------------------------------------------------------------
     | Hora de la verificación de confirmaciones vencidas
     |--------------------------------------------------------------------------
     |
