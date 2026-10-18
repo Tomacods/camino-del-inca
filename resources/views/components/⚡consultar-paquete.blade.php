@@ -42,8 +42,9 @@ new #[Title('Paquete')] class extends Component
 
         <h1 class="text-5xl font-semibold">{{ $paquete['nombre'] }}</h1>
 
+        {{-- El nombre del recorrido ya dice la duración («Camino Inca de 4 días»). --}}
         <p class="mt-3 text-[17px] text-texto-secundario">
-            {{ $paquete['nombre_recorrido'] }} · {{ $paquete['duracion_dias'] }} días · {{ $paquete['cantidad_etapas'] }} etapas
+            {{ $paquete['nombre_recorrido'] }} · {{ $paquete['cantidad_etapas'] }} etapas
         </p>
 
         <p class="mt-2 text-[17px]">

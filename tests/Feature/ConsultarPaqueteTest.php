@@ -69,7 +69,7 @@ class ConsultarPaqueteTest extends TestCase
 
         $respuesta->assertOk();
         $respuesta->assertSee('Camino Inca Clásico');
-        $respuesta->assertSee('Camino Inca de 4 días · 4 días · 3 etapas');
+        $respuesta->assertSee('Camino Inca de 4 días · 3 etapas');
         $respuesta->assertSee('Hotel en Cusco');
         $respuesta->assertSee('Tren a Ollantaytambo');
         $respuesta->assertSee('6 porteadores');
