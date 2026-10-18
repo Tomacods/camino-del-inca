@@ -68,6 +68,13 @@ class Paquete extends Model
             + $equiposCamping * (float) $this->costo_equipo_camping;
     }
 
+    /* -------------------------- CU-12 Reportar etapa -------------------------- */
+
+    public function getEtapas(): Collection
+    {
+        return $this->recorrido->getEtapas();
+    }
+
     /* ------------------------- CU-13 Notificar cliente ------------------------ */
 
     // Lo que el comprobante de la primera compra dice del paquete: el recorrido, con su duración, y los servicios.

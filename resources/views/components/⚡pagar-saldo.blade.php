@@ -219,7 +219,11 @@ new #[Title('Pagar saldo')] class extends Component
 
         <div class="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             <x-boton variante="secundario" wire:click="cancelar">Cancelar</x-boton>
-            <x-boton wire:click="confirmarPago">Pagar el saldo con Mercado Pago</x-boton>
+            {{-- Mientras se procesa queda deshabilitado, para que no se pidan dos cobros. --}}
+            <x-boton wire:click="confirmarPago" wire:loading.attr="disabled" wire:target="confirmarPago">
+                <span wire:loading.remove wire:target="confirmarPago">Pagar el saldo con Mercado Pago</span>
+                <span wire:loading wire:target="confirmarPago">Conectando con Mercado Pago…</span>
+            </x-boton>
         </div>
     @endif
 </div>

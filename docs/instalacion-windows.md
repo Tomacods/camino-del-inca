@@ -114,7 +114,8 @@ Una sola vez:
    ngrok config add-authtoken <token>
    ```
 
-Cada vez que se prueba el pago, en una terminal aparte, además de `php artisan serve` y `php artisan queue:work`:
+Cada vez que se prueba el pago, en una terminal aparte, además de `php artisan serve`, `php artisan queue:work` y
+`php artisan schedule:work`:
 
 ```bash
 ngrok http 8000
@@ -143,7 +144,8 @@ dirección del túnel es de una cuenta de ngrok, y las credenciales, de una cuen
 
 1. Internet andando: sin conexión no hay túnel ni Mercado Pago.
 2. PostgreSQL arrancado (`Start-Service postgresql`, ver «Problemas conocidos»).
-3. `npm run build`, y en tres terminales `php artisan serve`, `php artisan queue:work` y `ngrok http 8000`.
+3. `npm run build`, y en cuatro terminales `php artisan serve`, `php artisan queue:work`, `php artisan schedule:work` y
+   `ngrok http 8000`.
 4. En el `.env`, `APP_URL` con la dirección del túnel y `RESERVA_MINUTOS_RETENCION` en 5 o sin la línea, que es el
    plazo del caso de uso.
 5. Una ventana de incógnito abierta en la dirección del túnel, con el aviso de ngrok ya pasado.

@@ -67,7 +67,7 @@ class ConsultarReservaTest extends TestCase
         $this->consultarReserva('000125-9')
             ->assertSee(TipoPago::Sena->value)
             ->assertSee('Tarjeta de crédito')
-            ->assertSee('USD 650');
+            ->assertSee('USD 650,00');
     }
 
     public function test_las_opciones_con_pantalla_se_muestran_como_enlaces(): void
@@ -102,14 +102,24 @@ class ConsultarReservaTest extends TestCase
 
     public function test_las_opciones_sin_pantalla_se_muestran_deshabilitadas(): void
     {
+        $this->crearReservaFinalizada('000118-1', 'paula.benitez@mail.com');
+
+        $componente = $this->consultarReserva('000118-1', 'paula.benitez@mail.com')
+            ->assertSee('Reserva 000118-1')
+            ->assertSeeHtmlInOrder(['disabled="disabled"', 'Valorar servicios', 'Disponible próximamente']);
+
+        // Sólo Valorar: el resto de las opciones ya tiene pantalla.
+        $this->assertSame(1, substr_count($componente->html(), 'Disponible próximamente'));
+    }
+
+    public function test_las_opciones_de_una_reserva_sin_permiso_son_enlaces(): void
+    {
         $this->crearReservaSinPermiso('000123-5', 'ana.gomez@mail.com');
 
-        $componente = $this->consultarReserva('000123-5', 'ana.gomez@mail.com')
-            ->assertSee('Reserva 000123-5')
-            ->assertSeeHtmlInOrder(['disabled="disabled"', 'Solicitar reprogramación', 'Disponible próximamente']);
-
-        // Sólo Reprogramar: el reintegro ya tiene pantalla.
-        $this->assertSame(1, substr_count($componente->html(), 'Disponible próximamente'));
+        $this->consultarReserva('000123-5', 'ana.gomez@mail.com')
+            ->assertSeeHtml('href="/mi-reserva/000123-5/reintegro"')
+            ->assertSeeHtml('href="/mi-reserva/000123-5/reprogramar"')
+            ->assertDontSee('Disponible próximamente');
     }
 
     public function test_pagar_saldo_lleva_a_su_pantalla(): void

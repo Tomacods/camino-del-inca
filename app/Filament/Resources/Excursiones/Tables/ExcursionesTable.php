@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Excursiones\Tables;
 
+use App\Filament\Resources\Excursiones\Actions\IniciarRecorrido;
+use App\Filament\Resources\Excursiones\Actions\ReportarEtapa;
 use App\Filament\Resources\Excursiones\ExcursionResource;
 use App\Filament\Resources\Excursiones\Pages\ListarIntegrantesExcursion;
 use App\Models\Excursion;
@@ -14,12 +16,20 @@ class ExcursionesTable
     public static function configure(Table $table): Table
     {
         return $table
-            // La columna de integrantes los cuenta por reserva: se traen con la excursión para no consultar por cada fila.
+            // La columna de integrantes los cuenta por reserva, la acción de Iniciar Recorrido (CU-11) mira la duración del
+            // recorrido y la de Reportar Etapa (CU-12), sus etapas y la etapa actual: se traen con la excursión para no
+            // consultar por cada fila.
             // Filament pasa la consulta por el nombre del parámetro: tiene que llamarse $query.
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['paquete', 'reservasConfirmadas.excursionistas']))
-            // Primero las salidas de hoy en adelante, de la más cercana a la más lejana; después las pasadas, de la más
-            // reciente a la más vieja. El primer CASE separa los dos grupos; los otros dos ordenan cada uno.
+            ->modifyQueryUsing(fn (Builder $query) => $query->with([
+                'paquete.recorrido.etapas',
+                'etapaActual',
+                'reservasConfirmadas.excursionistas',
+            ]))
+            // Arriba de todo, la salida en curso: la que admite reportar etapa (CU-12, ver Excursion::scopeEnCursoPrimero()).
+            // Después, las salidas de hoy en adelante, de la más cercana a la más lejana, y al final las pasadas, de la más
+            // reciente a la más vieja. El primer CASE de abajo separa esos dos grupos; los otros dos ordenan cada uno.
             ->defaultSort(fn (Builder $query) => $query
+                ->enCursoPrimero()
                 ->orderByRaw('CASE WHEN fecha_salida >= ? THEN 0 ELSE 1 END', [today()->toDateString()])
                 ->orderByRaw('CASE WHEN fecha_salida >= ? THEN fecha_salida END ASC', [today()->toDateString()])
                 ->orderByRaw('CASE WHEN fecha_salida < ? THEN fecha_salida END DESC', [today()->toDateString()]))
@@ -32,14 +42,26 @@ class ExcursionesTable
                     ->sortable(),
                 TextColumn::make('cupo')
                     ->label('Cupo'),
+                // La cabecera de integrantes y los nombres de etapa largos van en dos renglones: así la tabla entra en una
+                // pantalla de 1366 px sin esconder la acción de Reportar Etapa (CU-12).
                 TextColumn::make('integrantes')
                     ->label('Integrantes confirmados')
+                    ->wrapHeader()
                     ->state(fn (Excursion $record) => $record->contarIntegrantesConfirmados()),
+                TextColumn::make('fecha_hora_inicio_recorrido')
+                    ->label('Inicio del recorrido')
+                    ->dateTime('d/m/Y H:i')
+                    ->placeholder('—'),
+                TextColumn::make('etapaActual.nombre')
+                    ->label('Etapa actual')
+                    ->wrap()
+                    ->placeholder('—'),
             ])
             ->recordUrl(fn (Excursion $record) => ExcursionResource::getUrl('integrantes', ['record' => $record]))
-            // Acá se van a sumar las acciones de Iniciar Recorrido (CU-11) y Reportar Etapa (CU-12).
             ->recordActions([
                 ListarIntegrantesExcursion::accionListarIntegrantes(),
+                IniciarRecorrido::accionIniciarRecorrido(),
+                ReportarEtapa::accionReportarEtapa(),
             ])
             // A2: el guía todavía no tiene excursiones a su cargo.
             ->emptyStateHeading('Todavía no tenés excursiones asignadas')

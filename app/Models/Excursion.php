@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoPaquete;
 use App\Enums\EstadoReserva;
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -209,6 +210,191 @@ class Excursion extends Model
         return $this->getReservasConfirmadas()->sum(fn (Reserva $reserva) => $reserva->getExcursionistas()->count());
     }
 
+    /* ------------------------- CU-11 Iniciar recorrido ------------------------ */
+
+    // También la usa Reportar Etapa (CU-12): no se puede reportar una etapa de un recorrido que todavía no empezó.
+    public function recorridoIniciado(): bool
+    {
+        return $this->fecha_hora_inicio_recorrido !== null;
+    }
+
+    // Un recorrido de 4 días que sale el lunes termina el jueves: el día de salida cuenta como el primero.
+    public function getUltimoDiaRecorrido(): Carbon
+    {
+        return $this->fecha_salida->copy()->addDays($this->paquete->recorrido->duracion_dias - 1);
+    }
+
+    // «El día correspondiente» es cualquiera de los días del recorrido, no sólo el de la salida: si el guía se olvida de
+    // iniciarlo el lunes, lo puede hacer después y la excursión no queda sin poder reportar etapas (CU-12). Se comparan
+    // días, no horas, como en cumpleAnticipacionMinima(): vale cualquier hora del primero y del último día.
+    public function esDiaDelRecorrido($fecha): bool
+    {
+        $dia = Carbon::parse($fecha)->startOfDay();
+
+        return $dia->betweenIncluded($this->fecha_salida, $this->getUltimoDiaRecorrido());
+    }
+
+    // Para mostrar u ocultar la acción en el panel. La misma regla que controla iniciarRecorrido() antes de registrar.
+    public function admiteInicioRecorrido($fecha): bool
+    {
+        return ! $this->recorridoIniciado() && $this->esDiaDelRecorrido($fecha);
+    }
+
+    // Paso 4, A1 y A2. La fila se bloquea hasta el final de la transacción: si el guía toca dos veces o tiene la salida
+    // abierta en dos pestañas, el segundo pedido espera al primero, encuentra el recorrido iniciado y no pisa la hora.
+    // Si no se puede iniciar, lanza DomainException con el aviso para el guía, como iniciarValidacionPermisos() de CU-04.
+    public function iniciarRecorrido(): void
+    {
+        DB::transaction(function () {
+            $excursion = Excursion::lockForUpdate()->findOrFail($this->id_excursion);
+            $ahora = now();
+
+            if ($excursion->recorridoIniciado()) {
+                throw new DomainException('El recorrido ya se inició el '.$excursion->fecha_hora_inicio_recorrido->format('d/m/Y').' a las '
+                    .$excursion->fecha_hora_inicio_recorrido->format('H:i').'.');
+            }
+
+            if (! $excursion->esDiaDelRecorrido($ahora)) {
+                throw new DomainException('El recorrido sólo se puede iniciar entre el día de la salida ('.$excursion->fecha_salida->format('d/m/Y')
+                    .') y el último día del recorrido ('.$excursion->getUltimoDiaRecorrido()->format('d/m/Y').').');
+            }
+
+            $excursion->fecha_hora_inicio_recorrido = $ahora;
+            $excursion->save();
+
+            $this->fecha_hora_inicio_recorrido = $excursion->fecha_hora_inicio_recorrido;
+        });
+    }
+
+    /* -------------------------- CU-12 Reportar etapa -------------------------- */
+
+    // Las etapas planificadas del recorrido del paquete, en orden.
+    public function getEtapas(): Collection
+    {
+        return $this->paquete->getEtapas();
+    }
+
+    // La última etapa reportada. Nula hasta que el guía reporta la primera.
+    public function getEtapaActual(): ?Etapa
+    {
+        return $this->etapaActual;
+    }
+
+    // Las etapas se reportan de a una y en el orden fijo del recorrido (regla de negocio): la siguiente es la primera con
+    // un orden mayor que el de la actual, o la primera del recorrido si todavía no se reportó ninguna. Es nula cuando la
+    // etapa actual es la final.
+    public function obtenerSiguienteEtapa(): ?Etapa
+    {
+        $ordenActual = $this->getEtapaActual()?->orden ?? 0;
+
+        return $this->getEtapas()->first(fn (Etapa $etapa) => $etapa->orden > $ordenActual);
+    }
+
+    // La etapa actual es la última del recorrido: el viaje terminó.
+    public function esEtapaFinal(): bool
+    {
+        return $this->getEtapaActual() !== null && $this->obtenerSiguienteEtapa() === null;
+    }
+
+    // Para adelantar en la confirmación que reportar la siguiente termina el viaje (A2).
+    public function esSiguienteEtapaFinal(): bool
+    {
+        $siguiente = $this->obtenerSiguienteEtapa();
+
+        return $siguiente !== null && $siguiente->is($this->getEtapas()->last());
+    }
+
+    // Paso 2: las etapas planificadas, la última reportada y la siguiente, para mostrarlas antes de reportar.
+    public function recuperarEtapaActual(): array
+    {
+        return [
+            'etapas' => $this->getEtapas(),
+            'etapa_actual' => $this->getEtapaActual(),
+            'siguiente' => $this->obtenerSiguienteEtapa(),
+        ];
+    }
+
+    // Para mostrar u ocultar la acción en el panel: la precondición del caso de uso. No hay un plazo en días, a diferencia
+    // de iniciarRecorrido(): si el guía reporta tarde la etapa final, las reservas igual llegan a «Finalizada» y el
+    // cliente puede valorar (CU-23).
+    public function admiteReporteEtapa(): bool
+    {
+        return $this->recorridoIniciado() && $this->obtenerSiguienteEtapa() !== null;
+    }
+
+    // Paso 1: el guía elige la excursión en curso, así que «Mis excursiones» la muestra primera. Es la misma regla que
+    // admiteReporteEtapa(), escrita en SQL para ordenar: el recorrido se inició y falta la etapa final, porque todavía no
+    // se reportó ninguna o porque hay una etapa del mismo recorrido con un orden mayor que la actual. Con EXISTS y sin
+    // funciones propias de un motor, anda igual en PostgreSQL y en SQLite (las pruebas).
+    public function scopeEnCursoPrimero(Builder $consulta): Builder
+    {
+        return $consulta->orderByRaw('CASE WHEN excursion.fecha_hora_inicio_recorrido IS NOT NULL AND ('
+            .'excursion.id_etapa_actual IS NULL OR EXISTS ('
+            .'SELECT 1 FROM etapa AS actual JOIN etapa AS posterior ON posterior.id_recorrido = actual.id_recorrido '
+            .'WHERE actual.id_etapa = excursion.id_etapa_actual AND posterior.orden > actual.orden'
+            .')) THEN 0 ELSE 1 END');
+    }
+
+    // Pasos 3 y 4, A1 y A2. Recibe la etapa que el guía vio en la confirmación y la registra sólo si sigue siendo la
+    // siguiente. La fila se bloquea hasta el final de la transacción: si el guía toca dos veces, tiene la excursión abierta
+    // en dos pestañas o reintenta después de un corte de conexión (A3) cuando el primer pedido sí había llegado, el
+    // segundo espera al primero, encuentra esa etapa ya reportada y no avanza otra.
+    // Con la etapa final, las reservas cambian en la misma transacción: o queda todo o no queda nada. Devuelve las
+    // reservas que pasaron a «Finalizada» (ninguna, si no era la final), para que quien la llamó invoque Notificar
+    // Cliente (CU-13) después de la transacción. Si no se puede reportar, lanza DomainException con el aviso para el guía.
+    // El DS-12 tiene actualizarEtapaActual() sin parámetros: la etapa se agrega para no avanzar dos con dos pedidos
+    // iguales.
+    public function actualizarEtapaActual(int $idEtapa): Collection
+    {
+        return DB::transaction(function () use ($idEtapa) {
+            $excursion = Excursion::lockForUpdate()->findOrFail($this->id_excursion);
+
+            if (! $excursion->recorridoIniciado()) {
+                throw new DomainException('El recorrido todavía no se inició: primero tenés que iniciarlo.');
+            }
+
+            $siguiente = $excursion->obtenerSiguienteEtapa();
+
+            if ($siguiente === null) {
+                throw new DomainException('El recorrido ya terminó: la etapa final, «'.$excursion->getEtapaActual()?->nombre.'», ya se reportó.');
+            }
+
+            if ($siguiente->id_etapa !== $idEtapa) {
+                throw new DomainException($idEtapa === (int) $excursion->id_etapa_actual
+                    ? 'La etapa «'.$excursion->getEtapaActual()->nombre.'» ya se reportó. La siguiente es «'.$siguiente->nombre.'».'
+                    : 'Las etapas se reportan en orden: la siguiente es «'.$siguiente->nombre.'».');
+            }
+
+            $excursion->setEtapaActual($siguiente);
+
+            $reservasFinalizadas = $excursion->esEtapaFinal() ? $excursion->finalizarReservasConfirmadas() : new Collection;
+
+            $this->id_etapa_actual = $excursion->id_etapa_actual;
+            $this->setRelation('etapaActual', $siguiente);
+
+            return $reservasFinalizadas;
+        });
+    }
+
+    private function setEtapaActual(Etapa $etapa): void
+    {
+        $this->etapaActual()->associate($etapa);
+        $this->save();
+    }
+
+    // A2 4.3: sólo las «Confirmada»; una «Pendiente» o «Sin Permiso» que haya quedado no viajó y no cambia. Se leen con
+    // bloqueo: si en ese momento se está guardando una cancelación (CU-21), la lectura la espera y esa reserva, ya
+    // «Cancelada», no se finaliza. Al revés no alcanza: una cancelación que leyó la reserva «Confirmada» antes y la guarda
+    // mientras tanto sólo espera a que termine esta transacción, y después la pisa. Eso lo tiene que controlar CU-21.
+    private function finalizarReservasConfirmadas(): Collection
+    {
+        $reservas = $this->reservasConfirmadas()->lockForUpdate()->get();
+
+        $reservas->each(fn (Reserva $reserva) => $reserva->finalizarReserva());
+
+        return $reservas;
+    }
+
     /* ------------------------------ CU-20 Modificar ------------------------------- */
 
     public function getDatosExcursion(): self
@@ -217,7 +403,7 @@ class Excursion extends Model
     }
 
     // No se revisa el estado del paquete: R-03 no deja pasar a «Inactivo» un paquete con reservas «Pendiente»,
-    // «Confirmada» o «Sin Permiso», así que el de una reserva «Confirmada» está siempre «Activo».
+    // «Confirmada» o «Sin Permiso», así que el de una reserva «Confirmada» o «Sin Permiso» está siempre «Activo».
     public static function buscarOtrasDelPaquete(int $idPaquete, Carbon $fechaOrigen, int $cantidad): Collection
     {
         $otras = self::with(['paquete', 'guia'])
@@ -255,11 +441,15 @@ class Excursion extends Model
             ->get();
     }
 
-    // Búsqueda por fecha: si el paquete tiene una salida disponible ese día.
+    // Búsqueda por fecha: si el paquete tiene una salida disponible ese día, es decir, futura y con cupo. Busca sólo esa
+    // salida, sin recalcular el cupo de las demás.
     public static function tieneFechaSalida(int $idPaquete, Carbon $fecha): bool
     {
-        return self::getExcursionesDisponibles($idPaquete)
-            ->contains(fn (Excursion $excursion) => $excursion->getFechaSalida()->isSameDay($fecha));
+        $excursion = self::buscarPorFechaSalida($idPaquete, $fecha->format('Y-m-d'));
+
+        return $excursion !== null
+            && $excursion->getFechaSalida()->isAfter(today())
+            && $excursion->obtenerCupoDisponible() > 0;
     }
 
     /* ------------------------ CU-06 Consultar paquete ------------------------ */

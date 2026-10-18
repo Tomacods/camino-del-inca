@@ -11,6 +11,7 @@ use App\Models\Recorrido;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -54,7 +55,8 @@ class ListarPaquetesTest extends TestCase
 
         $respuesta->assertOk();
         $respuesta->assertSee('Camino Inca Clásico');
-        $respuesta->assertSee('Camino Inca de 4 días · 4 días');
+        $respuesta->assertSee('Camino Inca de 4 días');
+        $respuesta->assertDontSee('Camino Inca de 4 días · 4 días');
         $respuesta->assertSee('USD 750');
         $respuesta->assertSee('04/01/2027');
     }
@@ -148,6 +150,14 @@ class ListarPaquetesTest extends TestCase
         $this->buscar('01/02/2027')->assertSee('No encontramos paquetes para «01/02/2027»');
     }
 
+    public function test_una_fecha_que_ya_paso_no_coincide(): void
+    {
+        $paquete = $this->crearPaquete('Camino Inca Clásico');
+        $this->crearExcursion($paquete, '2026-09-07');
+
+        $this->buscar('07/09/2026')->assertSee('No encontramos paquetes para «07/09/2026»');
+    }
+
     public function test_sin_criterio_muestra_todos_los_paquetes(): void
     {
         $this->crearPaquete('Camino Inca Clásico');
@@ -179,6 +189,14 @@ class ListarPaquetesTest extends TestCase
             ->assertSee('Camino Inca Clásico');
 
         $this->buscar('2027-01-04')->assertHasErrors(['criterio' => 'date_format']);
+    }
+
+    // La búsqueda aplicada sólo la cambia buscarPaquetes(), después de validar el criterio.
+    public function test_la_busqueda_aplicada_no_se_puede_cambiar_desde_el_navegador(): void
+    {
+        $this->expectException(CannotUpdateLockedPropertyException::class);
+
+        Livewire::test('listar-paquetes')->set('busqueda', '123');
     }
 
     public function test_ver_todos_vuelve_al_listado_completo(): void

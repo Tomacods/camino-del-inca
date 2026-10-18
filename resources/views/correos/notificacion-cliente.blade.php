@@ -138,7 +138,7 @@
                 <td style="{{ $celdaTitulo }}">Integrantes</td>
                 <td style="{{ $celdaDato }}">
                     @foreach ($datos['excursionistas'] as $integrante)
-                        {{ $integrante['nombre'] }} {{ $integrante['apellido'] }} · permiso {{ $integrante['estado_permiso']->value }}<br>
+                        {{ $integrante['nombre'] }} {{ $integrante['apellido'] }} · permiso {{ mb_strtolower($integrante['estado_permiso']->value) }}<br>
                     @endforeach
                 </td>
             </tr>

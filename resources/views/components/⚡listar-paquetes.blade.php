@@ -4,6 +4,7 @@ use App\Models\Paquete;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -12,7 +13,9 @@ new #[Title('Paquetes')] class extends Component
     // Lo que escribe el cliente en el buscador.
     public string $criterio = '';
 
-    // El criterio que se aplicó al tocar «Buscar». Vacío: el listado completo.
+    // El criterio que se aplicó al tocar «Buscar». Vacío: el listado completo. Lo pone sólo buscarPaquetes(), después de
+    // validarlo; con #[Locked] el navegador no lo puede cambiar, así nunca llega a la búsqueda sin validar.
+    #[Locked]
     public string $busqueda = '';
 
     protected function rules(): array
@@ -118,9 +121,8 @@ new #[Title('Paquetes')] class extends Component
         <div class="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             @foreach ($this->paquetes as $paquete)
                 <x-tarjeta :titulo="$paquete['nombre']" class="flex flex-col" wire:key="paquete-{{ $paquete['id_paquete'] }}">
-                    <p class="text-[17px] text-texto-secundario">
-                        {{ $paquete['nombre_recorrido'] }} · {{ $paquete['duracion_dias'] }} días
-                    </p>
+                    {{-- El nombre del recorrido ya dice la duración («Camino Inca de 4 días»). --}}
+                    <p class="text-[17px] text-texto-secundario">{{ $paquete['nombre_recorrido'] }}</p>
 
                     <p class="mt-4 text-[17px]">
                         Desde <span class="font-semibold tabular-nums">USD {{ number_format($paquete['precio_base'], 0, ',', '.') }}</span>
