@@ -8,7 +8,9 @@ use App\Enums\EstadoReserva;
 use App\Enums\EstadoSaldo;
 use App\Enums\MotivoDevolucion;
 use App\Enums\Rol;
+use App\Enums\TipoNotificacion;
 use App\Enums\TipoPago;
+use App\Mail\NotificacionCliente;
 use App\Models\Devolucion;
 use App\Models\Excursion;
 use App\Models\Guia;
@@ -19,6 +21,8 @@ use App\Models\Reserva;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -39,6 +43,8 @@ class SolicitarReintegroTest extends TestCase
 
         $this->travelTo(Carbon::parse('2026-10-13 10:00:00'));
 
+        Mail::fake();
+
         $this->excursion = $this->crearExcursion('2027-02-01');
         $this->reserva = $this->crearReserva('000125-9', EstadoReserva::SinPermiso);
     }
@@ -56,11 +62,11 @@ class SolicitarReintegroTest extends TestCase
             ->assertSet('paso', 2)
             ->assertSee('Te devolvemos todo lo abonado.')
             ->assertSee('Confirmar reintegro')
-            ->assertSee('USD 750')
+            ->assertSee('USD 750,00')
             ->call('confirmar')
             ->assertSet('paso', 3)
             ->assertSee('Reserva cancelada con reintegro del 100 %')
-            ->assertSee('Registramos el reintegro de USD 750.')
+            ->assertSee('Registramos el reintegro de USD 750,00.')
             ->assertDontSee('Te devolvemos todo lo abonado.');
 
         $reserva = $this->reserva->fresh();
@@ -95,6 +101,7 @@ class SolicitarReintegroTest extends TestCase
 
         $this->assertSame(EstadoReserva::Confirmada, $this->reserva->fresh()->estado);
         $this->assertNull($this->reserva->fresh()->devolucion);
+        Mail::assertNothingQueued();
     }
 
     public function test_si_la_confirmacion_llega_dos_veces_registra_una_sola_devolucion(): void
@@ -107,6 +114,7 @@ class SolicitarReintegroTest extends TestCase
             ->assertDontSee('SQLSTATE');
 
         $this->assertSame(1, Devolucion::count());
+        Mail::assertQueued(NotificacionCliente::class, 1); // para comprobar que la segunda confirmación no manda un correo duplicado
     }
 
     public function test_el_navegador_no_puede_cambiar_la_reserva(): void
@@ -117,6 +125,44 @@ class SolicitarReintegroTest extends TestCase
         $this->expectException(CannotUpdateLockedPropertyException::class);
 
         $this->abrirPantalla()->set('numeroReserva', '000122-3');
+    }
+
+    public function test_al_confirmar_se_encola_el_correo_de_falta_de_permisos_pedido_por_el_cliente(): void
+    {
+        $this->darAcceso();
+
+        $this->abrirPantalla()->call('confirmar')->assertSet('paso', 3);
+
+        Mail::assertQueued(NotificacionCliente::class, 1);
+        Mail::assertQueued(NotificacionCliente::class, fn ($mail) => $mail->hasTo('federico.rios@mail.com')
+            && $mail->tipo === TipoNotificacion::CancelacionFaltaPermisos
+            && $mail->datos['cancelada_por_vencimiento'] === false
+            && $mail->datos['devolucion'] !== null);
+    }
+
+    public function test_el_asunto_del_correo_informa_el_numero_de_reserva(): void
+    {
+        $this->darAcceso();
+
+        $this->abrirPantalla()->call('confirmar');
+
+        Mail::assertQueued(NotificacionCliente::class, fn ($mail) => $mail->envelope()->subject === 'Tu reserva 000125-9 fue cancelada por falta de permisos');
+    }
+
+    public function test_si_no_se_puede_encolar_el_correo_el_reintegro_igual_queda_registrado(): void
+    {
+        Log::spy();
+        Mail::shouldReceive('to')->once()->andThrow(new \RuntimeException('Cola caída'));
+        $this->darAcceso();
+
+        $this->abrirPantalla()
+            ->call('confirmar')
+            ->assertSet('paso', 3);
+
+        $reserva = $this->reserva->fresh();
+        $this->assertSame(EstadoReserva::Cancelada, $reserva->estado);
+        $this->assertSame(MotivoDevolucion::Reintegro, $reserva->devolucion->motivo);
+        Log::shouldHaveReceived('error')->once();
     }
 
     private function abrirPantalla()

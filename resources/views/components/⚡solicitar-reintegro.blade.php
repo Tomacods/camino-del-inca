@@ -1,12 +1,14 @@
 <?php
 
+use App\Enums\TipoNotificacion;
 use App\Models\Reserva;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new class extends Component
+new #[Title('Solicitar reintegro')] class extends Component
 {
     #[Locked]
     public string $correo = '';
@@ -47,6 +49,7 @@ new class extends Component
             // Se vuelve a calcular: si la reserva dejó de estar «Sin Permiso» entre un paso y otro, no se cancela
             $this->montoReintegro = $this->reserva->calcularReintegro();
             $this->reserva->ejecutarCancelacionConReintegro($this->montoReintegro, Carbon::now());
+            Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, $this->reserva->numero_reserva);
             $this->paso = 3;
         } catch (\Exception $e) {
             $this->mensajeError = $e->getMessage();
@@ -97,22 +100,27 @@ new class extends Component
                     <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Salida</dt><dd class="tabular-nums">{{ $this->reserva->excursion->getFechaSalida()->format('d/m/Y') }}</dd></div>
                     <div class="flex justify-between gap-4 py-3">
                         <dt class="font-semibold">Reintegro (100 %, sin penalidad)</dt>
-                        <dd class="font-semibold tabular-nums text-accion">USD {{ number_format($montoReintegro, 0, ',', '.') }}</dd>
+                        <dd class="font-semibold tabular-nums text-accion">USD {{ number_format($montoReintegro, 2, ',', '.') }}</dd>
                     </div>
                 </dl>
 
                 <x-aviso class="mt-5">La reserva se cancela y los lugares se liberan. No se puede deshacer.</x-aviso>
 
                 <div class="mt-5 flex flex-wrap gap-3">
-                    <x-boton wire:click="confirmar">Confirmar reintegro</x-boton>
+                    {{-- Mientras se procesa queda deshabilitado, para que no se confirme dos veces. --}}
+                    <x-boton wire:click="confirmar" wire:loading.attr="disabled" wire:target="confirmar">
+                        <span wire:loading.remove wire:target="confirmar">Confirmar reintegro</span>
+                        <span wire:loading wire:target="confirmar">Registrando el reintegro…</span>
+                    </x-boton>
                     <x-boton variante="secundario" wire:click="cancelarOperacion">Volver</x-boton>
                 </div>
             </x-tarjeta>
         @endif
 
         @if ($paso === 3)
-            <x-aviso titulo="Reserva cancelada con reintegro del 100 %">
-                Registramos el reintegro de USD {{ number_format($montoReintegro, 0, ',', '.') }}.
+            {{-- Recibe el foco al aparecer, para que el lector de pantalla anuncie cómo terminó la operación. --}}
+            <x-aviso titulo="Reserva cancelada con reintegro del 100 %" tabindex="-1" x-init="$el.focus()">
+                Registramos el reintegro de USD {{ number_format($montoReintegro, 2, ',', '.') }}.
             </x-aviso>
 
             <div>

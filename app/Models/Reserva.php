@@ -343,11 +343,12 @@ class Reserva extends Model
         ];
     }
 
-    // Pública porque también la va a necesitar la cancelación por falta de pago (CU-22). La fecha límite vence a las
-    // 23:59:59 de ese día, como la guardan los seeders y fijarFechasLimite(): hasta ese segundo, todavía se puede pagar.
-    public function verificarFechaLimiteSaldo(): bool
+    // Pública porque también la usa la cancelación por falta de pago (CU-22), que le pasa la hora de la verificación;
+    // CU-16 la llama sin hora y compara con la actual. La fecha límite vence a las 23:59:59 de ese día, como la guardan
+    // los seeders y fijarFechasLimite(): hasta ese segundo, todavía se puede pagar.
+    public function verificarFechaLimiteSaldo(?Carbon $fecha_hora = null): bool
     {
-        return $this->fecha_limite_saldo !== null && now()->lessThanOrEqualTo($this->fecha_limite_saldo);
+        return $this->fecha_limite_saldo !== null && ($fecha_hora ?? now())->lessThanOrEqualTo($this->fecha_limite_saldo);
     }
 
     // Paso 10 (actualizarReserva del DS-16): el saldo pasa a «Abonado». setEstadoSaldo del DS-16 es esta asignación. El
@@ -357,6 +358,89 @@ class Reserva extends Model
     {
         $this->estado_saldo = EstadoSaldo::Abonado;
         $this->save();
+    }
+
+    /* --------------------- CU-22 Cancelar por falta de pago ------------------- */
+
+    // El mensaje del Temporizador (DS-22), pasos 1 a 5. Cada reserva se cancela y se notifica por separado: si una falla,
+    // se anota en el registro y se sigue con las demás; la que falló vuelve a aparecer en la próxima verificación. El
+    // correo se pide después de guardar y fuera de la transacción, como en CU-21; si falla, notificarCliente() lo anota
+    // y la cancelación queda igual (A8 de CU-13). Devuelve cuántas reservas canceló: 0 en A1. La hora que recibe vale
+    // para todo el recorrido: con ella se buscan las reservas y se vuelve a comprobar cada una.
+    public static function verificarVencimientosDePago(Carbon $fecha_hora_actual): int
+    {
+        $canceladas = 0;
+
+        foreach (self::buscarSaldosVencidos($fecha_hora_actual) as $reserva) {
+            try {
+                if (! $reserva->ejecutarCancelacionSinDevolucion($fecha_hora_actual)) {
+                    continue;
+                }
+            } catch (Throwable $excepcion) {
+                Log::error('No se pudo cancelar por falta de pago la reserva '.$reserva->numero_reserva.': '.$excepcion->getMessage());
+
+                continue;
+            }
+
+            $canceladas++;
+            self::notificarCliente(TipoNotificacion::CancelacionFaltaPago, $reserva->numero_reserva);
+        }
+
+        return $canceladas;
+    }
+
+    // Paso 2. Es la regla de tieneSaldoVencido() escrita en SQL: vencida es anterior a la hora recibida, así que a las
+    // 23:59:59 del día límite todavía no aparece y a las 00:00:00 del día siguiente, sí. Una fecha nula no cumple el «<».
+    // Laravel pasa la hora como «Y-m-d H:i:s», sin fracciones de segundo, igual en PostgreSQL que en SQLite: nunca toma
+    // una reserva antes que verificarFechaLimiteSaldo(). Hay que filtrar por estado_saldo porque fecha_limite_saldo no se
+    // borra al pagar el saldo (actualizarReserva()).
+    public static function buscarSaldosVencidos(Carbon $fecha_hora_actual): Collection
+    {
+        return self::where('estado', EstadoReserva::Confirmada)
+            ->where('estado_saldo', EstadoSaldo::Adeudado)
+            ->where('fecha_limite_saldo', '<', $fecha_hora_actual)
+            ->orderBy('id_reserva')
+            ->get();
+    }
+
+    // Pasos 3 y 4: pasa a «Cancelada» sin registrar devolución (la seña no se reembolsa). El cupo no se toca: una reserva
+    // cancelada deja de contar en Excursion::sumarPlazasReservadas(). Se vuelve a leer la reserva con su fila bloqueada,
+    // como en Pago::registrarPagoSaldo(), que bloquea la misma: si el cliente paga el saldo mientras tanto, una de las
+    // dos espera a la otra. Por eso todo se comprueba de nuevo adentro, con la misma hora con la que se buscó; si ya no
+    // corresponde (pagó, se canceló o la canceló otra verificación que corría a la vez), no hace nada. Devuelve si la
+    // canceló.
+    //
+    // Cruce con CU-16: el cobro del saldo en Mercado Pago vence, como tarde, con la fecha límite, pero el pago se
+    // registra recién cuando el cliente vuelve al sitio. Si pagó a último momento y vuelve después de esta cancelación,
+    // registrarPagoSaldo() ya no lo registra y la devolución es manual, con la agencia, como en el cruce de CU-20
+    // (decisión del grupo del 13/09).
+    public function ejecutarCancelacionSinDevolucion(Carbon $fecha_hora_actual): bool
+    {
+        $cancelada = DB::transaction(function () use ($fecha_hora_actual) {
+            $actual = self::lockForUpdate()->find($this->id_reserva);
+
+            if ($actual === null || ! $actual->tieneSaldoVencido($fecha_hora_actual)) {
+                return false;
+            }
+
+            $actual->estado = EstadoReserva::Cancelada;
+            $actual->save();
+
+            return true;
+        });
+
+        $this->refresh();
+
+        return $cancelada;
+    }
+
+    // La condición de CU-22 para una reserva ya leída, a la hora de la verificación. La fecha la decide
+    // verificarFechaLimiteSaldo(), la misma regla que usa CU-16 para no dejar pagar.
+    private function tieneSaldoVencido(Carbon $fecha_hora_actual): bool
+    {
+        return $this->validarEstado([EstadoReserva::Confirmada])
+            && $this->estado_saldo === EstadoSaldo::Adeudado
+            && ! $this->verificarFechaLimiteSaldo($fecha_hora_actual);
     }
 
     /* ------------------------- CU-04 Validar permisos ------------------------- */
@@ -472,6 +556,20 @@ class Reserva extends Model
             throw new DomainException('El plazo para confirmar los permisos de la reserva '.$this->numero_reserva.' venció el '
                 .$this->fecha_limite_confirmacion->format('d/m/Y').': ya no admite validación de permisos.');
         }
+    }
+
+    /* -------------------------- CU-12 Reportar etapa -------------------------- */
+
+    // A2 4.3. Sólo termina el viaje una reserva «Confirmada»: las demás no viajaron. Lo controla también acá, y no sólo
+    // la excursión que elige las confirmadas, para que una reserva cancelada nunca pase a «Finalizada».
+    public function finalizarReserva(): void
+    {
+        if (! $this->validarEstado([EstadoReserva::Confirmada])) {
+            throw new DomainException('La reserva '.$this->numero_reserva.' está en «'.$this->estado->value.'»: sólo se finaliza una reserva «Confirmada».');
+        }
+
+        $this->estado = EstadoReserva::Finalizada;
+        $this->save();
     }
 
     /* ----------------------------- CU-21 Cancelar ----------------------------- */
@@ -605,7 +703,7 @@ class Reserva extends Model
         return $this->excursionistas->count();
     }
 
-    // Solo calcula: no asigna ni guarda. Lo usan fijarFechasLimite y el resumen de CU-20.
+    // Solo calcula: no asigna ni guarda. Lo usan fijarFechasLimite y los resúmenes de CU-19 y CU-20.
     public static function calcularFechaLimite($fechaSalida): Carbon
     {
         return Carbon::parse($fechaSalida)
@@ -613,10 +711,8 @@ class Reserva extends Model
             ->endOfDay();
     }
 
-    public function elegirExcursionDestino(Carbon $fechaElegida): array
+    private function armarResumenCambio(Collection $habilitadas, Carbon $fechaElegida): array
     {
-        $habilitadas = $this->iniciarModificacion();
-
         $destino = $habilitadas->first(
             fn ($excursion) => $excursion->fecha_salida->isSameDay($fechaElegida)
         );
@@ -635,6 +731,11 @@ class Reserva extends Model
         ];
     }
 
+    public function elegirExcursionDestino(Carbon $fechaElegida): array
+    {
+        return $this->armarResumenCambio($this->iniciarModificacion(), $fechaElegida);
+    }
+
     private function cambiarExcursion(Excursion $destino): void
     {
         $this->excursion()->associate($destino);
@@ -647,16 +748,20 @@ class Reserva extends Model
     // Cruce con CU-16: R-16 sólo cobra el saldo con la reserva «Confirmada». Si el cliente modifica con un cobro abierto
     // en Mercado Pago, ese pago queda sin registrar y la devolución es manual, con la agencia (decisión del grupo del
     // 13/09). No se bloquea la modificación porque la base no tiene dónde guardar el cobro abierto.
-    public function modificarExcursion(Excursion $destino): void
+    private function cambiarDeExcursionPendiente(EstadoReserva $estado, string $mensaje, Excursion $destino): void
     {
-        DB::transaction(function () use ($destino) {
+        DB::transaction(function () use ($destino, $estado, $mensaje) {
             $actual = self::with('excursionistas')->lockForUpdate()->findOrFail($this->id_reserva);
 
-            if (! $actual->validarEstado([EstadoReserva::Confirmada])) {
-                throw new DomainException('La reserva no admite modificación.');
+            if (! $actual->validarEstado([$estado])) {
+                throw new DomainException($mensaje);
             }
 
             $destino = Excursion::lockForUpdate()->findOrFail($destino->id_excursion);
+
+            if (! $destino->cumpleAnticipacionMinima(now())) {
+                throw new DomainException('La excursión elegida ya no cumple la anticipación mínima.');
+            }
 
             if (! $destino->tieneCupoPara($actual->getCantidadExcursionistas())) {
                 throw new DomainException('La excursión elegida ya no tiene lugar.');
@@ -675,6 +780,44 @@ class Reserva extends Model
 
         // Quien la llamó (la pantalla) ve la reserva como quedó.
         $this->refresh();
+    }
+
+    public function modificarExcursion(Excursion $destino): void
+    {
+        $this->cambiarDeExcursionPendiente(
+            EstadoReserva::Confirmada,
+            'La reserva no admite modificación.',
+            $destino
+        );
+    }
+
+    /* ----------------------------- CU-19 Solicitar Reprogramación Por Falta de Permisos ---------------------------- */
+
+    public function iniciarReprogramacion(): Collection
+    {
+        if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
+            throw new DomainException('La reserva no admite reprogramación.');
+        }
+
+        return Excursion::buscarOtrasDelPaquete(
+            $this->excursion->id_paquete,
+            $this->excursion->fecha_salida,
+            $this->getCantidadExcursionistas()
+        );
+    }
+
+    public function elegirDestino(Carbon $fechaElegida): array
+    {
+        return $this->armarResumenCambio($this->iniciarReprogramacion(), $fechaElegida);
+    }
+
+    public function reprogramar(Excursion $destino): void
+    {
+        $this->cambiarDeExcursionPendiente(
+            EstadoReserva::SinPermiso,
+            'La reserva no admite reprogramación.',
+            $destino
+        );
     }
 
     /* ------------------------- CU-13 Notificar cliente ------------------------ */

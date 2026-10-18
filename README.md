@@ -70,12 +70,13 @@ Después:
    Son sólo para probar en tu PC. No hace falta crear usuarios a mano: `php artisan make:filament-user` no sirve, porque
    la tabla `usuario` no tiene las columnas que usa Filament por defecto.
 
-5. Levantar la aplicación, en tres ventanas de Git Bash:
+5. Levantar la aplicación, en cuatro ventanas de Git Bash:
 
    ```bash
-   php artisan serve        # http://127.0.0.1:8000   (panel: http://127.0.0.1:8000/admin)
-   npm run dev              # recompila los estilos mientras se trabaja
-   php artisan queue:work   # corre las tareas de la cola
+   php artisan serve           # http://127.0.0.1:8000   (panel: http://127.0.0.1:8000/admin)
+   npm run dev                 # recompila los estilos mientras se trabaja
+   php artisan queue:work      # corre las tareas de la cola
+   php artisan schedule:work   # corre las tareas programadas: CU-22
    ```
 
    El sitio se abre en `http://127.0.0.1:8000` y no en `localhost:8000`: en Windows, `localhost` apunta primero a la
@@ -84,6 +85,9 @@ Después:
    Sin `php artisan queue:work`, las retenciones de cupo que el cliente abandona no se liberan: las plazas quedan
    retenidas hasta que se levante la cola. Si cambiás el código de una tarea (`app/Jobs`), cortá `queue:work` con
    Ctrl+C y volvé a levantarlo, porque guarda el código en memoria.
+
+   Sin `php artisan schedule:work`, las reservas confirmadas que no pagaron el saldo a tiempo nunca se cancelan (CU-22).
+   Para probarlo sin esperar a las 00:05, se corre a mano `php artisan reservas:cancelar-por-falta-de-pago`.
 
 Si al abrir el sitio aparece *Connection refused* en el puerto 5432, PostgreSQL está detenido: ver
 [Problemas conocidos](docs/instalacion-windows.md#problemas-conocidos) en la guía de instalación.
@@ -116,8 +120,9 @@ resto del sistema funciona sin esto.
    que también tiene la lista para la presentación.
 3. Compilar los estilos una vez con `npm run build`, en lugar de dejar `npm run dev`: el servidor de Vite escucha en
    `localhost` y desde la dirección del túnel no se alcanza.
-4. Levantar `php artisan serve` y `php artisan queue:work` como siempre, y entrar **siempre por la dirección del túnel**,
-   no por `127.0.0.1:8000`: la reserva en curso queda en la sesión, y la sesión es de una sola dirección.
+4. Levantar `php artisan serve`, `php artisan queue:work` y `php artisan schedule:work` como siempre, y entrar
+   **siempre por la dirección del túnel**, no por `127.0.0.1:8000`: la reserva en curso queda en la sesión, y la sesión
+   es de una sola dirección.
 
 Para pagar se usa el comprador de prueba de la cuenta y las tarjetas de prueba de Mercado Pago: con el titular `APRO`
 el pago se aprueba; con `FUND` u `OTHE`, se rechaza. Mercado Pago cobra en pesos el equivalente de los dólares, con su

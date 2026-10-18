@@ -2,9 +2,10 @@
 
 use App\Models\Reserva;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new class extends Component
+new #[Title('Mi reserva')] class extends Component
 {
     public string $correo = '';
 
@@ -95,7 +96,8 @@ new class extends Component
     ];
 @endphp
 
-<div>
+{{-- «buscada» se pone en true cuando el cliente envía el formulario: sólo entonces el foco pasa a la reserva encontrada. --}}
+<div x-data="{ buscada: false }">
     {{-- 1. Acceso: banda con el título y el buscador montado encima --}}
     <section class="relative overflow-hidden rounded-[28px] bg-accion px-6 pt-10 pb-40 text-white sm:px-10 sm:pt-14">
         {{-- Cordillera y sendero punteado, dibujados a mano: no hay fotos todavía. Los picos van a la derecha, lejos del texto. --}}
@@ -117,7 +119,7 @@ new class extends Component
 
     <div class="relative -mt-20 px-3 sm:px-8">
         <x-tarjeta class="shadow-tarjeta-elevada">
-            <form wire:submit="consultarReserva" class="grid gap-5 md:grid-cols-[1fr_1fr_auto]">
+            <form wire:submit="consultarReserva" x-on:submit="buscada = true" class="grid gap-5 md:grid-cols-[1fr_1fr_auto]">
                 <x-campo nombre="correo" etiqueta="Correo electrónico" type="email" wire:model="correo"
                          placeholder="nombre@correo.com" autocomplete="email" />
                 <x-campo nombre="numeroReserva" etiqueta="Número de reserva" wire:model="numeroReserva"
@@ -144,7 +146,11 @@ new class extends Component
         <div class="mt-12 grid items-start gap-5 md:grid-cols-[1fr_320px]">
             <x-tarjeta>
                 <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
-                    <h2 class="text-2xl font-semibold">Reserva {{ $reserva->numero_reserva }}</h2>
+                    {{-- Al encontrar la reserva con el buscador, el título recibe el foco para que el lector de pantalla la
+                         anuncie. Al abrir Mi reserva con la reserva ya consultada no se mueve el foco. El wire:key hace que
+                         el título se dibuje de nuevo (y vuelva a tomar el foco) si se busca otra reserva. --}}
+                    <h2 wire:key="titulo-{{ $reserva->numero_reserva }}" class="text-2xl font-semibold" tabindex="-1"
+                        x-init="if (buscada) $el.focus()">Reserva {{ $reserva->numero_reserva }}</h2>
                     <x-chip-estado :estado="$reserva->estado" />
                 </div>
 
@@ -168,11 +174,11 @@ new class extends Component
 
                 <h3 class="mt-8 text-lg font-semibold">Pagos</h3>
                 <dl class="mt-1 divide-y divide-divisor text-[17px]">
-                    <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Monto total</dt><dd class="tabular-nums">USD {{ number_format($reserva->calcularMontoTotal(), 0, ',', '.') }}</dd></div>
+                    <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Monto total</dt><dd class="tabular-nums">USD {{ number_format($reserva->calcularMontoTotal(), 2, ',', '.') }}</dd></div>
                     <div class="flex justify-between gap-4 py-3">
                         <dt class="text-texto-secundario">Saldo</dt>
                         <dd class="text-right tabular-nums {{ $saldoPorPagar ? 'font-semibold text-ambar' : '' }}">
-                            {{ $reserva->estado_saldo->value }} · USD {{ number_format($reserva->calcularSaldoPendiente(), 0, ',', '.') }}
+                            {{ $reserva->estado_saldo->value }} · USD {{ number_format($reserva->calcularSaldoPendiente(), 2, ',', '.') }}
                         </dd>
                     </div>
                 </dl>
@@ -186,7 +192,7 @@ new class extends Component
                                     <span class="tabular-nums">{{ $pago->fecha->format('d/m/Y') }}</span> · {{ $pago->medio_pago }}
                                 </p>
                             </div>
-                            <p class="text-[17px] font-medium tabular-nums">USD {{ number_format($pago->monto, 0, ',', '.') }}</p>
+                            <p class="text-[17px] font-medium tabular-nums">USD {{ number_format($pago->monto, 2, ',', '.') }}</p>
                         </li>
                     @empty
                         <li class="rounded-xl bg-fondo px-4 py-3 text-[15px] text-texto-secundario">Todavía no hay pagos registrados.</li>
@@ -205,8 +211,10 @@ new class extends Component
                             <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/modificar">{{ $opcion }}</x-boton>
                         @elseif ($opcion === Reserva::OPCION_PAGAR_SALDO)
                             <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/pagar-saldo">{{ $opcion }}</x-boton>
+                        @elseif ($opcion === Reserva::OPCION_REPROGRAMAR)
+                            <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/reprogramar">{{ $opcion }}</x-boton>
                         @else
-                            {{-- Reprogramar y valorar todavía no tienen pantalla. --}}
+                            {{-- Valorar todavía no tiene pantalla. --}}
                             <x-boton disabled class="flex-col">
                                 {{ $opcion }}
                                 <span class="text-sm">Disponible próximamente</span>
