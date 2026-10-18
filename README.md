@@ -85,6 +85,21 @@ Después:
    retenidas hasta que se levante la cola. Si cambiás el código de una tarea (`app/Jobs`), cortá `queue:work` con
    Ctrl+C y volvé a levantarlo, porque guarda el código en memoria.
 
+   Las cancelaciones automáticas (actor Temporizador) las dispara el programador de tareas de Laravel. Para probarlas
+   con su horario, levantarlo en una cuarta ventana:
+
+   ```bash
+   php artisan schedule:work   # revisa cada minuto si toca alguna tarea programada
+   php artisan schedule:list   # muestra las tareas programadas y cuándo corre cada una
+   ```
+
+   Sin esperar a la hora, cada cancelación se corre a mano. Cancela lo que esté vencido en ese momento, en la base de
+   tu PC; los correos salen con `queue:work`, como los demás:
+
+   ```bash
+   php artisan reservas:cancelar-por-falta-de-confirmacion   # CU-26: todos los días a las 00:05
+   ```
+
 Si al abrir el sitio aparece *Connection refused* en el puerto 5432, PostgreSQL está detenido: ver
 [Problemas conocidos](docs/instalacion-windows.md#problemas-conocidos) en la guía de instalación.
 
