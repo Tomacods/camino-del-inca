@@ -106,4 +106,19 @@ return [
 
     'porcentaje_reembolso' => 0.50,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Hora de la verificación de confirmaciones vencidas
+    |--------------------------------------------------------------------------
+    |
+    | Hora del día (HH:MM) en que el Temporizador cancela, con reintegro del
+    | 100 %, las reservas «Pendiente» o «Sin Permiso» cuya fecha límite de
+    | confirmación venció. La fecha vence a las 23:59:59, así que corre apenas
+    | pasada la medianoche (CU-26 Cancelar Reserva por Falta de Confirmación
+    | de Permisos).
+    |
+    */
+
+    'hora_verificacion_confirmaciones_vencidas' => '00:05',
+
 ];
