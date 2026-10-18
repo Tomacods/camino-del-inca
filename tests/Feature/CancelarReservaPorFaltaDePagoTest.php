@@ -21,6 +21,7 @@ use App\Models\Usuario;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -113,20 +114,41 @@ class CancelarReservaPorFaltaDePagoTest extends TestCase
         $this->assertSame(EstadoReserva::Cancelada, $reserva->fresh()->estado);
     }
 
-    // La consulta del paso 2 da lo mismo que verificarFechaLimiteSaldo(), la regla de CU-16.
+    // La consulta del paso 2 da lo mismo que verificarFechaLimiteSaldo(), la regla de CU-16, con la misma hora.
     public function test_la_busqueda_coincide_con_la_regla_de_la_fecha_limite(): void
     {
         $reserva = $this->crearReserva('000125-9');
 
         foreach (['2026-11-28 00:00:00', self::FECHA_LIMITE_SALDO, self::VENCIDA, '2026-12-15 10:00:00'] as $momento) {
-            $this->travelTo($momento);
+            $hora = Carbon::parse($momento);
 
             $this->assertSame(
-                ! $reserva->verificarFechaLimiteSaldo(),
-                Reserva::buscarSaldosVencidos(now())->contains('id_reserva', $reserva->id_reserva),
+                ! $reserva->verificarFechaLimiteSaldo($hora),
+                Reserva::buscarSaldosVencidos($hora)->contains('id_reserva', $reserva->id_reserva),
                 'A las '.$momento,
             );
         }
+    }
+
+    /* ------------------------- Hora de la verificación ------------------------ */
+
+    // La hora que recibe verificarVencimientosDePago() decide en todo el recorrido: al buscar y al volver a comprobar
+    // la reserva con la fila bloqueada. La del reloj no cuenta.
+    public function test_la_verificacion_usa_la_hora_que_recibe_y_no_la_del_reloj(): void
+    {
+        Mail::fake();
+        $reserva = $this->crearReserva('000125-9');
+
+        // Con el reloj después del vencimiento y una hora anterior, no la cancela.
+        $this->travelTo(self::VENCIDA);
+        $this->assertSame(0, Reserva::verificarVencimientosDePago(Carbon::parse(self::FECHA_LIMITE_SALDO)));
+        $this->assertSame(EstadoReserva::Confirmada, $reserva->fresh()->estado);
+
+        // Con el reloj antes del vencimiento y una hora posterior, la cancela.
+        $this->travelTo(self::FECHA_LIMITE_SALDO);
+        $this->assertSame(1, Reserva::verificarVencimientosDePago(Carbon::parse(self::VENCIDA)));
+        $this->assertSame(EstadoReserva::Cancelada, $reserva->fresh()->estado);
+        Mail::assertQueued(NotificacionCliente::class, 1);
     }
 
     /* ------------------------------ No cancela -------------------------------- */
@@ -240,7 +262,7 @@ class CancelarReservaPorFaltaDePagoTest extends TestCase
 
         Reserva::whereKey($leida->id_reserva)->update($cambio);
 
-        $this->assertFalse($leida->ejecutarCancelacionSinDevolucion());
+        $this->assertFalse($leida->ejecutarCancelacionSinDevolucion(now()));
         $this->assertSame($estadoFinal, $leida->fresh()->estado);
         $this->assertSame($saldoFinal, $leida->fresh()->estado_saldo);
     }
