@@ -406,6 +406,11 @@ class Reserva extends Model
     // como en Pago::registrarPagoSaldo(), que bloquea la misma: si el cliente paga el saldo mientras tanto, una de las
     // dos espera a la otra. Por eso todo se comprueba de nuevo adentro; si ya no corresponde (pagó, se canceló o la
     // canceló otra verificación que corría a la vez), no hace nada. Devuelve si la canceló.
+    //
+    // Cruce con CU-16: el cobro del saldo en Mercado Pago vence, como tarde, con la fecha límite, pero el pago se
+    // registra recién cuando el cliente vuelve al sitio. Si pagó a último momento y vuelve después de esta cancelación,
+    // registrarPagoSaldo() ya no lo registra y la devolución es manual, con la agencia, como en el cruce de CU-20
+    // (decisión del grupo del 13/09).
     public function ejecutarCancelacionSinDevolucion(): bool
     {
         $cancelada = DB::transaction(function () {
