@@ -255,10 +255,14 @@ class Excursion extends Model
             ->get();
     }
 
-    // Búsqueda por fecha: si el paquete tiene una salida disponible ese día.
+    // Búsqueda por fecha: si el paquete tiene una salida disponible ese día, es decir, futura y con cupo. Busca sólo esa
+    // salida, sin recalcular el cupo de las demás.
     public static function tieneFechaSalida(int $idPaquete, Carbon $fecha): bool
     {
-        return self::getExcursionesDisponibles($idPaquete)
-            ->contains(fn (Excursion $excursion) => $excursion->getFechaSalida()->isSameDay($fecha));
+        $excursion = self::buscarPorFechaSalida($idPaquete, $fecha->format('Y-m-d'));
+
+        return $excursion !== null
+            && $excursion->getFechaSalida()->isAfter(today())
+            && $excursion->obtenerCupoDisponible() > 0;
     }
 }
