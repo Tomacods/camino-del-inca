@@ -359,6 +359,82 @@ class Reserva extends Model
         $this->save();
     }
 
+    /* --------------------- CU-22 Cancelar por falta de pago ------------------- */
+
+    // El mensaje del Temporizador (DS-22), pasos 1 a 5. Cada reserva se cancela y se notifica por separado: si una falla,
+    // se anota en el registro y se sigue con las demás; la que falló vuelve a aparecer en la próxima verificación. El
+    // correo se pide después de guardar y fuera de la transacción, como en CU-21; si falla, notificarCliente() lo anota
+    // y la cancelación queda igual (A8 de CU-13). Devuelve cuántas reservas canceló: 0 en A1.
+    public static function verificarVencimientosDePago(Carbon $fecha_hora_actual): int
+    {
+        $canceladas = 0;
+
+        foreach (self::buscarSaldosVencidos($fecha_hora_actual) as $reserva) {
+            try {
+                if (! $reserva->ejecutarCancelacionSinDevolucion()) {
+                    continue;
+                }
+            } catch (Throwable $excepcion) {
+                Log::error('No se pudo cancelar por falta de pago la reserva '.$reserva->numero_reserva.': '.$excepcion->getMessage());
+
+                continue;
+            }
+
+            $canceladas++;
+            self::notificarCliente(TipoNotificacion::CancelacionFaltaPago, $reserva->numero_reserva);
+        }
+
+        return $canceladas;
+    }
+
+    // Paso 2. Es la regla de tieneSaldoVencido() escrita en SQL: vencida es anterior a la hora actual, así que a las
+    // 23:59:59 del día límite todavía no aparece y a las 00:00:00 del día siguiente, sí. Una fecha nula no cumple el «<».
+    // Laravel pasa la hora como «Y-m-d H:i:s», sin fracciones de segundo, igual en PostgreSQL que en SQLite: nunca toma
+    // una reserva antes que verificarFechaLimiteSaldo(). Hay que filtrar por estado_saldo porque fecha_limite_saldo no se
+    // borra al pagar el saldo (actualizarReserva()).
+    public static function buscarSaldosVencidos(Carbon $fecha_hora_actual): Collection
+    {
+        return self::where('estado', EstadoReserva::Confirmada)
+            ->where('estado_saldo', EstadoSaldo::Adeudado)
+            ->where('fecha_limite_saldo', '<', $fecha_hora_actual)
+            ->orderBy('id_reserva')
+            ->get();
+    }
+
+    // Pasos 3 y 4: pasa a «Cancelada» sin registrar devolución (la seña no se reembolsa). El cupo no se toca: una reserva
+    // cancelada deja de contar en Excursion::sumarPlazasReservadas(). Se vuelve a leer la reserva con su fila bloqueada,
+    // como en Pago::registrarPagoSaldo(), que bloquea la misma: si el cliente paga el saldo mientras tanto, una de las
+    // dos espera a la otra. Por eso todo se comprueba de nuevo adentro; si ya no corresponde (pagó, se canceló o la
+    // canceló otra verificación que corría a la vez), no hace nada. Devuelve si la canceló.
+    public function ejecutarCancelacionSinDevolucion(): bool
+    {
+        $cancelada = DB::transaction(function () {
+            $actual = self::lockForUpdate()->find($this->id_reserva);
+
+            if ($actual === null || ! $actual->tieneSaldoVencido()) {
+                return false;
+            }
+
+            $actual->estado = EstadoReserva::Cancelada;
+            $actual->save();
+
+            return true;
+        });
+
+        $this->refresh();
+
+        return $cancelada;
+    }
+
+    // La condición de CU-22 para una reserva ya leída. La fecha la decide verificarFechaLimiteSaldo(), la misma regla que
+    // usa CU-16 para no dejar pagar.
+    private function tieneSaldoVencido(): bool
+    {
+        return $this->validarEstado([EstadoReserva::Confirmada])
+            && $this->estado_saldo === EstadoSaldo::Adeudado
+            && ! $this->verificarFechaLimiteSaldo();
+    }
+
     /* ------------------------- CU-04 Validar permisos ------------------------- */
 
     public static function buscarReserva(string $numeroReserva): ?self
