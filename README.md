@@ -88,10 +88,10 @@ Después:
 
    Sin `php artisan schedule:work`, las cancelaciones automáticas (actor Temporizador) nunca se hacen: ni las de las
    reservas confirmadas que no pagaron el saldo a tiempo (CU-22) ni las de las pendientes o sin permiso cuya fecha
-   límite de confirmación venció (CU-26). `php artisan schedule:list` muestra las tareas programadas y cuándo corre cada
-   una.
+   límite de confirmación venció (CU-26). CU-22 corre a las 00:05, y CU-26, a los 5 minutos de cada hora.
+   `php artisan schedule:list` muestra las tareas programadas y cuándo corre cada una.
 
-   Para probarlas sin esperar a las 00:05, se corren a mano. Cancelan lo que esté vencido en ese momento, en la base de
+   Para probarlas sin esperar, se corren a mano. Cancelan lo que esté vencido en ese momento, en la base de
    tu PC; los correos salen con `queue:work`, como los demás:
 
    ```bash

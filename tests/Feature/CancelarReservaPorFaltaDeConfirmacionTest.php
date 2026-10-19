@@ -97,6 +97,23 @@ class CancelarReservaPorFaltaDeConfirmacionTest extends TestCase
         $this->assertSame(EstadoReserva::Cancelada, $reserva->fresh()->estado);
     }
 
+    // Una «Sin Permiso» con el plazo de 72 horas (CU-04 lo fijó a las 15:30) se cancela en la primera corrida después de
+    // ese segundo, y no a la medianoche.
+    public function test_el_plazo_de_72_horas_se_cancela_en_la_corrida_de_la_hora_siguiente(): void
+    {
+        Mail::fake();
+        $reserva = $this->crearReserva('000123-5', EstadoReserva::SinPermiso);
+        $reserva->update(['fecha_limite_confirmacion' => '2027-01-04 15:30:00']);
+
+        $this->travelTo(Carbon::parse('2027-01-04 15:05:00'));
+        $this->assertSame(0, Reserva::verificarVencimientosDePermisos(now()));
+        $this->assertSame(EstadoReserva::SinPermiso, $reserva->fresh()->estado);
+
+        $this->travelTo(Carbon::parse('2027-01-04 16:05:00'));
+        $this->assertSame(1, Reserva::verificarVencimientosDePermisos(now()));
+        $this->assertSame(EstadoReserva::Cancelada, $reserva->fresh()->estado);
+    }
+
     public function test_las_reservas_confirmadas_canceladas_o_finalizadas_no_se_tocan(): void
     {
         Mail::fake();
@@ -225,14 +242,16 @@ class CancelarReservaPorFaltaDeConfirmacionTest extends TestCase
             ->assertSuccessful();
     }
 
-    public function test_el_comando_esta_en_el_schedule_una_vez_por_dia_sin_superponerse(): void
+    // Cada hora, a los 5 minutos: el plazo de 72 horas de una reserva que pasó a «Sin Permiso» el último día puede vencer
+    // a cualquier hora.
+    public function test_el_comando_esta_en_el_schedule_cada_hora_sin_superponerse(): void
     {
         Mail::fake();
         $evento = collect(app(Schedule::class)->events())
             ->first(fn ($evento) => str_contains($evento->command, 'reservas:cancelar-por-falta-de-confirmacion'));
 
         $this->assertNotNull($evento);
-        $this->assertSame('5 0 * * *', $evento->expression);
+        $this->assertSame('5 * * * *', $evento->expression);
         $this->assertTrue($evento->withoutOverlapping);
     }
 
