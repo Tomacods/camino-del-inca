@@ -95,7 +95,7 @@
                         <li>{{ $integrante }}</li>
                     @endforeach
                 </ul>
-                <p style="margin:0 0 8px">Por eso tu reserva completa pasó a <strong>«{{ $reserva['estado']->value }}»</strong>. Hasta el <strong>{{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }}</strong> podés elegir, desde Mi reserva, una de estas opciones:</p>
+                <p style="margin:0 0 8px">Por eso tu reserva completa pasó a <strong>«{{ $reserva['estado']->value }}»</strong>. Hasta el <strong>{{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }} a las {{ $reserva['fecha_limite_confirmacion']->format('H:i') }}</strong> podés elegir, desde Mi reserva, una de estas opciones:</p>
                 <ul style="margin:0 0 16px;padding-left:20px">
                     <li>Pedir el reintegro de todo lo abonado: {{ $dolares($datos['monto_reintegro']) }}.</li>
                     <li>Reprogramar la reserva para otra salida.</li>

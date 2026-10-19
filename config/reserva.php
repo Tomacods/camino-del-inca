@@ -122,17 +122,33 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Hora de la verificación de confirmaciones vencidas
+    | Plazo para optar de una reserva «Sin Permiso» del último día
     |--------------------------------------------------------------------------
     |
-    | Hora del día (HH:MM) en que el Temporizador cancela, con reintegro del
-    | 100 %, las reservas «Pendiente» o «Sin Permiso» cuya fecha límite de
-    | confirmación venció. La fecha vence a las 23:59:59, así que corre apenas
-    | pasada la medianoche (CU-26 Cancelar Reserva por Falta de Confirmación
-    | de Permisos).
+    | Si la reserva pasa a «Sin Permiso» con menos de un mes de anticipación,
+    | el plazo para elegir entre el reintegro y la reprogramación vence a estas
+    | horas de la notificación o el día anterior a la salida, lo que ocurra
+    | primero (CU-04 Validar Permisos de Reserva y CU-26 Cancelar Reserva por
+    | Falta de Confirmación de Permisos).
     |
     */
 
-    'hora_verificacion_confirmaciones_vencidas' => '00:05',
+    'horas_plazo_sin_permiso' => 72,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Minuto de la verificación de confirmaciones vencidas
+    |--------------------------------------------------------------------------
+    |
+    | Minuto de cada hora en que el Temporizador cancela, con reintegro del
+    | 100 %, las reservas «Pendiente» o «Sin Permiso» cuya fecha límite de
+    | confirmación venció. Corre cada hora y no una vez por día porque el plazo
+    | de 72 horas puede vencer a cualquier hora; las demás fechas vencen a las
+    | 23:59:59 y se cancelan a las 00:05 (CU-26 Cancelar Reserva por Falta de
+    | Confirmación de Permisos).
+    |
+    */
+
+    'minuto_verificacion_confirmaciones_vencidas' => 5,
 
 ];

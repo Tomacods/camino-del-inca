@@ -481,9 +481,10 @@ class Reserva extends Model
         return $this->excursionistas;
     }
 
-    // Vence a las 23:59:59 de ese día, como fecha_limite_saldo: hasta ese segundo, todavía se puede validar. Es el único
-    // lugar que dice cuándo vence el plazo: también lo usa la cancelación por falta de confirmación (CU-26), que le pasa
-    // la hora que recibe del Temporizador. CU-04 no la pasa y usa la actual.
+    // Vence a las 23:59:59 de ese día, como fecha_limite_saldo: hasta ese segundo, todavía se puede validar. Si la
+    // reserva pasó a «Sin Permiso» el último día, la fecha guardada es la de las 72 horas (fijarFechaLimiteSinPermiso()).
+    // Es el único lugar que dice cuándo vence el plazo: también lo usa la cancelación por falta de confirmación (CU-26),
+    // que le pasa la hora que recibe del Temporizador. CU-04 no la pasa y usa la actual.
     public function verificarFechaLimiteConfirmacion(?Carbon $fecha_hora = null): bool
     {
         return ($fecha_hora ?? now())->lessThanOrEqualTo($this->fecha_limite_confirmacion);
@@ -521,7 +522,33 @@ class Reserva extends Model
         }
 
         $this->estado = $this->todosLosPermisosObtenidos() ? EstadoReserva::Confirmada : EstadoReserva::SinPermiso;
+
+        if ($this->estado === EstadoReserva::SinPermiso) {
+            $this->fijarFechaLimiteSinPermiso(now());
+        }
+
         $this->save();
+    }
+
+    // Regla de CU-26: si la reserva pasa a «Sin Permiso» con menos de un mes de anticipación, el plazo para elegir entre
+    // el reintegro (CU-17) y la reprogramación (CU-19) vence a las 72 horas de la notificación o el día anterior a la
+    // salida, lo que ocurra primero. Como CU-04 no valida después de la fecha límite, sólo pasa si se valida el último
+    // día: sin esta regla, el cliente tendría hasta las 23:59:59 de ese mismo día. El correo sale apenas se guarda la
+    // validación (paso 6), así que se cuenta desde ahora. El plazo se guarda en fecha_limite_confirmacion, la fecha con
+    // la que CU-17 y CU-19 dejan de admitir el pedido y CU-26 cancela. Con un mes de anticipación, las 72 horas siempre
+    // llegan antes que el día anterior a la salida, pero se compara igual porque la regla lo dice.
+    private function fijarFechaLimiteSinPermiso(Carbon $fecha_hora): void
+    {
+        $fechaSalida = $this->excursion->getFechaSalida();
+        $unMesAntes = $fechaSalida->copy()->subMonthsNoOverflow(config('reserva.meses_anticipacion_fechas_limite'));
+
+        if ($fecha_hora->lessThanOrEqualTo($unMesAntes)) {
+            return;
+        }
+
+        $this->fecha_limite_confirmacion = $fecha_hora->copy()
+            ->addHours(config('reserva.horas_plazo_sin_permiso'))
+            ->min($fechaSalida->copy()->subDay()->endOfDay());
     }
 
     // Paso 6 y A1: el correo de Notificar Cliente (CU-13) que corresponde al resultado de la validación. Usa la misma
@@ -601,7 +628,8 @@ class Reserva extends Model
     }
 
     // Paso 2. La base trae las reservas de los dos estados y el vencimiento lo decide verificarFechaLimiteConfirmacion(),
-    // la misma regla con la que CU-04 deja de admitir la validación: vencida es después de las 23:59:59 del día límite.
+    // la misma regla con la que CU-04 deja de admitir la validación: vencida es después del segundo guardado en
+    // fecha_limite_confirmacion (las 23:59:59 del día límite, o las 72 horas de una «Sin Permiso» del último día).
     // Filtrar acá no pesa: son sólo las reservas que esperan la confirmación de los permisos.
     public static function buscarConfirmacionesVencidas(Carbon $fecha_hora_actual): Collection
     {
@@ -704,8 +732,9 @@ class Reserva extends Model
     // La regla del DS-17, la misma que admiteReprogramacion() de CU-19: se pide el reintegro sólo con la reserva «Sin
     // Permiso» y dentro de la fecha límite de confirmación; al vencer, la cancela CU-26. El plazo lo decide
     // verificarFechaLimiteConfirmacion(), así CU-17 y CU-19 cortan en el mismo segundo que CU-04 y CU-26: hasta las
-    // 23:59:59 del día límite todavía se puede, y desde las 00:00:00 del día siguiente ya no. También la usa
-    // getOpcionesHabilitadas() para ofrecer la opción en Mi reserva.
+    // 23:59:59 del día límite todavía se puede, y desde las 00:00:00 del día siguiente ya no (si pasó a «Sin Permiso» el
+    // último día, el plazo es de 72 horas: fijarFechaLimiteSinPermiso()). También la usa getOpcionesHabilitadas() para
+    // ofrecer la opción en Mi reserva.
     public function admiteReintegro(): bool
     {
         return $this->validarEstado([EstadoReserva::SinPermiso]) && $this->verificarFechaLimiteConfirmacion();
@@ -931,7 +960,8 @@ class Reserva extends Model
     // La regla del DS-19: se reprograma sólo una reserva «Sin Permiso» y dentro de la fecha límite de confirmación; al
     // vencer, la cancela CU-26. El plazo lo decide verificarFechaLimiteConfirmacion(), la misma que usan CU-04 para
     // validar y CU-26 para cancelar: hasta las 23:59:59 del día límite todavía se puede reprogramar, y desde las 00:00:00
-    // del día siguiente ya no. También la usa getOpcionesHabilitadas() para ofrecer la opción en Mi reserva.
+    // del día siguiente ya no (si pasó a «Sin Permiso» el último día, el plazo es de 72 horas:
+    // fijarFechaLimiteSinPermiso()). También la usa getOpcionesHabilitadas() para ofrecer la opción en Mi reserva.
     public function admiteReprogramacion(): bool
     {
         return $this->validarEstado([EstadoReserva::SinPermiso]) && $this->verificarFechaLimiteConfirmacion();
@@ -1065,7 +1095,7 @@ class Reserva extends Model
                 ->values()
                 ->all();
             // Lo que le devolvería CU-17 si elige el reintegro: todo lo abonado. No se llama a calcularReintegro(), que
-            // además controla el plazo: si CU-04 valida a las 23:59:59 del día límite, el correo igual tiene que salir.
+            // además controla el estado y el plazo: el correo sólo informa el monto.
             $datos['monto_reintegro'] = $montoAbonado;
         }
 

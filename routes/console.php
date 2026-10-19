@@ -21,9 +21,10 @@ Schedule::command(CancelarReservasPorFaltaDePago::class)
     ->dailyAt(config('reserva.hora_verificacion_saldos_vencidos'))
     ->withoutOverlapping();
 
-// CU-26. La fecha límite de confirmación vence a las 23:59:59: se verifica una vez por día, apenas pasada la medianoche.
-// Puede correr a la misma hora que CU-22 porque no se cruzan: CU-22 cancela reservas «Confirmada», y CU-26, «Pendiente»
-// o «Sin Permiso».
+// CU-26. Se verifica cada hora: la fecha límite de confirmación vence a las 23:59:59, salvo la de una reserva que pasó a
+// «Sin Permiso» el último día, que vence a las 72 horas de la notificación, a cualquier hora. Así una reserva se cancela
+// a lo sumo una hora después de vencer; las del día límite, a las 00:05. Puede correr a la misma hora que CU-22 porque
+// no se cruzan: CU-22 cancela reservas «Confirmada», y CU-26, «Pendiente» o «Sin Permiso».
 Schedule::command(CancelarReservasPorFaltaDeConfirmacion::class)
-    ->dailyAt(config('reserva.hora_verificacion_confirmaciones_vencidas'))
+    ->hourlyAt(config('reserva.minuto_verificacion_confirmaciones_vencidas'))
     ->withoutOverlapping();
