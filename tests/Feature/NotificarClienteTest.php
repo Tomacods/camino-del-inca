@@ -236,8 +236,7 @@ class NotificarClienteTest extends TestCase
     // La causa la dice quien cancela: CU-17 (el cliente pidió el reintegro) o CU-26 (venció la fecha límite de
     // confirmación). No se deduce de la fecha: aunque el cliente lo pida en el último segundo del plazo, el correo dice
     // que lo pidió él. Pasadas las 23:59:59 del 04/12/2026, CU-17 ya no admite el reintegro (SolicitarReintegroTest) y
-    // la cancela CU-26, que todavía no existe: se simula con ejecutarCancelacionConReintegro(), el método del modelo que
-    // comparten los dos, con todo lo abonado.
+    // la cancela CU-26.
     #[DataProvider('causasFaltaDePermisos')]
     public function test_cancelacion_por_falta_de_permisos_reintegra_todo_e_informa_la_causa(string $fecha, bool $canceladaPorVencimiento, string $causa, string $otraCausa): void
     {
@@ -246,7 +245,7 @@ class NotificarClienteTest extends TestCase
         $reserva = Reserva::buscarReserva('000123-5');
 
         if ($canceladaPorVencimiento) {
-            $reserva->ejecutarCancelacionConReintegro((float) $reserva->pagos->sum('monto'), now());
+            $this->assertTrue($reserva->ejecutarCancelacionPorVencimiento(now()));
         } else {
             $reserva->confirmarReintegro(now());
         }
@@ -270,6 +269,23 @@ class NotificarClienteTest extends TestCase
             'pedido del cliente en el último segundo del plazo' => ['2026-12-04 23:59:59', false, $pedido, $vencimiento],
             'vencimiento de la fecha límite (CU-26)' => ['2026-12-05 03:00:00', true, $vencimiento, $pedido],
         ];
+    }
+
+    // CU-26 también cancela reservas «Pendiente»: nunca tuvieron que elegir entre el reintegro y la reprogramación, y el
+    // correo dice que los permisos no llegaron a validarse. 000124-7 tiene los tres permisos sin registrar.
+    public function test_cancelacion_por_vencimiento_de_una_reserva_pendiente_dice_que_los_permisos_no_se_validaron(): void
+    {
+        Mail::fake();
+        $this->travelTo('2026-12-19 00:05:00');
+        $this->assertTrue(Reserva::buscarReserva('000124-7')->ejecutarCancelacionPorVencimiento(now()));
+
+        Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, '000124-7', canceladaPorVencimiento: true);
+
+        $correo = $this->correoEnviado(TipoNotificacion::CancelacionFaltaPermisos, 'lucia.fernandez@mail.com');
+        $correo->assertSeeInHtml('porque el 18/12/2026 venció el plazo para confirmar los permisos de ingreso y todavía no estaban validados.');
+        $correo->assertDontSeeInHtml('elegir entre el reintegro y la reprogramación');
+        $correo->assertDontSeeInHtml('porque pediste el reintegro');
+        $correo->assertSeeInHtml('Te reintegramos todo lo abonado: un reintegro de <strong>USD 1.350,00</strong>', false);
     }
 
     /* ----------------------------- Destinatario ------------------------------- */

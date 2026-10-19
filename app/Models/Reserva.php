@@ -56,6 +56,10 @@ class Reserva extends Model
 
     private const SEGUNDOS_ESPERA_CANDADO = 5;
 
+    // Las que todavía esperan la confirmación de los permisos (CU-26): «Pendiente», sin validar (CU-04), y «Sin Permiso»,
+    // sin reintegro (CU-17) ni reprogramación (CU-19). Si la fecha límite vence en uno de estos estados, se cancela.
+    private const ESTADOS_SIN_CONFIRMAR = [EstadoReserva::Pendiente, EstadoReserva::SinPermiso];
+
     protected $table = 'reserva';
 
     protected $primaryKey = 'id_reserva';
@@ -477,11 +481,12 @@ class Reserva extends Model
         return $this->excursionistas;
     }
 
-    // Pública porque también la va a necesitar la cancelación por falta de confirmación (CU-26). Vence a las 23:59:59 de
-    // ese día, como fecha_limite_saldo: hasta ese segundo, todavía se puede validar.
-    public function verificarFechaLimiteConfirmacion(): bool
+    // Vence a las 23:59:59 de ese día, como fecha_limite_saldo: hasta ese segundo, todavía se puede validar. Es el único
+    // lugar que dice cuándo vence el plazo: también lo usa la cancelación por falta de confirmación (CU-26), que le pasa
+    // la hora que recibe del Temporizador. CU-04 no la pasa y usa la actual.
+    public function verificarFechaLimiteConfirmacion(?Carbon $fecha_hora = null): bool
     {
-        return now()->lessThanOrEqualTo($this->fecha_limite_confirmacion);
+        return ($fecha_hora ?? now())->lessThanOrEqualTo($this->fecha_limite_confirmacion);
     }
 
     // Paso 3, para un integrante. Sólo asigna y guarda el permiso: la reserva cambia de estado en
@@ -564,6 +569,82 @@ class Reserva extends Model
             throw new DomainException('El plazo para confirmar los permisos de la reserva '.$this->numero_reserva.' venció el '
                 .$this->fecha_limite_confirmacion->format('d/m/Y').': ya no admite validación de permisos.');
         }
+    }
+
+    /* ---------------- CU-26 Cancelar por falta de confirmación ---------------- */
+
+    // El mensaje del Temporizador (DS-26), pasos 1 a 5. Cada reserva se cancela y se notifica por separado: si una falla,
+    // se anota en el registro con su número y se sigue con las demás; la que falló vuelve a aparecer en la próxima
+    // verificación. El correo se pide después de guardar y fuera de la transacción, como en CU-17; si falla,
+    // notificarCliente() lo anota y la cancelación queda igual (A8 de CU-13). Devuelve cuántas canceló: 0 en A1.
+    public static function verificarVencimientosDePermisos(Carbon $fecha_hora_actual): int
+    {
+        $canceladas = 0;
+
+        foreach (self::buscarConfirmacionesVencidas($fecha_hora_actual) as $reserva) {
+            try {
+                if (! $reserva->ejecutarCancelacionPorVencimiento($fecha_hora_actual)) {
+                    continue;
+                }
+            } catch (Throwable $excepcion) {
+                Log::error('No se pudo cancelar por falta de confirmación de permisos la reserva '.$reserva->numero_reserva.': '
+                    .$excepcion->getMessage());
+
+                continue;
+            }
+
+            $canceladas++;
+            self::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, $reserva->numero_reserva, true);
+        }
+
+        return $canceladas;
+    }
+
+    // Paso 2. La base trae las reservas de los dos estados y el vencimiento lo decide verificarFechaLimiteConfirmacion(),
+    // la misma regla con la que CU-04 deja de admitir la validación: vencida es después de las 23:59:59 del día límite.
+    // Filtrar acá no pesa: son sólo las reservas que esperan la confirmación de los permisos.
+    public static function buscarConfirmacionesVencidas(Carbon $fecha_hora_actual): Collection
+    {
+        return self::whereIn('estado', self::ESTADOS_SIN_CONFIRMAR)
+            ->orderBy('id_reserva')
+            ->get()
+            ->filter(fn (self $reserva) => $reserva->tieneConfirmacionVencida($fecha_hora_actual))
+            ->values();
+    }
+
+    // Pasos 3 y 4: el ejecutarCancelacionConReintegro() del DS-26. Se aparta del diagrama porque el de CU-17 recibe el
+    // monto ya calculado y su calcularReintegro() sólo acepta «Sin Permiso» (A1 de CU-17), y CU-26 también cancela
+    // «Pendiente». Para no aflojar ese control, este método tiene el suyo (tieneConfirmacionVencida()), calcula el 100 %
+    // de lo abonado con sumarPagos() y se lo pasa al de CU-17, que registra la devolución con motivo «Reintegro»
+    // (generarDevolucion) y pasa la reserva a «Cancelada» (setEstado). El cupo no se toca: una reserva cancelada deja de
+    // contar en Excursion::sumarPlazasReservadas().
+    // Se vuelve a leer la reserva con su fila bloqueada y se controla todo de nuevo adentro: si mientras tanto el cliente
+    // pidió el reintegro o la reprogramación, el administrador validó los permisos u otra verificación ya la canceló, no
+    // hace nada. Así, correr la tarea dos veces no registra dos devoluciones. Devuelve si la canceló.
+    public function ejecutarCancelacionPorVencimiento(Carbon $fecha_hora_actual): bool
+    {
+        $cancelada = DB::transaction(function () use ($fecha_hora_actual) {
+            $actual = self::lockForUpdate()->find($this->id_reserva);
+
+            if ($actual === null || ! $actual->tieneConfirmacionVencida($fecha_hora_actual)) {
+                return false;
+            }
+
+            $actual->ejecutarCancelacionConReintegro($actual->sumarPagos(), $fecha_hora_actual);
+
+            return true;
+        });
+
+        $this->refresh();
+
+        return $cancelada;
+    }
+
+    // La condición de CU-26 para una reserva ya leída.
+    private function tieneConfirmacionVencida(Carbon $fecha_hora_actual): bool
+    {
+        return $this->validarEstado(self::ESTADOS_SIN_CONFIRMAR)
+            && ! $this->verificarFechaLimiteConfirmacion($fecha_hora_actual);
     }
 
     /* -------------------------- CU-12 Reportar etapa -------------------------- */
@@ -991,6 +1072,12 @@ class Reserva extends Model
         if ($tipoNotificacion === TipoNotificacion::CancelacionFaltaPermisos) {
             $datos['devolucion'] = $this->devolucion?->getDatos();
             $datos['cancelada_por_vencimiento'] = $canceladaPorVencimiento;
+            // CU-26 también cancela reservas «Pendiente», que nunca tuvieron que elegir entre el reintegro y la
+            // reprogramación. La base no guarda el estado anterior a «Cancelada», pero sale de los permisos: CU-04 no saca
+            // a una reserva de «Pendiente» sin registrarlos todos, y CU-19 los vuelve a «Pendiente» junto con ella. Si
+            // queda alguno sin registrar, la reserva estaba «Pendiente».
+            $datos['permisos_sin_validar'] = $this->getExcursionistas()
+                ->contains(fn (Excursionista $excursionista) => $excursionista->estado_permiso === EstadoPermiso::Pendiente);
         }
 
         $this->enviarCorreo($this->correo_electronico, $this->armarMensaje($tipoNotificacion, $datos));
