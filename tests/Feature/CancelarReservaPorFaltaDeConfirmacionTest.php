@@ -61,7 +61,7 @@ class CancelarReservaPorFaltaDeConfirmacionTest extends TestCase
         $this->assertSame(MotivoDevolucion::Reintegro, $reserva->devolucion->motivo);
         $this->assertSame('750.00', $reserva->devolucion->monto);
         $this->assertSame('2027-01-02', $reserva->devolucion->fecha->toDateString());
-        $this->assertCorreoDeVencimiento('000124-7', 750, true);
+        $this->assertCorreoDeVencimiento('000124-7', 750);
     }
 
     // Con la seña y el saldo pagados: el reintegro es la suma de todos los pagos.
@@ -78,7 +78,7 @@ class CancelarReservaPorFaltaDeConfirmacionTest extends TestCase
         $this->assertSame(EstadoReserva::Cancelada, $reserva->estado);
         $this->assertSame(MotivoDevolucion::Reintegro, $reserva->devolucion->motivo);
         $this->assertSame('1650.00', $reserva->devolucion->monto);
-        $this->assertCorreoDeVencimiento('000123-5', 1650, false);
+        $this->assertCorreoDeVencimiento('000123-5', 1650);
     }
 
     // La fecha límite es inclusiva, como en CU-04: hasta las 23:59:59 todavía se pueden validar los permisos.
@@ -236,16 +236,14 @@ class CancelarReservaPorFaltaDeConfirmacionTest extends TestCase
         $this->assertTrue($evento->withoutOverlapping);
     }
 
-    // $permisosSinValidar: la reserva estaba «Pendiente», y el correo lo dice en lugar del plazo para elegir entre el
-    // reintegro y la reprogramación de «Sin Permiso».
-    private function assertCorreoDeVencimiento(string $numeroReserva, float $montoReintegro, bool $permisosSinValidar): void
+    // El correo es el mismo para una reserva «Pendiente» y para una «Sin Permiso»: el texto lo prueba NotificarClienteTest.
+    private function assertCorreoDeVencimiento(string $numeroReserva, float $montoReintegro): void
     {
         Mail::assertQueued(NotificacionCliente::class, 1);
         Mail::assertQueued(NotificacionCliente::class, fn ($mail) => $mail->hasTo('titular.'.$numeroReserva.'@mail.com')
             && $mail->tipo === TipoNotificacion::CancelacionFaltaPermisos
             && $mail->datos['reserva']['numero_reserva'] === $numeroReserva
             && $mail->datos['cancelada_por_vencimiento'] === true
-            && $mail->datos['permisos_sin_validar'] === $permisosSinValidar
             && $mail->datos['devolucion']['motivo'] === MotivoDevolucion::Reintegro
             && $mail->datos['devolucion']['monto'] === $montoReintegro);
     }
