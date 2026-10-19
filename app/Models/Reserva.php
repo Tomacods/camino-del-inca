@@ -11,6 +11,7 @@ use App\Enums\TipoPago;
 use App\Enums\TipoServicio;
 use App\Jobs\LiberarCupoRetenido;
 use App\Mail\NotificacionCliente;
+use Closure;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -282,7 +283,8 @@ class Reserva extends Model
     }
 
     // «Modificar reserva» se ofrece con la misma anticipación que exige iniciarModificacion() (CU-20): a menos de 3 meses
-    // de la salida, la pantalla de modificar la rechazaría.
+    // de la salida, la pantalla de modificar la rechazaría. «Solicitar reprogramación», con la misma regla que exige
+    // iniciarReprogramacion() (CU-19): con el plazo vencido, la pantalla de reprogramar la rechazaría.
     public function getOpcionesHabilitadas(): array
     {
         return $this->determinarOpciones(
@@ -290,6 +292,7 @@ class Reserva extends Model
             $this->estado_saldo,
             $this->tieneValoracion(),
             $this->excursion->cumpleAnticipacionMinima(now()),
+            $this->admiteReprogramacion(),
         );
     }
 
@@ -298,7 +301,7 @@ class Reserva extends Model
         return $this->valoracion()->exists();
     }
 
-    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion, bool $cumpleAnticipacionMinima): array
+    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion, bool $cumpleAnticipacionMinima, bool $admiteReprogramacion): array
     {
         return match ($estado) {
             EstadoReserva::Confirmada => array_values(array_filter([
@@ -307,7 +310,10 @@ class Reserva extends Model
                 self::OPCION_CANCELAR,
             ])),
             EstadoReserva::Pendiente => [self::OPCION_CANCELAR],
-            EstadoReserva::SinPermiso => [self::OPCION_REINTEGRO, self::OPCION_REPROGRAMAR],
+            EstadoReserva::SinPermiso => array_values(array_filter([
+                self::OPCION_REINTEGRO,
+                $admiteReprogramacion ? self::OPCION_REPROGRAMAR : null,
+            ])),
             EstadoReserva::Finalizada => $tieneValoracion ? [] : [self::OPCION_VALORAR],
             default => [], // Cancelada
         };
@@ -743,19 +749,19 @@ class Reserva extends Model
 
     // Todo se hace sobre $actual, la reserva leída con su fila bloqueada, y no sobre esta instancia, que la pantalla leyó
     // antes: si mientras tanto se registró el pago del saldo (Pago::registrarPagoSaldo(), que bloquea la misma fila) o se
-    // canceló la reserva, $this tiene el estado viejo y fijarFechasLimite() usaría un estado_saldo que ya no es.
+    // canceló la reserva, $this tiene el estado viejo y fijarFechasLimite() usaría un estado_saldo que ya no es. Por eso
+    // cada caso de uso le pasa su control ($verificarAdmite), que se hace sobre $actual y lanza DomainException si la
+    // reserva ya no admite el cambio: así no se toca nada.
     //
     // Cruce con CU-16: R-16 sólo cobra el saldo con la reserva «Confirmada». Si el cliente modifica con un cobro abierto
     // en Mercado Pago, ese pago queda sin registrar y la devolución es manual, con la agencia (decisión del grupo del
     // 13/09). No se bloquea la modificación porque la base no tiene dónde guardar el cobro abierto.
-    private function cambiarDeExcursionPendiente(EstadoReserva $estado, string $mensaje, Excursion $destino): void
+    private function cambiarDeExcursionPendiente(Closure $verificarAdmite, Excursion $destino): void
     {
-        DB::transaction(function () use ($destino, $estado, $mensaje) {
+        DB::transaction(function () use ($destino, $verificarAdmite) {
             $actual = self::with('excursionistas')->lockForUpdate()->findOrFail($this->id_reserva);
 
-            if (! $actual->validarEstado([$estado])) {
-                throw new DomainException($mensaje);
-            }
+            $verificarAdmite($actual);
 
             $destino = Excursion::lockForUpdate()->findOrFail($destino->id_excursion);
 
@@ -784,20 +790,27 @@ class Reserva extends Model
 
     public function modificarExcursion(Excursion $destino): void
     {
-        $this->cambiarDeExcursionPendiente(
-            EstadoReserva::Confirmada,
-            'La reserva no admite modificación.',
-            $destino
-        );
+        $this->cambiarDeExcursionPendiente(function (self $actual) {
+            if (! $actual->validarEstado([EstadoReserva::Confirmada])) {
+                throw new DomainException('La reserva no admite modificación.');
+            }
+        }, $destino);
     }
 
     /* ----------------------------- CU-19 Solicitar Reprogramación Por Falta de Permisos ---------------------------- */
 
+    // La regla del DS-19: se reprograma sólo una reserva «Sin Permiso» y dentro de la fecha límite de confirmación; al
+    // vencer, la cancela CU-26. El plazo lo decide verificarFechaLimiteConfirmacion(), la misma que usan CU-04 para
+    // validar y CU-26 para cancelar: hasta las 23:59:59 del día límite todavía se puede reprogramar, y desde las 00:00:00
+    // del día siguiente ya no. También la usa getOpcionesHabilitadas() para ofrecer la opción en Mi reserva.
+    public function admiteReprogramacion(): bool
+    {
+        return $this->validarEstado([EstadoReserva::SinPermiso]) && $this->verificarFechaLimiteConfirmacion();
+    }
+
     public function iniciarReprogramacion(): Collection
     {
-        if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
-            throw new DomainException('La reserva no admite reprogramación.');
-        }
+        $this->verificarAdmiteReprogramacion();
 
         return Excursion::buscarOtrasDelPaquete(
             $this->excursion->id_paquete,
@@ -811,13 +824,27 @@ class Reserva extends Model
         return $this->armarResumenCambio($this->iniciarReprogramacion(), $fechaElegida);
     }
 
+    // La regla se controla de nuevo al confirmar, sobre la reserva bloqueada: el plazo pudo vencer entre que el cliente
+    // eligió el destino y confirmó. Si venció, no se cambia nada (ni plazas, ni estado, ni permisos, ni fechas).
     public function reprogramar(Excursion $destino): void
     {
-        $this->cambiarDeExcursionPendiente(
-            EstadoReserva::SinPermiso,
-            'La reserva no admite reprogramación.',
-            $destino
-        );
+        $this->cambiarDeExcursionPendiente(fn (self $actual) => $actual->verificarAdmiteReprogramacion(), $destino);
+    }
+
+    // Si admiteReprogramacion() no se cumple, lanza DomainException con el aviso para el cliente, como
+    // verificarAdmiteValidacionPermisos() de CU-04: uno si la reserva no está «Sin Permiso» y otro si venció el plazo.
+    private function verificarAdmiteReprogramacion(): void
+    {
+        if ($this->admiteReprogramacion()) {
+            return;
+        }
+
+        if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
+            throw new DomainException('La reserva no admite reprogramación.');
+        }
+
+        throw new DomainException('El plazo para elegir entre el reintegro y la reprogramación venció el '
+            .$this->fecha_limite_confirmacion->format('d/m/Y').': la reserva ya no admite reprogramación.');
     }
 
     /* ------------------------- CU-13 Notificar cliente ------------------------ */
