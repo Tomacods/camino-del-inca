@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\CancelarReservasPorFaltaDeConfirmacion;
 use App\Console\Commands\CancelarReservasPorFaltaDePago;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -18,4 +19,11 @@ Artisan::command('inspire', function () {
 // CU-22. La fecha límite del saldo vence a las 23:59:59: se verifica una vez por día, apenas pasada la medianoche.
 Schedule::command(CancelarReservasPorFaltaDePago::class)
     ->dailyAt(config('reserva.hora_verificacion_saldos_vencidos'))
+    ->withoutOverlapping();
+
+// CU-26. La fecha límite de confirmación vence a las 23:59:59: se verifica una vez por día, apenas pasada la medianoche.
+// Puede correr a la misma hora que CU-22 porque no se cruzan: CU-22 cancela reservas «Confirmada», y CU-26, «Pendiente»
+// o «Sin Permiso».
+Schedule::command(CancelarReservasPorFaltaDeConfirmacion::class)
+    ->dailyAt(config('reserva.hora_verificacion_confirmaciones_vencidas'))
     ->withoutOverlapping();
