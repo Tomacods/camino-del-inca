@@ -264,15 +264,15 @@ class ReprogramarReservaTest extends TestCase
         $this->assertSame($this->destino->id_excursion, $this->reserva->fresh()->id_excursion);
     }
 
-    // Vencido el plazo, la reserva es de CU-26, que la cancela por falta de confirmación. El reintegro (CU-17) se sigue
-    // ofreciendo: este caso de uso no lo cambia.
+    // Vencido el plazo, la reserva es de CU-26, que la cancela por falta de confirmación. Tampoco se ofrece el reintegro
+    // (CU-17): las dos opciones vencen con la misma fecha.
     public function test_con_el_plazo_vencido_no_se_ofrece_la_opcion_y_no_se_inicia_la_reprogramacion(): void
     {
         $this->travelTo(Carbon::parse('2027-01-10 10:00:00'));
         $reserva = $this->reserva->fresh();
 
         $this->assertFalse($reserva->admiteReprogramacion());
-        $this->assertSame([Reserva::OPCION_REINTEGRO], $reserva->getOpcionesHabilitadas());
+        $this->assertSame([], $reserva->getOpcionesHabilitadas());
 
         try {
             $reserva->iniciarReprogramacion();
@@ -329,6 +329,7 @@ class ReprogramarReservaTest extends TestCase
 
         $this->assertTrue($reserva->verificarFechaLimiteConfirmacion());
         $this->assertTrue($reserva->admiteReprogramacion());
+        $this->assertTrue($reserva->admiteReintegro());
         $this->assertSame([Reserva::OPCION_REINTEGRO, Reserva::OPCION_REPROGRAMAR], $reserva->getOpcionesHabilitadas());
         $this->assertSame(750.0, $reserva->calcularReintegro());
 
@@ -338,7 +339,8 @@ class ReprogramarReservaTest extends TestCase
         $this->assertSame($lejana->id_excursion, $this->reserva->fresh()->id_excursion);
     }
 
-    // Un segundo después, a las 00:00:00 del día siguiente, el plazo ya venció: es cuando CU-26 la cancela.
+    // Un segundo después, a las 00:00:00 del día siguiente, el plazo ya venció: es cuando CU-26 la cancela. En ese
+    // segundo CU-17 también deja de aceptar el reintegro.
     public function test_a_las_00_00_00_del_dia_siguiente_ya_no_se_puede_reprogramar(): void
     {
         $this->travelTo(Carbon::parse('2027-01-02 00:00:00'));
@@ -347,7 +349,8 @@ class ReprogramarReservaTest extends TestCase
 
         $this->assertFalse($reserva->verificarFechaLimiteConfirmacion());
         $this->assertFalse($reserva->admiteReprogramacion());
-        $this->assertSame([Reserva::OPCION_REINTEGRO], $reserva->getOpcionesHabilitadas());
+        $this->assertFalse($reserva->admiteReintegro());
+        $this->assertSame([], $reserva->getOpcionesHabilitadas());
 
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage(self::AVISO_PLAZO_VENCIDO);
@@ -485,15 +488,18 @@ class ReprogramarReservaTest extends TestCase
         $this->assertNoCambio(EstadoReserva::SinPermiso);
     }
 
-    public function test_con_el_plazo_vencido_mi_reserva_no_ofrece_reprogramar(): void
+    // Las dos opciones vencen juntas: en lugar de la lista, Mi reserva dice por qué ya no hay ninguna.
+    public function test_con_el_plazo_vencido_mi_reserva_no_ofrece_reprogramar_ni_reintegro(): void
     {
         $this->travelTo(Carbon::parse('2027-01-02 00:00:00'));
         $this->darAcceso();
 
         Livewire::test('consultar-reserva')
             ->assertSee('Reserva 000125-9')
-            ->assertSeeHtml('href="/mi-reserva/000125-9/reintegro"')
-            ->assertDontSeeHtml('/mi-reserva/000125-9/reprogramar');
+            ->assertDontSeeHtml('/mi-reserva/000125-9/reprogramar')
+            ->assertDontSeeHtml('/mi-reserva/000125-9/reintegro')
+            ->assertSee('El plazo para elegir entre el reintegro y la reprogramación venció el 01/01/2027.')
+            ->assertDontSee('no tiene opciones de gestión');
     }
 
     public function test_dentro_del_plazo_mi_reserva_ofrece_reprogramar(): void

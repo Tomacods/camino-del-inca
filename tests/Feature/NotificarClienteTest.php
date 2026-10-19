@@ -191,6 +191,19 @@ class NotificarClienteTest extends TestCase
         $correo->assertDontSeeInHtml('Saldo pendiente');
     }
 
+    // CU-04 valida hasta las 23:59:59 del día límite y el correo se pide después: si ya pasó la medianoche, igual sale con
+    // el monto del reintegro, aunque CU-17 ya no lo admita.
+    public function test_permisos_rechazados_sale_aunque_el_plazo_haya_vencido_al_enviarlo(): void
+    {
+        Mail::fake();
+        $this->travelTo('2026-12-05 00:00:00');
+
+        $this->assertTrue(Reserva::notificarCliente(TipoNotificacion::PermisosRechazados, '000123-5'));
+
+        $correo = $this->correoEnviado(TipoNotificacion::PermisosRechazados, 'diego.morales@mail.com');
+        $correo->assertSeeInHtml('reintegro de todo lo abonado: USD 870,00');
+    }
+
     // CU-22 todavía no existe: se simula su cambio de estado.
     public function test_cancelacion_por_falta_de_pago_avisa_que_la_sena_no_se_devuelve(): void
     {
@@ -221,15 +234,22 @@ class NotificarClienteTest extends TestCase
     }
 
     // La causa la dice quien cancela: CU-17 (el cliente pidió el reintegro) o CU-26 (venció la fecha límite de
-    // confirmación). No se deduce de la fecha: aunque el cliente pida el reintegro después del 04/12/2026, el correo dice
-    // que lo pidió él. CU-26 todavía no existe: se simula con el mismo método del modelo.
+    // confirmación). No se deduce de la fecha: aunque el cliente lo pida en el último segundo del plazo, el correo dice
+    // que lo pidió él. Pasadas las 23:59:59 del 04/12/2026, CU-17 ya no admite el reintegro (SolicitarReintegroTest) y
+    // la cancela CU-26, que todavía no existe: se simula con ejecutarCancelacionConReintegro(), el método del modelo que
+    // comparten los dos, con todo lo abonado.
     #[DataProvider('causasFaltaDePermisos')]
     public function test_cancelacion_por_falta_de_permisos_reintegra_todo_e_informa_la_causa(string $fecha, bool $canceladaPorVencimiento, string $causa, string $otraCausa): void
     {
         Mail::fake();
         $this->travelTo($fecha);
         $reserva = Reserva::buscarReserva('000123-5');
-        $reserva->ejecutarCancelacionConReintegro($reserva->calcularReintegro(), now());
+
+        if ($canceladaPorVencimiento) {
+            $reserva->ejecutarCancelacionConReintegro((float) $reserva->pagos->sum('monto'), now());
+        } else {
+            $reserva->confirmarReintegro(now());
+        }
 
         Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, '000123-5', canceladaPorVencimiento: $canceladaPorVencimiento);
 
@@ -247,7 +267,7 @@ class NotificarClienteTest extends TestCase
 
         return [
             'pedido del cliente (CU-17)' => ['2026-10-14 12:00:00', false, $pedido, $vencimiento],
-            'pedido del cliente después de la fecha límite' => ['2026-12-05 03:00:00', false, $pedido, $vencimiento],
+            'pedido del cliente en el último segundo del plazo' => ['2026-12-04 23:59:59', false, $pedido, $vencimiento],
             'vencimiento de la fecha límite (CU-26)' => ['2026-12-05 03:00:00', true, $vencimiento, $pedido],
         ];
     }

@@ -283,8 +283,9 @@ class Reserva extends Model
     }
 
     // «Modificar reserva» se ofrece con la misma anticipación que exige iniciarModificacion() (CU-20): a menos de 3 meses
-    // de la salida, la pantalla de modificar la rechazaría. «Solicitar reprogramación», con la misma regla que exige
-    // iniciarReprogramacion() (CU-19): con el plazo vencido, la pantalla de reprogramar la rechazaría.
+    // de la salida, la pantalla de modificar la rechazaría. «Solicitar reintegro» y «Solicitar reprogramación», con la
+    // misma regla que exigen calcularReintegro() (CU-17) e iniciarReprogramacion() (CU-19): con el plazo vencido, las dos
+    // pantallas la rechazarían.
     public function getOpcionesHabilitadas(): array
     {
         return $this->determinarOpciones(
@@ -292,6 +293,7 @@ class Reserva extends Model
             $this->estado_saldo,
             $this->tieneValoracion(),
             $this->excursion->cumpleAnticipacionMinima(now()),
+            $this->admiteReintegro(),
             $this->admiteReprogramacion(),
         );
     }
@@ -301,7 +303,7 @@ class Reserva extends Model
         return $this->valoracion()->exists();
     }
 
-    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion, bool $cumpleAnticipacionMinima, bool $admiteReprogramacion): array
+    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion, bool $cumpleAnticipacionMinima, bool $admiteReintegro, bool $admiteReprogramacion): array
     {
         return match ($estado) {
             EstadoReserva::Confirmada => array_values(array_filter([
@@ -311,7 +313,7 @@ class Reserva extends Model
             ])),
             EstadoReserva::Pendiente => [self::OPCION_CANCELAR],
             EstadoReserva::SinPermiso => array_values(array_filter([
-                self::OPCION_REINTEGRO,
+                $admiteReintegro ? self::OPCION_REINTEGRO : null,
                 $admiteReprogramacion ? self::OPCION_REPROGRAMAR : null,
             ])),
             EstadoReserva::Finalizada => $tieneValoracion ? [] : [self::OPCION_VALORAR],
@@ -618,18 +620,64 @@ class Reserva extends Model
 
     /* --------------------------- CU-17 Solicitar Reintegro -------------------- */
 
+    // La regla del DS-17, la misma que admiteReprogramacion() de CU-19: se pide el reintegro sólo con la reserva «Sin
+    // Permiso» y dentro de la fecha límite de confirmación; al vencer, la cancela CU-26. El plazo lo decide
+    // verificarFechaLimiteConfirmacion(), así CU-17 y CU-19 cortan en el mismo segundo que CU-04 y CU-26: hasta las
+    // 23:59:59 del día límite todavía se puede, y desde las 00:00:00 del día siguiente ya no. También la usa
+    // getOpcionesHabilitadas() para ofrecer la opción en Mi reserva.
+    public function admiteReintegro(): bool
+    {
+        return $this->validarEstado([EstadoReserva::SinPermiso]) && $this->verificarFechaLimiteConfirmacion();
+    }
+
     public function calcularReintegro(): float
     {
-        if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
-            throw new \Exception('La reserva se encuentra en estado «'.$this->estado->value.'» y no admite reintegro.');
-        }
+        $this->verificarAdmiteReintegro();
 
         return $this->sumarPagos();
+    }
+
+    // Lo que hace la pantalla al confirmar. La regla se controla de nuevo sobre la reserva leída con su fila bloqueada: el
+    // plazo pudo vencer, o la reserva cambiar de estado, entre que el cliente vio el monto y confirmó. Si ya no admite el
+    // reintegro, no se cancela ni se registra la devolución. No está en el DS-17 y el control no va dentro de
+    // ejecutarCancelacionConReintegro() porque CU-26 también la usa, justo cuando el plazo ya venció. Devuelve el monto
+    // reintegrado.
+    public function confirmarReintegro(Carbon $fecha_actual): float
+    {
+        $montoReintegro = DB::transaction(function () use ($fecha_actual) {
+            $actual = self::lockForUpdate()->findOrFail($this->id_reserva);
+
+            $montoReintegro = $actual->calcularReintegro();
+            $actual->ejecutarCancelacionConReintegro($montoReintegro, $fecha_actual);
+
+            return $montoReintegro;
+        });
+
+        // Quien la llamó (la pantalla) ve la reserva como quedó.
+        $this->refresh();
+
+        return $montoReintegro;
     }
 
     public function ejecutarCancelacionConReintegro(float $monto_reintegro, Carbon $fecha_actual): void
     {
         $this->cancelarRegistrandoDevolucion($monto_reintegro, $fecha_actual, MotivoDevolucion::Reintegro);
+    }
+
+    // Si admiteReintegro() no se cumple, lanza DomainException con el aviso para el cliente, como
+    // verificarAdmiteReprogramacion() de CU-19: uno si la reserva no está «Sin Permiso» (A1) y otro si venció el plazo.
+    private function verificarAdmiteReintegro(): void
+    {
+        if ($this->admiteReintegro()) {
+            return;
+        }
+
+        if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
+            throw new DomainException('La reserva se encuentra en estado «'.$this->estado->value.'» y no admite reintegro.');
+        }
+
+        throw new DomainException('El plazo para elegir entre el reintegro y la reprogramación venció el '
+            .$this->fecha_limite_confirmacion->format('d/m/Y').': la reserva ya no admite reintegro.');
     }
 
     private function cancelarRegistrandoDevolucion(float $monto, Carbon $fecha, MotivoDevolucion $motivo): void
@@ -935,8 +983,9 @@ class Reserva extends Model
                 ->map(fn (Excursionista $excursionista) => $excursionista->nombre.' '.$excursionista->apellido)
                 ->values()
                 ->all();
-            // Lo que le devolvería CU-17 si elige el reintegro.
-            $datos['monto_reintegro'] = round($this->calcularReintegro(), 2);
+            // Lo que le devolvería CU-17 si elige el reintegro: todo lo abonado. No se llama a calcularReintegro(), que
+            // además controla el plazo: si CU-04 valida a las 23:59:59 del día límite, el correo igual tiene que salir.
+            $datos['monto_reintegro'] = $montoAbonado;
         }
 
         if ($tipoNotificacion === TipoNotificacion::CancelacionFaltaPermisos) {

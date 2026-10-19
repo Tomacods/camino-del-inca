@@ -46,9 +46,9 @@ new #[Title('Solicitar reintegro')] class extends Component
     public function confirmar(): void
     {
         try {
-            // Se vuelve a calcular: si la reserva dejó de estar «Sin Permiso» entre un paso y otro, no se cancela
-            $this->montoReintegro = $this->reserva->calcularReintegro();
-            $this->reserva->ejecutarCancelacionConReintegro($this->montoReintegro, Carbon::now());
+            // El modelo vuelve a controlar la regla sobre la reserva bloqueada: si dejó de estar «Sin Permiso» o venció
+            // el plazo entre un paso y otro, no se cancela
+            $this->montoReintegro = $this->reserva->confirmarReintegro(Carbon::now());
             Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, $this->reserva->numero_reserva);
             $this->paso = 3;
         } catch (\Exception $e) {
