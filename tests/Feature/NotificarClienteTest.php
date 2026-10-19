@@ -271,9 +271,9 @@ class NotificarClienteTest extends TestCase
         ];
     }
 
-    // CU-26 también cancela reservas «Pendiente»: nunca tuvieron que elegir entre el reintegro y la reprogramación, y el
-    // correo dice que los permisos no llegaron a validarse. 000124-7 tiene los tres permisos sin registrar.
-    public function test_cancelacion_por_vencimiento_de_una_reserva_pendiente_dice_que_los_permisos_no_se_validaron(): void
+    // CU-26 también cancela reservas «Pendiente». El correo da la misma causa que a una «Sin Permiso», como dice el A7:
+    // venció el plazo sin que la reserva quedara confirmada. 000124-7 tiene los tres permisos sin registrar.
+    public function test_cancelacion_por_vencimiento_de_una_reserva_pendiente_da_la_misma_causa(): void
     {
         Mail::fake();
         $this->travelTo('2026-12-19 00:05:00');
@@ -282,8 +282,7 @@ class NotificarClienteTest extends TestCase
         Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, '000124-7', canceladaPorVencimiento: true);
 
         $correo = $this->correoEnviado(TipoNotificacion::CancelacionFaltaPermisos, 'lucia.fernandez@mail.com');
-        $correo->assertSeeInHtml('porque el 18/12/2026 venció el plazo para confirmar los permisos de ingreso y todavía no estaban validados.');
-        $correo->assertDontSeeInHtml('elegir entre el reintegro y la reprogramación');
+        $correo->assertSeeInHtml('porque el 18/12/2026 venció el plazo de confirmación sin que la reserva quedara confirmada.');
         $correo->assertDontSeeInHtml('porque pediste el reintegro');
         $correo->assertSeeInHtml('Te reintegramos todo lo abonado: un reintegro de <strong>USD 1.350,00</strong>', false);
     }

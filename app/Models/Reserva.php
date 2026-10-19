@@ -1101,13 +1101,9 @@ class Reserva extends Model
 
         if ($tipoNotificacion === TipoNotificacion::CancelacionFaltaPermisos) {
             $datos['devolucion'] = $this->devolucion?->getDatos();
+            // Con CU-26 el correo da una sola causa, como dice el A7: venció el plazo de confirmación sin que la reserva
+            // quedara confirmada. Vale igual para una «Pendiente» sin validar que para una «Sin Permiso» que no eligió.
             $datos['cancelada_por_vencimiento'] = $canceladaPorVencimiento;
-            // CU-26 también cancela reservas «Pendiente», que nunca tuvieron que elegir entre el reintegro y la
-            // reprogramación. La base no guarda el estado anterior a «Cancelada», pero sale de los permisos: CU-04 no saca
-            // a una reserva de «Pendiente» sin registrarlos todos, y CU-19 los vuelve a «Pendiente» junto con ella. Si
-            // queda alguno sin registrar, la reserva estaba «Pendiente».
-            $datos['permisos_sin_validar'] = $this->getExcursionistas()
-                ->contains(fn (Excursionista $excursionista) => $excursionista->estado_permiso === EstadoPermiso::Pendiente);
         }
 
         $this->enviarCorreo($this->correo_electronico, $this->armarMensaje($tipoNotificacion, $datos));

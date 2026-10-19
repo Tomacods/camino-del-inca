@@ -116,10 +116,8 @@
             @case(TipoNotificacion::CancelacionFaltaPermisos)
                 <p style="margin:0 0 16px">
                     Tu reserva <strong>{{ $reserva['numero_reserva'] }}</strong> fue cancelada el {{ $datos['fecha_envio']->format('d/m/Y') }} por falta de permisos,
-                    @if ($datos['cancelada_por_vencimiento'] && $datos['permisos_sin_validar'])
-                        porque el {{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }} venció el plazo para confirmar los permisos de ingreso y todavía no estaban validados.
-                    @elseif ($datos['cancelada_por_vencimiento'])
-                        porque el {{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }} venció el plazo para elegir entre el reintegro y la reprogramación.
+                    @if ($datos['cancelada_por_vencimiento'])
+                        porque el {{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }} venció el plazo de confirmación sin que la reserva quedara confirmada.
                     @else
                         porque pediste el reintegro.
                     @endif
