@@ -29,7 +29,11 @@ new #[Title('Mi reserva')] class extends Component
     {
         return [
             'correo' => 'required|email',
-            'numeroReserva' => ['required', 'regex:/^\d{6}-\d$/'],
+            'numeroReserva' => ['bail', 'required', 'regex:/^\d{6}-\d$/', function ($atributo, $valor, $fallar) {
+                if (! Reserva::validarNumeroReserva($valor)) {
+                    $fallar('El dígito verificador del número de reserva no es correcto.');
+                }
+            }],
         ];
     }
 

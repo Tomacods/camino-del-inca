@@ -253,6 +253,19 @@ class Reserva extends Model
 
     /* ----------------------------- CU-18 Consultar ---------------------------- */
 
+    // A1. El dígito tiene que ser el que calcularDigitoVerificador() da para las seis cifras. Un número con otro
+    // formato tampoco es válido.
+    public static function validarNumeroReserva(string $numeroReserva): bool
+    {
+        if (preg_match('/^\d{'.self::CIFRAS_NUMERO_RESERVA.'}-\d$/', $numeroReserva) !== 1) {
+            return false;
+        }
+
+        [$cifras, $digito] = explode('-', $numeroReserva);
+
+        return self::calcularDigitoVerificador((int) $cifras) === (int) $digito;
+    }
+
     // Los correos se guardan en minúsculas y sin espacios en las puntas: el que escribe el cliente se convierte igual,
     // así encuentra su reserva aunque lo escriba con otras mayúsculas.
     public static function buscarPorCorreoYNumero(string $correo, string $numeroReserva): ?self
