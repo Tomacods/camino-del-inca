@@ -204,7 +204,7 @@ new #[Title('Pagar saldo')] class extends Component
             </div>
             <dl class="mt-3 flex justify-between gap-4 text-[17px]">
                 <dt class="text-texto-secundario">Fecha límite para pagar el saldo</dt>
-                <dd class="font-semibold tabular-nums">{{ $fechaLimiteSaldo->format('d/m/Y') }}</dd>
+                <dd class="font-semibold tabular-nums">{{ $fechaLimiteSaldo->format('d/m/Y') }} a las {{ $fechaLimiteSaldo->format('H:i') }}</dd>
             </dl>
             <p class="mt-3 text-sm text-texto-secundario">
                 Mercado Pago te cobra el equivalente en pesos, con su cotización del momento.

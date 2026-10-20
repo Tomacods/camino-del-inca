@@ -108,32 +108,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Hora de la verificación de saldos vencidos
+    | Minuto de la verificación de saldos vencidos
     |--------------------------------------------------------------------------
     |
-    | Hora del día (HH:MM) en que el Temporizador cancela las reservas
-    | confirmadas que no pagaron el saldo antes de la fecha límite. La fecha
-    | vence a las 23:59:59, así que corre apenas pasada la medianoche (CU-22
-    | Cancelar Reserva por Falta de Pago de Saldo).
+    | Minuto de cada hora en que el Temporizador cancela las reservas
+    | confirmadas que no pagaron el saldo antes de la fecha límite. Corre cada
+    | hora y no una vez por día porque el plazo de 72 horas puede vencer a
+    | cualquier hora; las demás fechas vencen a las 23:59:59 y se cancelan a
+    | las 00:05 (CU-22 Cancelar Reserva por Falta de Pago de Saldo).
     |
     */
 
-    'hora_verificacion_saldos_vencidos' => '00:05',
+    'minuto_verificacion_saldos_vencidos' => 5,
 
     /*
     |--------------------------------------------------------------------------
-    | Plazo para optar de una reserva «Sin Permiso» del último día
+    | Plazo de una validación de permisos del último día
     |--------------------------------------------------------------------------
     |
-    | Si la reserva pasa a «Sin Permiso» con menos de un mes de anticipación,
-    | el plazo para elegir entre el reintegro y la reprogramación vence a estas
-    | horas de la notificación o el día anterior a la salida, lo que ocurra
-    | primero (CU-04 Validar Permisos de Reserva y CU-26 Cancelar Reserva por
-    | Falta de Confirmación de Permisos).
+    | Si los permisos se validan con menos de un mes de anticipación, el plazo
+    | vence a estas horas de la notificación o el día anterior a la salida, lo
+    | que ocurra primero (CU-04 Validar Permisos de Reserva). Si la reserva
+    | queda «Confirmada» con el saldo adeudado, es el plazo para pagar el saldo
+    | (CU-16 Pagar Saldo Pendiente y CU-22 Cancelar Reserva por Falta de Pago
+    | de Saldo); si queda «Sin Permiso», el plazo para elegir entre el
+    | reintegro y la reprogramación (CU-26 Cancelar Reserva por Falta de
+    | Confirmación de Permisos).
     |
     */
 
-    'horas_plazo_sin_permiso' => 72,
+    'horas_plazo_excepcional' => 72,
 
     /*
     |--------------------------------------------------------------------------

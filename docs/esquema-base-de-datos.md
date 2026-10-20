@@ -202,7 +202,7 @@ Reserva grupal de una excursión.
 | `estado_saldo` | Enumeración EstadoSaldo | No | «Adeudado» si se pagó la seña; «Abonado» si se pagó el total |
 | `noches_extra_antes` | SMALLINT | No | Mayor o igual a 0. Sumada a `noches_extra_despues`, a lo sumo 2 |
 | `noches_extra_despues` | SMALLINT | No | Mayor o igual a 0 |
-| `fecha_limite_saldo` | TIMESTAMP | Sí | Nulo si se abonó el total. Si se pagó la seña, un mes antes de la fecha de salida, a las 23:59:59 |
+| `fecha_limite_saldo` | TIMESTAMP | Sí | Nulo si se abonó el total. Si se pagó la seña, un mes antes de la fecha de salida, a las 23:59:59. Si la reserva pasa a «Confirmada» con menos de un mes de anticipación, 72 horas después de la notificación o el día anterior a la salida, lo que ocurra primero |
 | `fecha_limite_confirmacion` | TIMESTAMP | No | Un mes antes de la fecha de salida, a las 23:59:59. Si la reserva pasa a «Sin Permiso» con menos de un mes de anticipación, 72 horas después de la notificación o el día anterior a la salida, lo que ocurra primero |
 
 ### excursionista
