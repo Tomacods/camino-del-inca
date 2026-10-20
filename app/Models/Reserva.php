@@ -8,7 +8,6 @@ use App\Enums\EstadoSaldo;
 use App\Enums\MotivoDevolucion;
 use App\Enums\TipoNotificacion;
 use App\Enums\TipoPago;
-use App\Enums\TipoServicio;
 use App\Jobs\LiberarCupoRetenido;
 use App\Mail\NotificacionCliente;
 use Closure;
@@ -892,9 +891,17 @@ class Reserva extends Model
         return $consulta->whereHas('excursionistas', fn (Builder $integrante) => $integrante->where('equipo_camping', true));
     }
 
-    public function scopeConServicio(Builder $consulta, TipoServicio $tipo): Builder
+    // Los porteadores no son un servicio: son una cantidad del paquete.
+    public function scopeConPorteadores(Builder $consulta): Builder
     {
-        return $consulta->whereHas('excursion.paquete.servicios', fn (Builder $servicio) => $servicio->where('tipo', $tipo->value));
+        return $consulta->whereHas('excursion.paquete', fn (Builder $paquete) => $paquete->where('cantidad_porteadores', '>', 0));
+    }
+
+    // whereKey() escribe la columna con la tabla (servicio.id_servicio): paquete_servicio también tiene id_servicio, y
+    // sin la tabla la consulta sería ambigua.
+    public function scopeConServicio(Builder $consulta, int $idServicio): Builder
+    {
+        return $consulta->whereHas('excursion.paquete.servicios', fn (Builder $servicio) => $servicio->whereKey($idServicio));
     }
 
     /* ----------------------------- CU-20 Modificar ---------------------------- */
