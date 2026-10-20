@@ -18,7 +18,10 @@ class LiberarCupoRetenido implements ShouldQueue
 
     // Cuánto dura la marca de «ya liberada». La demorada puede llegar mucho después del plazo de la retención: si la
     // cola estuvo detenida, o si alguien reintenta a mano una tarea fallida. Sin la marca descontaría plazas que ya son
-    // de otros clientes. No es para siempre porque, con la caché en la base, cada marca es una fila.
+    // de otros clientes. Lleva vencimiento porque sólo así Cache::add() usa la inserción atómica de la base
+    // (insertOrIgnore); sin vencimiento lee y después escribe, y dos tareas al mismo tiempo podrían liberar las dos.
+    // Con la caché en la base, una fila vencida se borra recién cuando se vuelve a leer su clave: queda una fila chica
+    // por retención, que para este sistema no pesa.
     private const DIAS_MARCA_LIBERADA = 30;
 
     public function __construct(

@@ -342,4 +342,5 @@ Resuelta con CU-14, sin tabla nueva: el esquema no cambia. Lo único que se escr
 - **Una sola vez por retención.** La misma tarea se ejecuta en el momento cuando el cliente cancela, y se va a ejecutar
   cuando pague. Antes de descontar, anota en la caché que esa retención ya se liberó: si llega otra vez (la demorada
   después de cancelar o de pagar), no descuenta de nuevo. La marca dura 30 días, para cubrir una demorada que llegue
-  tarde porque la cola estuvo detenida o porque se reintentó a mano.
+  tarde porque la cola estuvo detenida o porque se reintentó a mano. Con la caché en la base, la fila de una marca
+  vencida se borra recién cuando se vuelve a leer su clave: queda una fila chica por retención.
