@@ -52,13 +52,29 @@ public function mount(string $numeroReserva): void
             return;
         }
 
+        $this->mensajeError = '';
+
         try {
-            $this->reserva->confirmarCancelacion(Carbon::now());
+            // El monto que vio el cliente: si ya no es el que corresponde, el modelo no cancela
+            $this->reserva->confirmarCancelacion($this->montoReembolso, Carbon::now());
             Reserva::notificarCliente(TipoNotificacion::CancelacionReserva, $this->reserva->numero_reserva);
             $this->paso = 3;
         } catch (\Exception $e) {
-            // Si el estado cambió entre un paso y otro, se muestra el aviso en vez de un error 500
-            $this->mensajeError = $e->getMessage();
+            $this->mostrarError($e);
+        }
+    }
+
+    // Si la reserva todavía admite la cancelación, lo que cambió fue el monto: se queda en la revisión con el monto nuevo,
+    // para que el cliente lo vea y confirme otra vez. Si no, sólo el aviso, en vez de un error 500.
+    private function mostrarError(\Exception $e): void
+    {
+        unset($this->reserva);   // descarta la reserva cacheada y la vuelve a leer
+        $this->mensajeError = $e->getMessage();
+
+        try {
+            $this->montoReembolso = $this->reserva->calcularReembolso(Carbon::now());
+            $this->paso = 2;
+        } catch (\Exception) {
             $this->paso = 1;
         }
     }
@@ -104,6 +120,10 @@ public function cancelarOperacion()
         @endif
 
         @if ($paso === 2 && $this->reserva)
+            @if ($mensajeError)
+                <x-aviso tipo="error">{{ $mensajeError }}</x-aviso>
+            @endif
+
             <x-tarjeta titulo="Confirmar cancelación">
                 <dl class="divide-y divide-divisor text-[17px]">
                     <div class="flex justify-between gap-4 py-3"><dt class="text-texto-secundario">Reserva</dt><dd class="font-semibold">{{ $this->reserva->numero_reserva }}</dd></div>

@@ -716,16 +716,23 @@ class Reserva extends Model
         return 0.0;
     }
 
-    // Lo que hace la pantalla al confirmar. El reembolso se calcula de nuevo sobre la reserva leída con su fila bloqueada:
-    // entre que el cliente vio el monto y confirmó, la reserva pudo cambiar de estado (por ejemplo, pasar a «Finalizada»
-    // con CU-12) o recibir el pago del saldo (CU-16), y el reembolso es sobre todo lo abonado. Si ya no admite la
-    // cancelación, no se cancela ni se registra la devolución. No está en el DS-21.
-    public function confirmarCancelacion(Carbon $fecha_actual): void
+    // Lo que hace la pantalla al confirmar, con el monto que le mostró al cliente. El reembolso se calcula de nuevo sobre
+    // la reserva leída con su fila bloqueada: entre que el cliente vio el monto y confirmó, la reserva pudo cambiar de
+    // estado (por ejemplo, pasar a «Finalizada» con CU-12), recibir el pago del saldo (CU-16) o quedar a 30 días o menos
+    // de la salida. Si ya no admite la cancelación, o si el monto ya no es el que vio el cliente, no se cancela ni se
+    // registra la devolución: el cliente tiene que ver el monto nuevo y confirmar otra vez, así como CU-17 corta el
+    // reintegro si el plazo vence en el medio. Ni la segunda lectura ni la comparación del monto están en el DS-21.
+    public function confirmarCancelacion(float $monto_mostrado, Carbon $fecha_actual): void
     {
-        DB::transaction(function () use ($fecha_actual) {
+        DB::transaction(function () use ($monto_mostrado, $fecha_actual) {
             $actual = self::lockForUpdate()->findOrFail($this->id_reserva);
 
             $montoReembolso = $actual->calcularReembolso($fecha_actual);
+
+            if (round($montoReembolso, 2) !== round($monto_mostrado, 2)) {
+                throw new DomainException('El monto a reembolsar cambió mientras revisabas la cancelación. Revisalo y confirmá de nuevo.');
+            }
+
             $actual->ejecutarCancelacionConReembolso($montoReembolso, $fecha_actual);
         });
 
