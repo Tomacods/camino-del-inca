@@ -19,6 +19,7 @@ use App\Models\Paquete;
 use App\Models\Recorrido;
 use App\Models\Reserva;
 use App\Models\Usuario;
+use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -117,6 +118,50 @@ class CancelarReservaTest extends TestCase
         $this->assertSame(EstadoReserva::SinPermiso, $this->reserva->fresh()->estado);
         $this->assertNull($this->reserva->fresh()->devolucion);
         Mail::assertNothingQueued();
+    }
+
+    // Las dos que siguen se prueban sobre el modelo: la pantalla vuelve a leer la reserva en cada pedido, así que con ella
+    // no se ve una lectura vieja. Acá la pantalla abrió la reserva «Confirmada» y, antes de que el cliente confirme, el
+    // guía reportó la última etapa (CU-12) y la reserva pasó a «Finalizada».
+    public function test_si_la_reserva_se_finaliza_entre_la_lectura_y_la_confirmacion_no_se_cancela(): void
+    {
+        $leida = Reserva::buscarReserva('000125-9');
+        $this->assertSame(375.0, $leida->calcularReembolso(now()));
+
+        Reserva::buscarReserva('000125-9')->finalizarReserva();
+
+        try {
+            $leida->confirmarCancelacion(now());
+            $this->fail('Se canceló una reserva «Finalizada».');
+        } catch (DomainException $excepcion) {
+            $this->assertSame('La reserva se encuentra en estado «Finalizada» y no admite cancelación por esta vía.', $excepcion->getMessage());
+        }
+
+        $this->assertSame(EstadoReserva::Finalizada, $this->reserva->fresh()->estado);
+        $this->assertSame(0, Devolucion::count());
+    }
+
+    // Con un segundo integrante, el total es de USD 1500 y le queda un saldo de 750. La pantalla abrió la reserva con la
+    // seña sola y, antes de que el cliente confirme, se pagó el saldo (CU-16): el reembolso es el 50 % de todo lo abonado.
+    public function test_si_el_saldo_se_paga_entre_la_lectura_y_la_confirmacion_el_reembolso_lo_incluye(): void
+    {
+        $this->reserva->excursionistas()->create([
+            'nombre' => 'Lucía',
+            'apellido' => 'Ríos',
+            'documento_pasaporte' => 'AAH0001260',
+            'equipo_camping' => false,
+            'estado_permiso' => EstadoPermiso::Obtenido,
+        ]);
+
+        $leida = Reserva::buscarReserva('000125-9');
+        $this->assertSame(375.0, $leida->calcularReembolso(now()));
+
+        $this->assertNotNull(Pago::registrarPagoSaldo(Reserva::buscarReserva('000125-9'), 'Tarjeta de débito'));
+
+        $leida->confirmarCancelacion(now());
+
+        $this->assertSame(EstadoReserva::Cancelada, $leida->estado);
+        $this->assertSame('750.00', $this->reserva->fresh()->devolucion->monto);
     }
 
     public function test_si_la_confirmacion_llega_dos_veces_registra_una_sola_devolucion_y_un_solo_correo(): void

@@ -694,7 +694,7 @@ class Reserva extends Model
     public function calcularReembolso(Carbon $fecha_actual): float
     {
         if (! $this->validarEstado([EstadoReserva::Pendiente, EstadoReserva::Confirmada])) {
-            throw new \Exception('La reserva se encuentra en estado «'.$this->estado->value.'» y no admite cancelación por esta vía.');
+            throw new DomainException('La reserva se encuentra en estado «'.$this->estado->value.'» y no admite cancelación por esta vía.');
         }
 
         $fechaSalida = Carbon::parse($this->excursion->fecha_salida);
@@ -716,10 +716,21 @@ class Reserva extends Model
         return 0.0;
     }
 
+    // Lo que hace la pantalla al confirmar. El reembolso se calcula de nuevo sobre la reserva leída con su fila bloqueada:
+    // entre que el cliente vio el monto y confirmó, la reserva pudo cambiar de estado (por ejemplo, pasar a «Finalizada»
+    // con CU-12) o recibir el pago del saldo (CU-16), y el reembolso es sobre todo lo abonado. Si ya no admite la
+    // cancelación, no se cancela ni se registra la devolución. No está en el DS-21.
     public function confirmarCancelacion(Carbon $fecha_actual): void
     {
-        $montoReembolso = $this->calcularReembolso($fecha_actual);
-        $this->ejecutarCancelacionConReembolso($montoReembolso, $fecha_actual);
+        DB::transaction(function () use ($fecha_actual) {
+            $actual = self::lockForUpdate()->findOrFail($this->id_reserva);
+
+            $montoReembolso = $actual->calcularReembolso($fecha_actual);
+            $actual->ejecutarCancelacionConReembolso($montoReembolso, $fecha_actual);
+        });
+
+        // Quien la llamó (la pantalla) ve la reserva como quedó.
+        $this->refresh();
     }
 
     public function ejecutarCancelacionConReembolso(float $monto_reembolso, Carbon $fecha_actual): void
