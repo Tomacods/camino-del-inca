@@ -892,6 +892,12 @@ class Reserva extends Model
         return $consulta->whereHas('excursionistas', fn (Builder $integrante) => $integrante->where('equipo_camping', true));
     }
 
+    // Los porteadores no son un servicio: son una cantidad del paquete.
+    public function scopeConPorteadores(Builder $consulta): Builder
+    {
+        return $consulta->whereHas('excursion.paquete', fn (Builder $paquete) => $paquete->where('cantidad_porteadores', '>', 0));
+    }
+
     public function scopeConServicio(Builder $consulta, TipoServicio $tipo): Builder
     {
         return $consulta->whereHas('excursion.paquete.servicios', fn (Builder $servicio) => $servicio->where('tipo', $tipo->value));

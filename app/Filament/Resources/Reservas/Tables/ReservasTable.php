@@ -74,6 +74,10 @@ class ReservasTable
                     ->label('Con equipo de camping')
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->conEquipoCamping()),
+                Filter::make('con_porteadores')
+                    ->label('Con porteadores')
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->conPorteadores()),
             ])
             ->recordActions([
                 ViewAction::make()->label('Ver'),
