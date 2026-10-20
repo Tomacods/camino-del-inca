@@ -133,7 +133,7 @@ Los dos pendientes de diseño que frenaban al Área B se resolvieron con CU-14, 
    se vence el plazo, aunque el cliente haya cerrado el navegador.
 2. **Concurrencia.** `Excursion::retenerCupo()` verifica y retiene en una transacción con la fila de la excursión
    bloqueada: dos clientes a la vez quedan uno detrás del otro. La tarea anota en la caché cada retención que libera,
-   así una retención nunca se descuenta dos veces.
+   así una retención no se descuenta dos veces mientras dure la marca, que es de 30 días.
 
 Si el cliente confirma y vuelve atrás con el navegador, el formulario se carga de cero: Livewire manda las páginas con
 `Cache-Control: no-store` y el navegador no las guarda. Por eso, al abrir el formulario de una salida en la que el

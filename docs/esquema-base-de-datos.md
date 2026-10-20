@@ -341,4 +341,5 @@ Resuelta con CU-14, sin tabla nueva: el esquema no cambia. Lo único que se escr
   navegador y descuenta esas plazas de `plazas_retenidas`. Para eso tiene que estar corriendo `php artisan queue:work`.
 - **Una sola vez por retención.** La misma tarea se ejecuta en el momento cuando el cliente cancela, y se va a ejecutar
   cuando pague. Antes de descontar, anota en la caché que esa retención ya se liberó: si llega otra vez (la demorada
-  después de cancelar o de pagar), no descuenta de nuevo.
+  después de cancelar o de pagar), no descuenta de nuevo. La marca dura 30 días, para cubrir una demorada que llegue
+  tarde porque la cola estuvo detenida o porque se reintentó a mano.

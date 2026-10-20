@@ -9,14 +9,17 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 // Devuelve a la excursión las plazas de una retención (CU-14). Se usa en tres momentos: al vencer el plazo (demorada,
-// corre aunque el cliente se haya ido), al cancelar y al pagar (en el momento). Cada retención se libera una sola
-// vez: si el cliente canceló o pagó, la demorada llega después y no descuenta de nuevo.
+// corre aunque el cliente se haya ido), al cancelar y al pagar (en el momento). Mientras dura la marca de «ya
+// liberada» (30 días), cada retención se libera una sola vez: si el cliente canceló o pagó, la demorada llega después y
+// no descuenta de nuevo.
 class LiberarCupoRetenido implements ShouldQueue
 {
     use Queueable;
 
-    // Cuánto dura la marca de «ya liberada»: bastante más que el plazo de la retención, por si la cola arranca tarde.
-    private const HORAS_MARCA_LIBERADA = 24;
+    // Cuánto dura la marca de «ya liberada». La demorada puede llegar mucho después del plazo de la retención: si la
+    // cola estuvo detenida, o si alguien reintenta a mano una tarea fallida. Sin la marca descontaría plazas que ya son
+    // de otros clientes. No es para siempre porque, con la caché en la base, cada marca es una fila.
+    private const DIAS_MARCA_LIBERADA = 30;
 
     public function __construct(
         public int $idExcursion,
@@ -31,7 +34,7 @@ class LiberarCupoRetenido implements ShouldQueue
         DB::transaction(function () {
             // add() sólo guarda si la clave no existía, y dice si la guardó: la primera vez da verdadero y las
             // siguientes, falso.
-            $primeraVez = Cache::add(self::claveMarcaLiberada($this->idRetencion), true, now()->addHours(self::HORAS_MARCA_LIBERADA));
+            $primeraVez = Cache::add(self::claveMarcaLiberada($this->idRetencion), true, now()->addDays(self::DIAS_MARCA_LIBERADA));
 
             if ($primeraVez) {
                 Excursion::findOrFail($this->idExcursion)->liberarCupoRetenido($this->cantidadPlazas);
