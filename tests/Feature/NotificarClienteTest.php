@@ -114,7 +114,8 @@ class NotificarClienteTest extends TestCase
     public function test_cancelacion_de_reserva_con_reembolso(): void
     {
         Mail::fake();
-        Reserva::buscarReserva('000124-7')->confirmarCancelacion(now());
+        $reserva = Reserva::buscarReserva('000124-7');
+        $reserva->confirmarCancelacion($reserva->calcularReembolso(now()), now());
 
         Reserva::notificarCliente(TipoNotificacion::CancelacionReserva, '000124-7');
 
@@ -131,7 +132,8 @@ class NotificarClienteTest extends TestCase
     {
         Mail::fake();
         $this->travelTo('2026-12-25 10:00:00');
-        Reserva::buscarReserva('000124-7')->confirmarCancelacion(now());
+        $reserva = Reserva::buscarReserva('000124-7');
+        $reserva->confirmarCancelacion($reserva->calcularReembolso(now()), now());
 
         Reserva::notificarCliente(TipoNotificacion::CancelacionReserva, '000124-7');
 
