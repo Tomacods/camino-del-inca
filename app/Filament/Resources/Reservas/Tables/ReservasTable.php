@@ -7,12 +7,14 @@ use App\Enums\TipoServicio;
 use App\Filament\Resources\Reservas\Pages\ValidarPermisosReserva;
 use App\Models\Guia;
 use App\Models\Paquete;
+use App\Models\Servicio;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 
 class ReservasTable
 {
@@ -64,12 +66,7 @@ class ReservasTable
                     ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
                         ? $query->deGuia((int) $data['value'])
                         : $query),
-                SelectFilter::make('servicio')
-                    ->label('Servicio incluido')
-                    ->options(self::opcionesDe(TipoServicio::cases()))
-                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
-                        ? $query->conServicio(TipoServicio::from($data['value']))
-                        : $query),
+                ...self::filtrosDeServicio(),
                 Filter::make('con_equipo_camping')
                     ->label('Con equipo de camping')
                     ->toggle()
@@ -83,6 +80,31 @@ class ReservasTable
                 ViewAction::make()->label('Ver'),
                 ValidarPermisosReserva::accionValidarPermisos(),
             ]);
+    }
+
+    // Un filtro por tipo de servicio, en el orden del R-07, que elige un servicio concreto de ese tipo. El nombre sale
+    // del caso del enum: servicio_hotel, servicio_camping_de_etapa, servicio_transporte_en_bus, etc.
+    private static function filtrosDeServicio(): array
+    {
+        $tipos = [
+            TipoServicio::Hotel,
+            TipoServicio::CampingDeEtapa,
+            TipoServicio::TransporteEnBus,
+            TipoServicio::TransporteFerroviario,
+        ];
+
+        $filtros = [];
+
+        foreach ($tipos as $tipo) {
+            $filtros[] = SelectFilter::make('servicio_'.Str::snake($tipo->name))
+                ->label($tipo->value)
+                ->options(fn () => Servicio::where('tipo', $tipo->value)->orderBy('nombre')->pluck('nombre', 'id_servicio')->all())
+                ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
+                    ? $query->conServicio((int) $data['value'])
+                    : $query);
+        }
+
+        return $filtros;
     }
 
     // Opciones de un filtro a partir de un enum: el texto es el valor del enum

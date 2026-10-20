@@ -6,13 +6,16 @@ use App\Enums\EstadoPaquete;
 use App\Enums\EstadoReserva;
 use App\Enums\EstadoSaldo;
 use App\Enums\Rol;
+use App\Enums\TipoServicio;
 use App\Filament\Resources\Reservas\Pages\ListReservas;
 use App\Models\Excursion;
 use App\Models\Guia;
 use App\Models\Paquete;
 use App\Models\Recorrido;
 use App\Models\Reserva;
+use App\Models\Servicio;
 use App\Models\Usuario;
+use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -27,9 +30,15 @@ class ListarReservasTest extends TestCase
 
     private Recorrido $recorrido;
 
-    private Reserva $reservaConPorteadores;
+    private Servicio $hotelCusco;
 
-    private Reserva $reservaSinPorteadores;
+    private Servicio $hotelAguasCalientes;
+
+    private Servicio $campingAyapata;
+
+    private Reserva $reservaClasico;
+
+    private Reserva $reservaCorto;
 
     protected function setUp(): void
     {
@@ -42,9 +51,14 @@ class ListarReservasTest extends TestCase
 
         $this->recorrido = Recorrido::create(['nombre' => 'Camino Clásico', 'duracion_dias' => 4, 'cantidad_campings' => 3]);
 
-        // Una reserva en un paquete con 6 porteadores y otra en uno sin porteadores.
-        $this->reservaConPorteadores = $this->crearReserva('000124-7', $this->crearExcursion('Camino Inca Clásico', 6));
-        $this->reservaSinPorteadores = $this->crearReserva('000125-9', $this->crearExcursion('Camino Inca Corto', 0));
+        $this->hotelCusco = Servicio::create(['tipo' => TipoServicio::Hotel, 'nombre' => 'Hotel en Cusco']);
+        $this->hotelAguasCalientes = Servicio::create(['tipo' => TipoServicio::Hotel, 'nombre' => 'Hotel en Aguas Calientes']);
+        $this->campingAyapata = Servicio::create(['tipo' => TipoServicio::CampingDeEtapa, 'nombre' => 'Camping Ayapata']);
+
+        // Una reserva en cada paquete. El Clásico tiene 6 porteadores, un hotel y un camping; el Corto no tiene
+        // porteadores ni camping, y tiene otro hotel.
+        $this->reservaClasico = $this->crearReserva('000124-7', $this->crearExcursion('Camino Inca Clásico', 6, [$this->hotelCusco, $this->campingAyapata]));
+        $this->reservaCorto = $this->crearReserva('000125-9', $this->crearExcursion('Camino Inca Corto', 0, [$this->hotelAguasCalientes]));
     }
 
     /* ---------------------------- Con porteadores ----------------------------- */
@@ -52,7 +66,7 @@ class ListarReservasTest extends TestCase
     public function test_el_scope_trae_solo_las_reservas_de_paquetes_con_porteadores(): void
     {
         $this->assertSame(
-            [$this->reservaConPorteadores->id_reserva],
+            [$this->reservaClasico->id_reserva],
             Reserva::conPorteadores()->pluck('id_reserva')->all(),
         );
     }
@@ -62,15 +76,68 @@ class ListarReservasTest extends TestCase
         $this->actingAs($this->administrador);
 
         Livewire::test(ListReservas::class)
-            ->assertCanSeeTableRecords([$this->reservaConPorteadores, $this->reservaSinPorteadores])
+            ->assertCanSeeTableRecords([$this->reservaClasico, $this->reservaCorto])
             ->filterTable('con_porteadores')
-            ->assertCanSeeTableRecords([$this->reservaConPorteadores])
-            ->assertCanNotSeeTableRecords([$this->reservaSinPorteadores]);
+            ->assertCanSeeTableRecords([$this->reservaClasico])
+            ->assertCanNotSeeTableRecords([$this->reservaCorto]);
+    }
+
+    /* -------------------------------- Servicios ------------------------------- */
+
+    public function test_el_scope_trae_solo_las_reservas_de_paquetes_con_ese_servicio(): void
+    {
+        $this->assertSame(
+            [$this->reservaCorto->id_reserva],
+            Reserva::conServicio($this->hotelAguasCalientes->id_servicio)->pluck('id_reserva')->all(),
+        );
+    }
+
+    public function test_el_filtro_de_hotel_muestra_solo_las_reservas_con_ese_hotel(): void
+    {
+        $this->actingAs($this->administrador);
+
+        Livewire::test(ListReservas::class)
+            ->filterTable('servicio_hotel', $this->hotelCusco->id_servicio)
+            ->assertCanSeeTableRecords([$this->reservaClasico])
+            ->assertCanNotSeeTableRecords([$this->reservaCorto]);
+    }
+
+    public function test_con_hotel_y_camping_tienen_que_cumplirse_los_dos(): void
+    {
+        $this->actingAs($this->administrador);
+
+        Livewire::test(ListReservas::class)
+            ->filterTable('servicio_hotel', $this->hotelCusco->id_servicio)
+            ->filterTable('servicio_camping_de_etapa', $this->campingAyapata->id_servicio)
+            ->assertCanSeeTableRecords([$this->reservaClasico])
+            ->assertCanNotSeeTableRecords([$this->reservaCorto]);
+    }
+
+    // El Clásico tiene el camping pero no ese hotel, y el Corto tiene el hotel pero no tiene camping.
+    public function test_con_un_hotel_y_un_camping_de_paquetes_distintos_no_queda_ninguna(): void
+    {
+        $this->actingAs($this->administrador);
+
+        Livewire::test(ListReservas::class)
+            ->filterTable('servicio_hotel', $this->hotelAguasCalientes->id_servicio)
+            ->filterTable('servicio_camping_de_etapa', $this->campingAyapata->id_servicio)
+            ->assertCountTableRecords(0);
+    }
+
+    public function test_el_filtro_de_hotel_solo_ofrece_hoteles(): void
+    {
+        $this->actingAs($this->administrador);
+
+        Livewire::test(ListReservas::class)
+            ->assertTableFilterExists('servicio_hotel', fn (SelectFilter $filtro) => $filtro->getOptions() === [
+                $this->hotelAguasCalientes->id_servicio => 'Hotel en Aguas Calientes',
+                $this->hotelCusco->id_servicio => 'Hotel en Cusco',
+            ]);
     }
 
     /* --------------------------------- Datos ---------------------------------- */
 
-    private function crearExcursion(string $nombrePaquete, int $cantidadPorteadores): Excursion
+    private function crearExcursion(string $nombrePaquete, int $cantidadPorteadores, array $servicios): Excursion
     {
         $paquete = Paquete::create([
             'id_recorrido' => $this->recorrido->id_recorrido,
@@ -82,6 +149,8 @@ class ListarReservasTest extends TestCase
             'estado' => EstadoPaquete::Activo,
             'fecha_creacion' => '2026-01-05',
         ]);
+
+        $paquete->servicios()->attach(collect($servicios)->pluck('id_servicio'));
 
         return Excursion::create([
             'id_paquete' => $paquete->id_paquete,
