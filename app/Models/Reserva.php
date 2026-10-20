@@ -344,7 +344,7 @@ class Reserva extends Model
         // A3. Sólo se informa: la cancelación por falta de pago es de CU-22. Una reserva con saldo adeudado siempre tiene
         // fecha límite; si faltara, el aviso sale sin la fecha.
         if (! $this->verificarFechaLimiteSaldo()) {
-            $fechaLimite = $this->fecha_limite_saldo === null ? '' : ' el '.$this->fecha_limite_saldo->format('d/m/Y');
+            $fechaLimite = $this->fecha_limite_saldo === null ? '' : ' el '.$this->fecha_limite_saldo->format('d/m/Y').' a las '.$this->fecha_limite_saldo->format('H:i');
 
             throw new DomainException('El plazo para pagar el saldo venció'.$fechaLimite.' y la reserva se cancela por falta de pago.');
         }
@@ -357,7 +357,8 @@ class Reserva extends Model
 
     // Pública porque también la usa la cancelación por falta de pago (CU-22), que le pasa la hora de la verificación;
     // CU-16 la llama sin hora y compara con la actual. La fecha límite vence a las 23:59:59 de ese día, como la guardan
-    // los seeders y fijarFechasLimite(): hasta ese segundo, todavía se puede pagar.
+    // los seeders y fijarFechasLimite(), salvo que los permisos se hayan validado el último día: ahí es la de las 72 horas
+    // (fijarFechaLimiteSaldoConfirmada()). Hasta ese segundo, todavía se puede pagar.
     public function verificarFechaLimiteSaldo(?Carbon $fecha_hora = null): bool
     {
         return $this->fecha_limite_saldo !== null && ($fecha_hora ?? now())->lessThanOrEqualTo($this->fecha_limite_saldo);
@@ -401,8 +402,8 @@ class Reserva extends Model
         return $canceladas;
     }
 
-    // Paso 2. Es la regla de tieneSaldoVencido() escrita en SQL: vencida es anterior a la hora recibida, así que a las
-    // 23:59:59 del día límite todavía no aparece y a las 00:00:00 del día siguiente, sí. Una fecha nula no cumple el «<».
+    // Paso 2. Es la regla de tieneSaldoVencido() escrita en SQL: vencida es anterior a la hora recibida, así que en el
+    // último segundo del plazo todavía no aparece y en el siguiente, sí. Una fecha nula no cumple el «<».
     // Laravel pasa la hora como «Y-m-d H:i:s», sin fracciones de segundo, igual en PostgreSQL que en SQLite: nunca toma
     // una reserva antes que verificarFechaLimiteSaldo(). Hay que filtrar por estado_saldo porque fecha_limite_saldo no se
     // borra al pagar el saldo (actualizarReserva()).
@@ -527,27 +528,62 @@ class Reserva extends Model
             $this->fijarFechaLimiteSinPermiso(now());
         }
 
+        if ($this->estado === EstadoReserva::Confirmada) {
+            $this->fijarFechaLimiteSaldoConfirmada(now());
+        }
+
         $this->save();
     }
 
     // Regla de CU-26: si la reserva pasa a «Sin Permiso» con menos de un mes de anticipación, el plazo para elegir entre
     // el reintegro (CU-17) y la reprogramación (CU-19) vence a las 72 horas de la notificación o el día anterior a la
     // salida, lo que ocurra primero. Como CU-04 no valida después de la fecha límite, sólo pasa si se valida el último
-    // día: sin esta regla, el cliente tendría hasta las 23:59:59 de ese mismo día. El correo sale apenas se guarda la
-    // validación (paso 6), así que se cuenta desde ahora. El plazo se guarda en fecha_limite_confirmacion, la fecha con
-    // la que CU-17 y CU-19 dejan de admitir el pedido y CU-26 cancela. Con un mes de anticipación, las 72 horas siempre
-    // llegan antes que el día anterior a la salida, pero se compara igual porque la regla lo dice.
+    // día: sin esta regla, el cliente tendría hasta las 23:59:59 de ese mismo día. El plazo se guarda en
+    // fecha_limite_confirmacion, la fecha con la que CU-17 y CU-19 dejan de admitir el pedido y CU-26 cancela.
     private function fijarFechaLimiteSinPermiso(Carbon $fecha_hora): void
+    {
+        $plazo = $this->calcularPlazoExcepcional($fecha_hora);
+
+        if ($plazo !== null) {
+            $this->fecha_limite_confirmacion = $plazo;
+        }
+    }
+
+    // Regla de CU-16: el saldo se paga hasta un mes antes de la salida, pero si los permisos se validaron con menos de un
+    // mes de anticipación, el plazo vence a las 72 horas de la notificación o el día anterior a la salida, lo que ocurra
+    // primero. Como en «Sin Permiso», sólo pasa si se valida el último día: sin esta regla, el cliente tendría hasta las
+    // 23:59:59 de ese mismo día para pagar. El plazo se guarda en fecha_limite_saldo, la fecha con la que CU-16 deja de
+    // admitir el pago y CU-22 cancela. Con el saldo «Abonado» no hay nada que pagar y fecha_limite_saldo sigue en nulo.
+    // fecha_limite_confirmacion no cambia: la reserva ya quedó confirmada.
+    private function fijarFechaLimiteSaldoConfirmada(Carbon $fecha_hora): void
+    {
+        if ($this->estado_saldo !== EstadoSaldo::Adeudado) {
+            return;
+        }
+
+        $plazo = $this->calcularPlazoExcepcional($fecha_hora);
+
+        if ($plazo !== null) {
+            $this->fecha_limite_saldo = $plazo;
+        }
+    }
+
+    // El plazo de las reglas de CU-16 y CU-26 para una validación hecha a esa hora: las 72 horas o las 23:59:59 del día
+    // anterior a la salida, lo que ocurra primero. Devuelve null si se validó con un mes o más de anticipación, es decir,
+    // hasta las 00:00:00 del día límite: ahí siguen valiendo las fechas de fijarFechasLimite(). El correo sale apenas se
+    // guarda la validación (paso 6), así que se cuenta desde la hora de la validación. Con un mes de anticipación, las 72
+    // horas siempre llegan antes que el día anterior a la salida, pero se compara igual porque la regla lo dice.
+    private function calcularPlazoExcepcional(Carbon $fecha_hora): ?Carbon
     {
         $fechaSalida = $this->excursion->getFechaSalida();
         $unMesAntes = $fechaSalida->copy()->subMonthsNoOverflow(config('reserva.meses_anticipacion_fechas_limite'));
 
         if ($fecha_hora->lessThanOrEqualTo($unMesAntes)) {
-            return;
+            return null;
         }
 
-        $this->fecha_limite_confirmacion = $fecha_hora->copy()
-            ->addHours(config('reserva.horas_plazo_sin_permiso'))
+        return $fecha_hora->copy()
+            ->addHours(config('reserva.horas_plazo_excepcional'))
             ->min($fechaSalida->copy()->subDay()->endOfDay());
     }
 

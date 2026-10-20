@@ -96,7 +96,7 @@ class SaldoPendienteTest extends TestCase
         $this->travelTo(Carbon::parse('2027-01-02 00:00:00'));
 
         $this->expectExceptionObject(new DomainException(
-            'El plazo para pagar el saldo venció el 01/01/2027 y la reserva se cancela por falta de pago.'
+            'El plazo para pagar el saldo venció el 01/01/2027 a las 23:59 y la reserva se cancela por falta de pago.'
         ));
 
         $this->reserva->iniciarPagoSaldo();

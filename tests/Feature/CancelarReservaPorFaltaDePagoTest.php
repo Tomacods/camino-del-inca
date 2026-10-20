@@ -114,6 +114,24 @@ class CancelarReservaPorFaltaDePagoTest extends TestCase
         $this->assertSame(EstadoReserva::Cancelada, $reserva->fresh()->estado);
     }
 
+    // Una reserva que quedó «Confirmada» el último día tiene 72 horas para pagar el saldo (CU-04 lo fijó a las 15:30): no
+    // se cancela a la medianoche del día límite ni en el último segundo del plazo, y sí en el siguiente.
+    public function test_con_el_plazo_de_72_horas_a_la_hora_limite_no_cancela_y_un_segundo_despues_si(): void
+    {
+        Mail::fake();
+        $reserva = $this->crearReserva('000125-9', fechaLimiteSaldo: '2026-12-01 15:30:00');
+
+        foreach ([self::VENCIDA, '2026-12-01 15:30:00'] as $momento) {
+            $this->travelTo($momento);
+            $this->assertSame(0, Reserva::verificarVencimientosDePago(now()), 'A las '.$momento);
+        }
+        $this->assertSame(EstadoReserva::Confirmada, $reserva->fresh()->estado);
+
+        $this->travelTo('2026-12-01 15:30:01');
+        $this->assertSame(1, Reserva::verificarVencimientosDePago(now()));
+        $this->assertSame(EstadoReserva::Cancelada, $reserva->fresh()->estado);
+    }
+
     // La consulta del paso 2 da lo mismo que verificarFechaLimiteSaldo(), la regla de CU-16, con la misma hora.
     public function test_la_busqueda_coincide_con_la_regla_de_la_fecha_limite(): void
     {
@@ -319,13 +337,15 @@ class CancelarReservaPorFaltaDePagoTest extends TestCase
         Mail::assertNothingQueued();
     }
 
-    public function test_el_comando_esta_en_el_schedule_una_vez_por_dia_a_las_0005(): void
+    // Cada hora, a los 5 minutos: el plazo de 72 horas de una reserva que quedó «Confirmada» el último día puede vencer a
+    // cualquier hora.
+    public function test_el_comando_esta_en_el_schedule_cada_hora_sin_superponerse(): void
     {
         $eventos = collect(app(Schedule::class)->events())
             ->filter(fn (Event $evento) => str_contains($evento->command ?? '', 'reservas:cancelar-por-falta-de-pago'));
 
         $this->assertCount(1, $eventos);
-        $this->assertSame('5 0 * * *', $eventos->first()->expression);
+        $this->assertSame('5 * * * *', $eventos->first()->expression);
         $this->assertTrue($eventos->first()->withoutOverlapping);
     }
 

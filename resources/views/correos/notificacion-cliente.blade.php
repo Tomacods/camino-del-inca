@@ -82,7 +82,7 @@
                 <p style="margin:0 0 16px">Todos los integrantes obtuvieron el permiso de ingreso al Camino Inca: tu reserva pasó a <strong>«{{ $reserva['estado']->value }}»</strong>.</p>
 
                 @if ($datos['saldo_por_pagar'] !== null)
-                    <p style="margin:0 0 24px">Te queda un saldo de <strong>{{ $dolares($datos['saldo_por_pagar']['monto']) }}</strong>, que podés pagar desde Mi reserva hasta el {{ $datos['saldo_por_pagar']['fecha_limite']->format('d/m/Y') }}.</p>
+                    <p style="margin:0 0 24px">Te queda un saldo de <strong>{{ $dolares($datos['saldo_por_pagar']['monto']) }}</strong>, que podés pagar desde Mi reserva hasta el {{ $datos['saldo_por_pagar']['fecha_limite']->format('d/m/Y') }} a las {{ $datos['saldo_por_pagar']['fecha_limite']->format('H:i') }}.</p>
                 @else
                     <p style="margin:0 0 24px">Tu reserva ya está pagada por completo.</p>
                 @endif
@@ -104,7 +104,7 @@
                 @break
 
             @case(TipoNotificacion::CancelacionFaltaPago)
-                <p style="margin:0 0 16px">Tu reserva <strong>{{ $reserva['numero_reserva'] }}</strong> fue cancelada el {{ $datos['fecha_envio']->format('d/m/Y') }} porque el saldo no se pagó antes de la fecha límite, el {{ $reserva['fecha_limite_saldo']->format('d/m/Y') }}.</p>
+                <p style="margin:0 0 16px">Tu reserva <strong>{{ $reserva['numero_reserva'] }}</strong> fue cancelada el {{ $datos['fecha_envio']->format('d/m/Y') }} porque el saldo no se pagó antes de la fecha límite, el {{ $reserva['fecha_limite_saldo']->format('d/m/Y') }} a las {{ $reserva['fecha_limite_saldo']->format('H:i') }}.</p>
                 <p style="margin:0 0 24px">La seña abonada ({{ $dolares($datos['monto_abonado']) }}) no es reembolsable.</p>
                 @break
 
@@ -154,7 +154,7 @@
             </tr>
             <tr><td style="{{ $celdaTitulo }}">Abonado</td><td style="{{ $celdaDato }}">{{ $dolares($datos['monto_abonado']) }}</td></tr>
             @if ($datos['saldo_por_pagar'] !== null)
-                <tr><td style="{{ $celdaTitulo }}">Saldo pendiente</td><td style="{{ $celdaDato }}">{{ $dolares($datos['saldo_por_pagar']['monto']) }}, hasta el {{ $datos['saldo_por_pagar']['fecha_limite']->format('d/m/Y') }}</td></tr>
+                <tr><td style="{{ $celdaTitulo }}">Saldo pendiente</td><td style="{{ $celdaDato }}">{{ $dolares($datos['saldo_por_pagar']['monto']) }}, hasta el {{ $datos['saldo_por_pagar']['fecha_limite']->format('d/m/Y') }} a las {{ $datos['saldo_por_pagar']['fecha_limite']->format('H:i') }}</td></tr>
             @elseif ($reserva['estado_saldo'] === EstadoSaldo::Abonado)
                 <tr><td style="{{ $celdaTitulo }}">Saldo</td><td style="{{ $celdaDato }}">{{ $reserva['estado_saldo']->value }}</td></tr>
             @endif

@@ -155,6 +155,22 @@ class NotificarClienteTest extends TestCase
         $correo->assertSeeInOrderInHtml(['Te queda un saldo de', $this->dolares($saldoPendiente), 'hasta el 01/01/2027']);
     }
 
+    // Si los permisos se validaron el último día, el saldo vence a las 72 horas, a cualquier hora (CU-16): el correo da
+    // la fecha y la hora, en el texto y en la tabla.
+    public function test_permisos_obtenidos_muestra_la_fecha_y_la_hora_del_plazo_del_saldo(): void
+    {
+        Mail::fake();
+        Reserva::buscarReserva('000125-9')->update(['fecha_limite_saldo' => '2027-01-04 22:00:00']);
+
+        Reserva::notificarCliente(TipoNotificacion::PermisosObtenidos, '000125-9');
+
+        $correo = $this->correoEnviado(TipoNotificacion::PermisosObtenidos, 'federico.rios@mail.com');
+        $correo->assertSeeInOrderInHtml([
+            'que podés pagar desde Mi reserva hasta el 04/01/2027 a las 22:00.',
+            'Saldo pendiente', 'hasta el 04/01/2027 a las 22:00',
+        ]);
+    }
+
     public function test_permisos_obtenidos_con_saldo_abonado_no_pide_saldo(): void
     {
         Mail::fake();
@@ -216,7 +232,7 @@ class NotificarClienteTest extends TestCase
 
         $correo = $this->correoEnviado(TipoNotificacion::CancelacionFaltaPago, 'federico.rios@mail.com');
         $correo->assertHasSubject('Tu reserva 000125-9 fue cancelada por falta de pago');
-        $correo->assertSeeInHtml('el saldo no se pagó antes de la fecha límite, el 01/01/2027');
+        $correo->assertSeeInHtml('el saldo no se pagó antes de la fecha límite, el 01/01/2027 a las 23:59.');
         $correo->assertSeeInHtml('no es reembolsable');
     }
 
