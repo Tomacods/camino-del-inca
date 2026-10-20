@@ -38,13 +38,22 @@ necesita RESERVA.
 | CU-01 | Crear Paquete | Administrador | Panel |
 | CU-02 | Modificar Paquete | Administrador | Panel |
 | CU-03 | Eliminar Paquete | Administrador | Panel |
-| CU-05 | Listar Paquetes | Cliente | Portal |
-| CU-06 | Consultar Paquete | Cliente | Portal |
+| CU-05 | Listar Paquetes | Cliente, Administrador | Portal y Panel |
+| CU-06 | Consultar Paquete | Cliente, Administrador | Portal y Panel |
 | CU-08 | Listar Valoraciones | Administrador | Panel |
 | CU-09 | Consultar Valoración | Administrador | Panel |
 | CU-23 | Valorar Servicios | Cliente | Portal |
 | CU-24 | Iniciar Sesión | Administrador, Guía | Panel |
 | CU-25 | Cerrar Sesión | Administrador, Guía | Panel |
+
+CU-05 y CU-06 son compartidos: el flujo principal corresponde al cliente y el uso del administrador está definido
+como alternativa. En el panel, el administrador lista y consulta paquetes activos e inactivos, y filtra el listado
+por estado.
+
+La parte administrativa de CU-01, CU-02, CU-03, CU-05 y CU-06 se implementa en un único recurso de Paquetes en
+Filament: listado con filtro Activo/Inactivo, vista del paquete con sus excursiones y cupo disponible, creación,
+edición y baja lógica. El cupo se calcula con la misma regla del modelo que usa el portal. Los cinco casos siguen
+siendo responsabilidad de Mariano.
 
 ## Área B — Reserva y pagos
 
