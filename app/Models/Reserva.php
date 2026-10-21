@@ -10,6 +10,7 @@ use App\Enums\TipoNotificacion;
 use App\Enums\TipoPago;
 use App\Jobs\LiberarCupoRetenido;
 use App\Mail\NotificacionCliente;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Closure;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
@@ -249,6 +250,52 @@ class Reserva extends Model
 
         $this->fecha_limite_confirmacion = $fechaLimite;
         $this->fecha_limite_saldo = $this->estado_saldo === EstadoSaldo::Adeudado ? $fechaLimite : null;
+    }
+
+    // CU-15 y CU-16: los datos del comprobante de este pago. Los pagos posteriores no cambian el saldo que informa.
+    // Se pasan arreglos al PDF y al correo para conservar los datos cuando el mensaje espera en la cola.
+    public function getDatosComprobante(Pago $pago): array
+    {
+        if (! $pago->exists || (int) $pago->id_reserva !== (int) $this->id_reserva) {
+            throw new InvalidArgumentException('El pago no pertenece a esta reserva.');
+        }
+
+        $montoTotal = round($this->calcularMontoTotal(), 2);
+        $montoAbonado = (float) $this->pagos()->where('id_pago', '<=', $pago->id_pago)->sum('monto');
+
+        return [
+            ...$pago->getComprobante()->getDatos(),
+            'reserva' => Arr::only($this->getDatos(), [
+                'numero_reserva', 'correo_electronico', 'noches_extra_antes', 'noches_extra_despues',
+            ]),
+            'excursion' => [
+                'id_excursion' => $this->id_excursion,
+                'paquete' => $this->excursion->paquete->nombre,
+                'fecha_salida' => $this->excursion->getFechaSalida(),
+            ],
+            'paquete' => $this->excursion->paquete->getDatosComprobante(),
+            'excursionistas' => $this->excursionistas
+                ->map(fn (Excursionista $integrante) => Arr::only($integrante->getDatos(), ['nombre', 'apellido']))
+                ->all(),
+            'noches_extra' => $this->noches_extra_antes + $this->noches_extra_despues,
+            'monto_total' => $montoTotal,
+            'pago' => $pago->getPago(),
+            'saldo_despues_pago' => round($montoTotal - $montoAbonado, 2),
+        ];
+    }
+
+    public function generarComprobantePdf(Pago $pago): string
+    {
+        return self::armarComprobantePdf($this->getDatosComprobante($pago));
+    }
+
+    // No consulta modelos: también genera el adjunto con los datos que se leyeron al encolar el correo (CU-13).
+    public static function armarComprobantePdf(array $datos): string
+    {
+        return Pdf::loadView('comprobantes.pago', ['datos' => $datos])
+            ->setPaper('a4')
+            ->setOption('isFontSubsettingEnabled', true)
+            ->output();
     }
 
     /* ----------------------------- CU-18 Consultar ---------------------------- */
