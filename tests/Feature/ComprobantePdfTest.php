@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Enums\EstadoPermiso;
 use App\Enums\TipoPago;
 use App\Models\Pago;
 use App\Models\Reserva;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ComprobantePdfTest extends TestCase
@@ -34,6 +36,7 @@ class ComprobantePdfTest extends TestCase
         $this->assertSame('000124-7', $datos['reserva']['numero_reserva']);
         $this->assertSame('lucia.fernandez@mail.com', $datos['reserva']['correo_electronico']);
         $this->assertSame('Camino Inca Clásico', $datos['excursion']['paquete']);
+        $this->assertArrayNotHasKey('id_excursion', $datos['excursion']);
         $this->assertSame('18/01/2027', $datos['excursion']['fecha_salida']->format('d/m/Y'));
         $this->assertSame('Camino Inca de 4 días', $datos['paquete']['recorrido']['nombre_recorrido']);
         $this->assertEquals(4, $datos['paquete']['recorrido']['duracion_dias']);
@@ -131,6 +134,69 @@ class ComprobantePdfTest extends TestCase
         }
 
         $this->assertStringContainsString('DejaVu Sans', $html);
+        $this->assertMatchesRegularExpression('/Detalle del pago.*Detalle del viaje/s', $html);
+        $this->assertStringNotContainsString('N.º '.$reserva->id_excursion, $textoRenderizado);
+    }
+
+    public function test_la_vista_indica_sin_noches_extra_cuando_no_se_contrataron(): void
+    {
+        $reserva = Reserva::buscarReserva('000125-9');
+        $datos = $reserva->getDatosComprobante($reserva->pagos()->sole());
+
+        $html = view('comprobantes.pago', ['datos' => $datos])->render();
+
+        $this->assertStringContainsString('Sin noches extra', $html);
+        $this->assertStringNotContainsString('0 (antes: 0; después: 0)', $html);
+    }
+
+    #[DataProvider('reservasConComprobanteDeUnaPagina')]
+    public function test_el_comprobante_de_sena_y_el_de_total_ocupan_una_pagina(string $numeroReserva, TipoPago $tipoPago): void
+    {
+        $reserva = Reserva::buscarReserva($numeroReserva);
+        $pago = $reserva->pagos()->sole();
+        $this->assertSame($tipoPago, $pago->tipo_pago);
+
+        $pdf = $reserva->generarComprobantePdf($pago);
+
+        $this->assertStringStartsWith('%PDF', $pdf);
+        $this->assertSame(1, preg_match_all('/\/Type\s*\/Page\b/', $pdf));
+    }
+
+    public static function reservasConComprobanteDeUnaPagina(): array
+    {
+        return [
+            'Seña de 000125-9' => ['000125-9', TipoPago::Sena],
+            'Total de 000126-0' => ['000126-0', TipoPago::Total],
+        ];
+    }
+
+    public function test_el_comprobante_con_seis_integrantes_ocupa_una_pagina(): void
+    {
+        $reserva = Reserva::buscarReserva('000124-7');
+        foreach ([
+            ['nombre' => 'José', 'apellido' => 'Peña'],
+            ['nombre' => 'María', 'apellido' => 'Núñez'],
+            ['nombre' => 'Álvaro', 'apellido' => 'Quiñones'],
+        ] as $posicion => $integrante) {
+            $reserva->excursionistas()->create([
+                ...$integrante,
+                'documento_pasaporte' => 'COMPROBANTE-'.($posicion + 4),
+                'equipo_camping' => false,
+                'estado_permiso' => EstadoPermiso::Pendiente,
+            ]);
+        }
+        $pago = $reserva->pagos()->sole();
+        $datos = $reserva->getDatosComprobante($pago);
+        $this->assertCount(6, $datos['excursionistas']);
+        $html = view('comprobantes.pago', ['datos' => $datos])->render();
+        foreach ($datos['excursionistas'] as $integrante) {
+            $this->assertStringContainsString($integrante['nombre'].' '.$integrante['apellido'], $html);
+        }
+
+        $pdf = $reserva->generarComprobantePdf($pago);
+
+        $this->assertStringStartsWith('%PDF', $pdf);
+        $this->assertSame(1, preg_match_all('/\/Type\s*\/Page\b/', $pdf));
     }
 
     public function test_rechaza_un_pago_que_pertenece_a_otra_reserva(): void

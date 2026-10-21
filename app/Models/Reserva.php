@@ -269,7 +269,6 @@ class Reserva extends Model
                 'numero_reserva', 'correo_electronico', 'noches_extra_antes', 'noches_extra_despues',
             ]),
             'excursion' => [
-                'id_excursion' => $this->id_excursion,
                 'paquete' => $this->excursion->paquete->nombre,
                 'fecha_salida' => $this->excursion->getFechaSalida(),
             ],
