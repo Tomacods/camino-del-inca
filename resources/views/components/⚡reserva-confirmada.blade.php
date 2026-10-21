@@ -10,6 +10,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 // Pantalla de vuelta de Mercado Pago y del paso 11 de Pagar Reserva (CU-15): con el pago aprobado registra la reserva y
 // muestra el número de reserva y el comprobante. No hay notificaciones de Mercado Pago (webhooks): los datos de la
@@ -145,6 +146,24 @@ new #[Title('Pago de la reserva')] class extends Component
 
         return $reserva;
     }
+
+    public function descargarComprobante(): ?StreamedResponse
+    {
+        $reserva = $this->reserva;
+        $pago = $reserva?->pagos->first();
+
+        if ($pago === null) {
+            return null;
+        }
+
+        return response()->streamDownload(
+            function () use ($reserva, $pago): void {
+                echo $reserva->generarComprobantePdf($pago);
+            },
+            'comprobante-'.$pago->comprobante->numero_comprobante.'.pdf',
+            ['Content-Type' => 'application/pdf'],
+        );
+    }
 };
 
 ?>
@@ -199,6 +218,11 @@ new #[Title('Pago de la reserva')] class extends Component
                     <dd class="font-semibold tabular-nums">{{ $dolares($pago->monto) }}</dd>
                 </div>
             </dl>
+
+            <x-boton wire:click="descargarComprobante" wire:loading.attr="disabled" wire:target="descargarComprobante" class="mt-5">
+                <span wire:loading.remove wire:target="descargarComprobante">Descargar comprobante</span>
+                <span wire:loading wire:target="descargarComprobante">Preparando comprobante…</span>
+            </x-boton>
         </x-tarjeta>
 
         <x-tarjeta titulo="Tu viaje" class="mt-5">
