@@ -49,7 +49,7 @@ class ListarPaquetesTest extends TestCase
     public function test_muestra_los_datos_resumen_de_cada_paquete(): void
     {
         $paquete = $this->crearPaquete('Camino Inca Clásico');
-        $this->crearExcursion($paquete, '2027-01-04');
+        $this->crearExcursion($paquete, '2027-02-15');
 
         $respuesta = $this->get('/paquetes');
 
@@ -58,7 +58,7 @@ class ListarPaquetesTest extends TestCase
         $respuesta->assertSee('Camino Inca de 4 días');
         $respuesta->assertDontSee('Camino Inca de 4 días · 4 días');
         $respuesta->assertSee('USD 750');
-        $respuesta->assertSee('04/01/2027');
+        $respuesta->assertSee('15/02/2027');
     }
 
     public function test_muestra_solo_los_paquetes_activos(): void
@@ -80,27 +80,33 @@ class ListarPaquetesTest extends TestCase
         $this->get('/paquetes')->assertSeeInOrder(['Paquete nuevo', 'Paquete viejo']);
     }
 
-    public function test_muestra_solo_las_salidas_futuras_que_tienen_cupo(): void
+    // Disponibles: a 3 meses o más (como pide Realizar Reserva) y con cupo. La fecha fija es el 06/10/2026, así que el
+    // límite es el 06/01/2027.
+    public function test_muestra_solo_las_salidas_que_se_pueden_reservar(): void
     {
         $paquete = $this->crearPaquete('Camino Inca Clásico');
         $this->crearExcursion($paquete, '2026-09-07');
-        $this->crearExcursion($paquete, '2027-01-04');
+        $this->crearExcursion($paquete, '2026-12-14');
+        $this->crearExcursion($paquete, '2027-01-06');
+        $this->crearExcursion($paquete, '2027-02-15');
         $this->crearExcursion($paquete, '2027-02-01', plazasRetenidas: 12);
 
         $respuesta = $this->get('/paquetes');
 
-        $respuesta->assertSee('04/01/2027');
+        $respuesta->assertSee('06/01/2027');
+        $respuesta->assertSee('15/02/2027');
         $respuesta->assertDontSee('07/09/2026');
+        $respuesta->assertDontSee('14/12/2026');
         $respuesta->assertDontSee('01/02/2027');
     }
 
     public function test_cada_salida_lleva_al_formulario_de_reserva(): void
     {
         $paquete = $this->crearPaquete('Camino Inca Clásico');
-        $this->crearExcursion($paquete, '2027-01-04');
+        $this->crearExcursion($paquete, '2027-02-15');
 
         $this->get('/paquetes')
-            ->assertSee('href="/reservar/'.$paquete->id_paquete.'/2027-01-04"', false);
+            ->assertSee('href="/reservar/'.$paquete->id_paquete.'/2027-02-15"', false);
     }
 
     // Flujo alternativo A2.
@@ -133,10 +139,10 @@ class ListarPaquetesTest extends TestCase
     {
         $clasico = $this->crearPaquete('Camino Inca Clásico');
         $corto = $this->crearPaquete('Camino Inca Corto');
-        $this->crearExcursion($clasico, '2027-01-04');
-        $this->crearExcursion($corto, '2027-01-11');
+        $this->crearExcursion($clasico, '2027-02-15');
+        $this->crearExcursion($corto, '2027-02-22');
 
-        $this->buscar('04/01/2027')
+        $this->buscar('15/02/2027')
             ->assertHasNoErrors()
             ->assertSee('Camino Inca Clásico')
             ->assertDontSee('Camino Inca Corto');
@@ -148,6 +154,14 @@ class ListarPaquetesTest extends TestCase
         $this->crearExcursion($paquete, '2027-02-01', plazasRetenidas: 12);
 
         $this->buscar('01/02/2027')->assertSee('No encontramos paquetes para «01/02/2027»');
+    }
+
+    public function test_una_fecha_a_menos_de_tres_meses_no_coincide(): void
+    {
+        $paquete = $this->crearPaquete('Camino Inca Clásico');
+        $this->crearExcursion($paquete, '2026-12-14');
+
+        $this->buscar('14/12/2026')->assertSee('No encontramos paquetes para «14/12/2026»');
     }
 
     public function test_una_fecha_que_ya_paso_no_coincide(): void
@@ -188,7 +202,7 @@ class ListarPaquetesTest extends TestCase
             ->assertHasErrors(['criterio' => 'date_format'])
             ->assertSee('Camino Inca Clásico');
 
-        $this->buscar('2027-01-04')->assertHasErrors(['criterio' => 'date_format']);
+        $this->buscar('2027-02-15')->assertHasErrors(['criterio' => 'date_format']);
     }
 
     // La búsqueda aplicada sólo la cambia buscarPaquetes(), después de validar el criterio.

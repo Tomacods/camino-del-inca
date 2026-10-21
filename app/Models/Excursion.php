@@ -425,10 +425,13 @@ class Excursion extends Model
 
     /* ------------------------- CU-05 Listar paquetes ------------------------- */
 
-    // También para CU-06: una salida está disponible si todavía no salió y le queda al menos un lugar.
+    // También para CU-06: una salida está disponible si se puede reservar, es decir, si está a 3 meses o más (la misma
+    // regla con la que Realizar Reserva la acepta) y le queda al menos un lugar. La anticipación se mira primero, así
+    // no se calcula el cupo de las salidas que no se van a mostrar.
     public static function getExcursionesDisponibles(int $idPaquete): Collection
     {
         return self::buscarFuturas($idPaquete)
+            ->filter(fn (Excursion $excursion) => $excursion->cumpleAnticipacionMinima(today()))
             ->filter(fn (Excursion $excursion) => $excursion->obtenerCupoDisponible() > 0)
             ->values();
     }
@@ -441,14 +444,14 @@ class Excursion extends Model
             ->get();
     }
 
-    // Búsqueda por fecha: si el paquete tiene una salida disponible ese día, es decir, futura y con cupo. Busca sólo esa
-    // salida, sin recalcular el cupo de las demás.
+    // Búsqueda por fecha: si el paquete tiene una salida disponible ese día, con la misma regla que el listado. Busca
+    // sólo esa salida, sin recalcular el cupo de las demás.
     public static function tieneFechaSalida(int $idPaquete, Carbon $fecha): bool
     {
         $excursion = self::buscarPorFechaSalida($idPaquete, $fecha->format('Y-m-d'));
 
         return $excursion !== null
-            && $excursion->getFechaSalida()->isAfter(today())
+            && $excursion->cumpleAnticipacionMinima(today())
             && $excursion->obtenerCupoDisponible() > 0;
     }
 

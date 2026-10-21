@@ -81,25 +81,27 @@ class ConsultarPaqueteTest extends TestCase
     public function test_muestra_las_salidas_disponibles_con_su_cupo_y_su_guia(): void
     {
         $this->crearExcursion($this->paquete, '2026-09-07');
-        $this->crearExcursion($this->paquete, '2027-01-04', plazasRetenidas: 4);
+        $this->crearExcursion($this->paquete, '2026-12-14');
+        $this->crearExcursion($this->paquete, '2027-02-15', plazasRetenidas: 4);
         $this->crearExcursion($this->paquete, '2027-02-01', plazasRetenidas: 12);
 
         $respuesta = $this->get('/paquetes/'.$this->paquete->id_paquete);
 
-        $respuesta->assertSee('04/01/2027');
+        $respuesta->assertSee('15/02/2027');
         $respuesta->assertSee('Quedan 8 lugares');
         $respuesta->assertSee('Guía: Rosa Quispe');
         $respuesta->assertDontSee('07/09/2026');
+        $respuesta->assertDontSee('14/12/2026');
         $respuesta->assertDontSee('01/02/2027');
     }
 
     // Flujo alternativo A2.
     public function test_cada_salida_lleva_al_formulario_de_reserva(): void
     {
-        $this->crearExcursion($this->paquete, '2027-01-04');
+        $this->crearExcursion($this->paquete, '2027-02-15');
 
         $this->get('/paquetes/'.$this->paquete->id_paquete)
-            ->assertSee('href="/reservar/'.$this->paquete->id_paquete.'/2027-01-04"', false);
+            ->assertSee('href="/reservar/'.$this->paquete->id_paquete.'/2027-02-15"', false);
     }
 
     public function test_calcula_el_promedio_con_las_valoraciones_de_sus_reservas(): void

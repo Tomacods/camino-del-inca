@@ -33,7 +33,7 @@ new #[Title('Paquetes')] class extends Component
     {
         return [
             'criterio.max' => 'La búsqueda puede tener hasta 100 caracteres.',
-            'criterio.date_format' => 'La fecha de salida tiene que tener el formato dd/mm/aaaa, por ejemplo 04/01/2027.',
+            'criterio.date_format' => 'La fecha de salida tiene que tener el formato dd/mm/aaaa, por ejemplo 15/03/2027.',
         ];
     }
 
@@ -90,7 +90,7 @@ new #[Title('Paquetes')] class extends Component
     <x-tarjeta class="mt-10">
         <form wire:submit="buscarPaquetes" class="grid gap-5 md:grid-cols-[1fr_auto]">
             <x-campo nombre="criterio" etiqueta="Buscar por nombre o fecha de salida" wire:model="criterio"
-                     placeholder="Ej.: Clásico o 04/01/2027" />
+                     placeholder="Ej.: Clásico o 15/03/2027" />
 
             <div>
                 {{-- Ocupa el lugar de la etiqueta, para que el botón quede a la altura del campo. --}}
