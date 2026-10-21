@@ -52,6 +52,7 @@
                     <tr><td style="{{ $celdaTitulo }}">Precio final</td><td style="{{ $celdaDato }}">{{ $dolares($datos['monto_total']) }}</td></tr>
                     <tr><td style="{{ $celdaTitulo }}">Abonado ({{ $datos['ultimo_pago']['tipo_pago']->value }})</td><td style="{{ $celdaDato }}">{{ $dolares($datos['ultimo_pago']['monto']) }}, con {{ $datos['ultimo_pago']['medio_pago'] }}</td></tr>
                 </table>
+                <p style="margin:0 0 24px">Te adjuntamos el comprobante en PDF.</p>
                 @break
 
             @case(TipoNotificacion::PagoSaldo)
@@ -66,6 +67,7 @@
                     <tr><td style="{{ $celdaTitulo }}">Monto abonado</td><td style="{{ $celdaDato }}">{{ $dolares($datos['ultimo_pago']['monto']) }}, con {{ $datos['ultimo_pago']['medio_pago'] }}</td></tr>
                     <tr><td style="{{ $celdaTitulo }}">Saldo</td><td style="{{ $celdaDato }}">{{ $reserva['estado_saldo']->value }}</td></tr>
                 </table>
+                <p style="margin:0 0 24px">Te adjuntamos el comprobante en PDF.</p>
                 @break
 
             @case(TipoNotificacion::CancelacionReserva)

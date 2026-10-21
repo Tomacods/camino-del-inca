@@ -1196,7 +1196,7 @@ class Reserva extends Model
         if (in_array($tipoNotificacion, [TipoNotificacion::PrimeraCompra, TipoNotificacion::PagoSaldo], true)) {
             $ultimoPago = $this->getUltimoPago();
             $datos['ultimo_pago'] = $ultimoPago->getPago();
-            $datos['comprobante'] = $ultimoPago->getComprobante()?->getDatos();
+            $datos['comprobante'] = $this->getDatosComprobante($ultimoPago);
         }
 
         if ($tipoNotificacion === TipoNotificacion::PrimeraCompra) {

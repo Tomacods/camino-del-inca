@@ -110,6 +110,106 @@ class NotificarClienteTest extends TestCase
         ];
     }
 
+    #[DataProvider('tiposConComprobante')]
+    public function test_primera_compra_y_pago_de_saldo_adjuntan_el_pdf_del_ultimo_pago(TipoNotificacion $tipoNotificacion): void
+    {
+        Mail::fake();
+        $reserva = Reserva::buscarReserva('000125-9');
+        $pagoSaldo = Pago::registrarPagoSaldo($reserva, 'Tarjeta de débito');
+
+        Reserva::notificarCliente($tipoNotificacion, '000125-9');
+
+        $correo = $this->correoEnviado($tipoNotificacion, 'federico.rios@mail.com');
+        $adjuntos = $correo->attachments();
+        $this->assertCount(1, $adjuntos);
+        $this->assertSame('comprobante-'.$pagoSaldo->comprobante->numero_comprobante.'.pdf', $adjuntos[0]->as);
+        $this->assertSame('application/pdf', $adjuntos[0]->mime);
+        $contenido = $adjuntos[0]->attachWith(
+            fn () => $this->fail('El comprobante debe generarse desde los datos del correo.'),
+            fn ($datos) => $datos(),
+        );
+        $this->assertStringStartsWith('%PDF', $contenido);
+        $correo->assertSeeInHtml('Te adjuntamos el comprobante en PDF.');
+    }
+
+    #[DataProvider('tiposSinComprobante')]
+    public function test_los_otros_seis_tipos_no_adjuntan_un_pdf(TipoNotificacion $tipoNotificacion): void
+    {
+        Mail::fake();
+
+        // Esta reserva admite también Permisos Rechazados, que requiere al menos un permiso no obtenido.
+        Reserva::notificarCliente($tipoNotificacion, '000123-5');
+
+        $correo = $this->correoEnviado($tipoNotificacion, 'diego.morales@mail.com');
+        $this->assertSame([], $correo->attachments());
+        $correo->assertDontSeeInHtml('Te adjuntamos el comprobante en PDF.');
+    }
+
+    public static function tiposSinComprobante(): array
+    {
+        return [
+            'Cancelación de Reserva' => [TipoNotificacion::CancelacionReserva],
+            'Permisos Obtenidos' => [TipoNotificacion::PermisosObtenidos],
+            'Permisos Rechazados' => [TipoNotificacion::PermisosRechazados],
+            'Cancelación por Falta de Pago' => [TipoNotificacion::CancelacionFaltaPago],
+            'Etapa Final' => [TipoNotificacion::EtapaFinal],
+            'Cancelación por Falta de Permisos' => [TipoNotificacion::CancelacionFaltaPermisos],
+        ];
+    }
+
+    public function test_el_adjunto_se_genera_al_enviar_con_los_datos_guardados_al_encolar(): void
+    {
+        Mail::fake();
+        $reserva = Reserva::buscarReserva('000125-9');
+        $pago = $reserva->pagos()->sole();
+        $numeroComprobante = $pago->comprobante->numero_comprobante;
+
+        Reserva::notificarCliente(TipoNotificacion::PrimeraCompra, '000125-9');
+
+        // La cola serializa el mensaje, y el PDF todavía no está generado ni guardado como texto binario.
+        $correo = unserialize(serialize($this->correoEnviado(TipoNotificacion::PrimeraCompra, 'federico.rios@mail.com')));
+        $datosComprobante = $correo->datos['comprobante'];
+        $this->assertStringNotContainsString('%PDF', serialize($datosComprobante));
+
+        $reserva->update(['noches_extra_antes' => 1, 'correo_electronico' => 'nuevo@mail.com']);
+        $reserva->excursion->paquete->update(['nombre' => 'Paquete modificado', 'precio_base' => 9999]);
+        $reserva->excursionistas()->update(['nombre' => 'Nombre modificado']);
+        $pago->update(['medio_pago' => 'Medio modificado']);
+        $pago->comprobante->update(['numero_comprobante' => '0001-99999999']);
+
+        // Al salir de la cola, el adjunto no vuelve a consultar modelos que ahora contienen otros datos.
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        try {
+            $adjunto = $correo->attachments()[0];
+            $contenido = $adjunto->attachWith(
+                fn () => $this->fail('El comprobante debe generarse desde los datos del correo.'),
+                fn ($datos) => $datos(),
+            );
+            $this->assertSame([], DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+        }
+
+        $this->assertSame($datosComprobante, $correo->datos['comprobante']);
+        $this->assertSame('comprobante-'.$numeroComprobante.'.pdf', $adjunto->as);
+        $this->assertStringStartsWith('%PDF', $contenido);
+        $vistaComprobante = view('comprobantes.pago', ['datos' => $correo->datos['comprobante']])->render();
+        $this->assertStringContainsString('federico.rios@mail.com', $vistaComprobante);
+        $this->assertStringContainsString('Camino Inca Clásico', $vistaComprobante);
+        $this->assertStringContainsString('Federico Ríos', $vistaComprobante);
+        $this->assertStringContainsString($numeroComprobante, $vistaComprobante);
+        $this->assertStringNotContainsString('Paquete modificado', $vistaComprobante);
+        $this->assertStringNotContainsString('Nombre modificado', $vistaComprobante);
+        $this->assertStringNotContainsString('Medio modificado', $vistaComprobante);
+        $this->assertStringNotContainsString('nuevo@mail.com', $vistaComprobante);
+        $correo->assertSeeInHtml('Camino Inca Clásico');
+        $correo->assertDontSeeInHtml('Paquete modificado');
+        $correo->assertDontSeeInHtml('Nombre modificado');
+        $correo->assertDontSeeInHtml('Medio modificado');
+        $correo->assertDontSeeInHtml('nuevo@mail.com');
+    }
+
     // CU-21 con más de 30 días de anticipación: el 50 % de lo abonado. La fecha de cancelación es la del envío.
     public function test_cancelacion_de_reserva_con_reembolso(): void
     {
