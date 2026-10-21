@@ -10,6 +10,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 // Pantalla de vuelta de Mercado Pago de Pagar Saldo Pendiente (CU-16), pasos 7 a 10: con el pago aprobado registra el
 // pago «Saldo» y muestra el comprobante. No hay notificaciones de Mercado Pago (webhooks), como en CU-15: el pago se
@@ -151,6 +152,24 @@ new #[Title('Pago del saldo')] class extends Component
     {
         return $this->reserva?->pagos->firstWhere('tipo_pago', TipoPago::Saldo);
     }
+
+    public function descargarComprobante(): ?StreamedResponse
+    {
+        $reserva = $this->reserva;
+        $pago = $this->pagoSaldo;
+
+        if ($pago === null) {
+            return null;
+        }
+
+        return response()->streamDownload(
+            function () use ($reserva, $pago): void {
+                echo $reserva->generarComprobantePdf($pago);
+            },
+            'comprobante-'.$pago->comprobante->numero_comprobante.'.pdf',
+            ['Content-Type' => 'application/pdf'],
+        );
+    }
 };
 
 ?>
@@ -202,6 +221,11 @@ new #[Title('Pago del saldo')] class extends Component
                     <dd class="font-semibold tabular-nums">{{ $dolares($pago->monto) }}</dd>
                 </div>
             </dl>
+
+            <x-boton variante="secundario" wire:click="descargarComprobante" wire:loading.attr="disabled" wire:target="descargarComprobante" class="mt-5">
+                <span wire:loading.remove wire:target="descargarComprobante">Descargar comprobante</span>
+                <span wire:loading wire:target="descargarComprobante">Preparando comprobante…</span>
+            </x-boton>
         </x-tarjeta>
 
         <x-boton href="/mi-reserva" class="mt-8">Ir a Mi reserva</x-boton>
