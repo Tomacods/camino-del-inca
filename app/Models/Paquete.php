@@ -57,6 +57,19 @@ class Paquete extends Model
         return $this->hasMany(Excursion::class, 'id_paquete', 'id_paquete');
     }
 
+    /* --------------------------- CU-01 Crear paquete --------------------------- */
+
+    // R-01: al crearse, el paquete queda «Activo», listo para recibir reservas. Los servicios y las excursiones los
+    // guarda después el formulario del panel, con sus relaciones.
+    public static function crearPaquete(array $datos): self
+    {
+        return self::create([
+            ...$datos,
+            'estado' => EstadoPaquete::Activo,
+            'fecha_creacion' => today(),
+        ]);
+    }
+
     /* ------------------------------ CU-15 Pagar ------------------------------- */
 
     // Las noches extra se contratan para todo el grupo y se cobran por persona; el equipo de camping, por equipo. Los

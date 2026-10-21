@@ -1,0 +1,135 @@
+<?php
+
+namespace App\Filament\Resources\Paquetes\Schemas;
+
+use App\Models\Excursion;
+use App\Models\Guia;
+use App\Models\Recorrido;
+use App\Models\Servicio;
+use Closure;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
+use Illuminate\Support\Carbon;
+
+// Los datos del R-01. El formulario valida el formato; las reglas de negocio (salidas los lunes y guías sin
+// superposiciones) las decide el modelo Excursion.
+class PaqueteForm
+{
+    public static function configure(Schema $schema): Schema
+    {
+        return $schema->components([
+            Section::make('Datos del paquete')
+                ->columns(2)
+                ->schema([
+                    TextInput::make('nombre')
+                        ->label('Nombre')
+                        ->required()
+                        ->maxLength(80)
+                        ->unique(ignoreRecord: true),
+                    Select::make('id_recorrido')
+                        ->label('Recorrido')
+                        ->relationship('recorrido', 'nombre')
+                        ->required()
+                        ->helperText('Define la duración del viaje y las etapas que reporta el guía.'),
+                    TextInput::make('cantidad_porteadores')
+                        ->label('Cantidad de porteadores')
+                        ->integer()
+                        ->minValue(0)
+                        ->required(),
+                ]),
+
+            Section::make('Precios por persona')
+                ->columns(3)
+                ->schema([
+                    TextInput::make('precio_base')
+                        ->label('Precio base')
+                        ->prefix('USD')
+                        ->numeric()
+                        ->minValue(0.01)
+                        ->required(),
+                    TextInput::make('costo_noche_extra_cusco')
+                        ->label('Noche extra en Cusco')
+                        ->prefix('USD')
+                        ->numeric()
+                        ->minValue(0)
+                        ->required(),
+                    TextInput::make('costo_equipo_camping')
+                        ->label('Equipo de camping')
+                        ->prefix('USD')
+                        ->numeric()
+                        ->minValue(0)
+                        ->required(),
+                ]),
+
+            Section::make('Servicios incluidos')
+                ->description('Son los mismos para todas las excursiones del paquete.')
+                ->schema([
+                    CheckboxList::make('servicios')
+                        ->hiddenLabel()
+                        ->relationship('servicios', 'nombre')
+                        ->getOptionLabelFromRecordUsing(fn (Servicio $servicio) => $servicio->nombre.' ('.$servicio->tipo->value.')')
+                        ->columns(2)
+                        ->required(),
+                ]),
+
+            Section::make('Excursiones')
+                ->description('Cada una con su fecha de salida (siempre un lunes), su cupo y su guía.')
+                ->schema([
+                    Repeater::make('excursiones')
+                        ->hiddenLabel()
+                        ->relationship()
+                        ->schema([
+                            DatePicker::make('fecha_salida')
+                                ->label('Fecha de salida')
+                                ->displayFormat('d/m/Y')
+                                ->required()
+                                ->after('today')
+                                ->distinct()
+                                ->rules([
+                                    fn (): Closure => function (string $attribute, $value, Closure $fail) {
+                                        if (filled($value) && ! Excursion::esDiaDeSalida(Carbon::parse($value))) {
+                                            $fail('La salida tiene que ser un lunes.');
+                                        }
+                                    },
+                                ]),
+                            TextInput::make('cupo')
+                                ->label('Cupo')
+                                ->integer()
+                                ->minValue(1)
+                                ->required(),
+                            Select::make('id_guia')
+                                ->label('Guía')
+                                ->options(fn () => Guia::orderBy('apellido')->get()
+                                    ->mapWithKeys(fn (Guia $guia) => [$guia->id_usuario => $guia->getNombreCompleto()])
+                                    ->all())
+                                ->required(),
+                        ])
+                        ->columns(3)
+                        ->defaultItems(1)
+                        ->minItems(1)
+                        ->addActionLabel('Agregar excursión')
+                        ->rules([
+                            fn (Get $get): Closure => function (string $attribute, $value, Closure $fail) use ($get) {
+                                $recorrido = Recorrido::find($get('id_recorrido'));
+
+                                if ($recorrido === null) {
+                                    return;
+                                }
+
+                                $fecha = Excursion::buscarConflictoDeGuia(array_values($value ?? []), $recorrido->duracion_dias);
+
+                                if ($fecha !== null) {
+                                    $fail('El guía de la salida del '.$fecha->format('d/m/Y').' ya conduce otra excursión en esas fechas.');
+                                }
+                            },
+                        ]),
+                ]),
+        ]);
+    }
+}
