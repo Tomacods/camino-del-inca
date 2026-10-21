@@ -219,7 +219,7 @@ new #[Title('Pago de la reserva')] class extends Component
                 </div>
             </dl>
 
-            <x-boton wire:click="descargarComprobante" wire:loading.attr="disabled" wire:target="descargarComprobante" class="mt-5">
+            <x-boton variante="secundario" wire:click="descargarComprobante" wire:loading.attr="disabled" wire:target="descargarComprobante" class="mt-5">
                 <span wire:loading.remove wire:target="descargarComprobante">Descargar comprobante</span>
                 <span wire:loading wire:target="descargarComprobante">Preparando comprobante…</span>
             </x-boton>

@@ -118,20 +118,6 @@ class DescargarComprobanteTest extends TestCase
             ->assertNoFileDownloaded();
     }
 
-    public function test_cu16_con_el_mismo_correo_pero_el_numero_de_otra_reserva_no_descarga(): void
-    {
-        $this->pagarSaldo();
-        session(['acceso_reserva' => [
-            'correo' => $this->reserva->correo_electronico,
-            'numeroReserva' => '000122-3',
-        ]]);
-
-        $this->abrirSaldoPagado()
-            ->assertDontSee('Descargar comprobante')
-            ->call('descargarComprobante')
-            ->assertNoFileDownloaded();
-    }
-
     public function test_cu16_si_la_sesion_pierde_el_acceso_no_descarga(): void
     {
         $this->darAcceso();

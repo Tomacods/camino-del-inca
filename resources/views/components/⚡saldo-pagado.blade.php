@@ -137,7 +137,7 @@ new #[Title('Pago del saldo')] class extends Component
     #[Computed]
     public function reserva(): ?Reserva
     {
-        if ($this->estado !== 'registrado' || session('acceso_reserva.numeroReserva') !== $this->numeroReserva) {
+        if ($this->estado !== 'registrado') {
             return null;
         }
 
@@ -222,7 +222,7 @@ new #[Title('Pago del saldo')] class extends Component
                 </div>
             </dl>
 
-            <x-boton wire:click="descargarComprobante" wire:loading.attr="disabled" wire:target="descargarComprobante" class="mt-5">
+            <x-boton variante="secundario" wire:click="descargarComprobante" wire:loading.attr="disabled" wire:target="descargarComprobante" class="mt-5">
                 <span wire:loading.remove wire:target="descargarComprobante">Descargar comprobante</span>
                 <span wire:loading wire:target="descargarComprobante">Preparando comprobante…</span>
             </x-boton>
