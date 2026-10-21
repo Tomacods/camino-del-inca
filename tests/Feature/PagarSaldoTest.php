@@ -83,7 +83,7 @@ class PagarSaldoTest extends TestCase
             ->assertSeeInOrder(['Salida', '01/02/2027'])
             ->assertSeeInOrder(['Monto total de la reserva', 'USD 1.500,00'])
             ->assertSeeInOrder(['Abonado (seña, 01/10/2026)', 'USD 750,00'])
-            ->assertSeeInOrder(['Fecha límite para pagar el saldo', '01/01/2027'])
+            ->assertSeeInOrder(['Fecha límite para pagar el saldo', '01/01/2027 a las 23:59'])
             ->assertSeeInOrder(['Saldo pendiente', 'USD 750,00'])
             ->assertSee('Mercado Pago te cobra el equivalente en pesos, con su cotización del momento.')
             ->assertSee('Pagar el saldo con Mercado Pago')
@@ -141,12 +141,29 @@ class PagarSaldoTest extends TestCase
         $this->darAcceso();
 
         $this->abrirPantalla()
-            ->assertSee('El plazo para pagar el saldo venció el 01/01/2027 y la reserva se cancela por falta de pago.')
+            ->assertSee('El plazo para pagar el saldo venció el 01/01/2027 a las 23:59 y la reserva se cancela por falta de pago.')
             ->assertSeeHtml('href="/mi-reserva"')
             ->assertDontSee('Pagar el saldo con Mercado Pago');
 
         // La cancelación por falta de pago es de CU-22: esta pantalla sólo informa.
         $this->assertSame(EstadoReserva::Confirmada, $this->reserva->fresh()->estado);
+    }
+
+    // Regla de CU-16: los permisos se validaron el último día, el 01/01/2027 a las 22:00, así que el saldo se paga hasta
+    // las 72 horas de esa notificación. Pasadas las 23:59:59 del día límite de siempre, todavía se puede.
+    public function test_con_el_plazo_de_72_horas_se_paga_despues_del_dia_limite_original(): void
+    {
+        $this->reserva->update(['fecha_limite_saldo' => '2027-01-04 22:00:00']);
+        $this->travelTo(Carbon::parse('2027-01-02 10:00:00'));
+        $this->darAcceso();
+        $this->mercadoPago->responder(['id' => '123-abc', 'init_point' => self::DIRECCION_MERCADO_PAGO]);
+
+        $this->abrirPantalla()
+            ->assertSeeInOrder(['Fecha límite para pagar el saldo', '04/01/2027 a las 22:00'])
+            ->call('confirmarPago')
+            ->assertRedirect(self::DIRECCION_MERCADO_PAGO);
+
+        $this->assertSame('2027-01-02T10:05:00.000-03:00', $this->mercadoPago->datosDelPedido()['expiration_date_to']);
     }
 
     public function test_confirmar_el_pago_deriva_a_mercado_pago_con_el_saldo(): void

@@ -19,6 +19,7 @@ use App\Models\Paquete;
 use App\Models\Recorrido;
 use App\Models\Reserva;
 use App\Models\Usuario;
+use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -28,10 +29,13 @@ use Livewire\Livewire;
 use Tests\TestCase;
 
 // Solicitar Reintegro (CU-17). La reserva 000125-9 está «Sin Permiso» y tiene pagada la seña de USD 750: se devuelve
-// todo lo abonado, sin penalidad.
+// todo lo abonado, sin penalidad. Su fecha límite de confirmación es el 01/01/2027 a las 23:59:59: hasta ese segundo se
+// puede pedir el reintegro.
 class SolicitarReintegroTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const AVISO_PLAZO_VENCIDO = 'El plazo para elegir entre el reintegro y la reprogramación venció el 01/01/2027: la reserva ya no admite reintegro.';
 
     private Excursion $excursion;
 
@@ -163,6 +167,158 @@ class SolicitarReintegroTest extends TestCase
         $this->assertSame(EstadoReserva::Cancelada, $reserva->estado);
         $this->assertSame(MotivoDevolucion::Reintegro, $reserva->devolucion->motivo);
         Log::shouldHaveReceived('error')->once();
+    }
+
+    /* ---------------------- Plazo: fecha límite de confirmación ---------------------- */
+
+    public function test_dentro_del_plazo_se_ofrece_el_reintegro_y_se_puede_confirmar(): void
+    {
+        $reserva = $this->reserva->fresh();
+
+        $this->assertTrue($reserva->admiteReintegro());
+        $this->assertContains(Reserva::OPCION_REINTEGRO, $reserva->getOpcionesHabilitadas());
+
+        $this->assertSame(750.0, $reserva->confirmarReintegro(now()));
+
+        $this->assertSame(EstadoReserva::Cancelada, $reserva->estado);
+        $this->assertSame(MotivoDevolucion::Reintegro, $reserva->devolucion->motivo);
+        $this->assertSame('750.00', $reserva->devolucion->monto);
+    }
+
+    // El borde es el de verificarFechaLimiteConfirmacion(), el mismo que usan CU-04 para validar, CU-19 para reprogramar y
+    // CU-26 para cancelar: a las 23:59:59 del día límite todavía se puede elegir cualquiera de las dos opciones.
+    public function test_a_las_23_59_59_del_dia_limite_todavia_se_puede_pedir_el_reintegro(): void
+    {
+        $this->travelTo(Carbon::parse('2027-01-01 23:59:59'));
+        $reserva = $this->reserva->fresh();
+
+        $this->assertTrue($reserva->verificarFechaLimiteConfirmacion());
+        $this->assertTrue($reserva->admiteReintegro());
+        $this->assertTrue($reserva->admiteReprogramacion());
+        $this->assertSame([Reserva::OPCION_REINTEGRO, Reserva::OPCION_REPROGRAMAR], $reserva->getOpcionesHabilitadas());
+
+        $this->assertSame(750.0, $reserva->confirmarReintegro(now()));
+
+        $this->assertSame(EstadoReserva::Cancelada, $this->reserva->fresh()->estado);
+        $this->assertSame('750.00', $this->reserva->fresh()->devolucion->monto);
+    }
+
+    // Un segundo después, a las 00:00:00 del día siguiente, el plazo ya venció para las dos opciones: es cuando CU-26 la
+    // cancela.
+    public function test_a_las_00_00_00_del_dia_siguiente_ya_no_se_puede_pedir_el_reintegro(): void
+    {
+        $this->travelTo(Carbon::parse('2027-01-02 00:00:00'));
+        $reserva = $this->reserva->fresh();
+
+        $this->assertFalse($reserva->verificarFechaLimiteConfirmacion());
+        $this->assertFalse($reserva->admiteReintegro());
+        $this->assertFalse($reserva->admiteReprogramacion());
+        $this->assertSame([], $reserva->getOpcionesHabilitadas());
+
+        try {
+            $reserva->calcularReintegro();
+            $this->fail('Se calculó el reintegro con el plazo vencido.');
+        } catch (DomainException $excepcion) {
+            $this->assertSame(self::AVISO_PLAZO_VENCIDO, $excepcion->getMessage());
+        }
+
+        try {
+            $reserva->confirmarReintegro(now());
+            $this->fail('Se confirmó el reintegro con el plazo vencido.');
+        } catch (DomainException $excepcion) {
+            $this->assertSame(self::AVISO_PLAZO_VENCIDO, $excepcion->getMessage());
+        }
+
+        $this->assertSinCancelar();
+    }
+
+    // Una reserva que además dejó de estar «Sin Permiso» avisa por el estado (A1), como antes.
+    public function test_con_el_plazo_vencido_y_otro_estado_avisa_por_el_estado(): void
+    {
+        $this->travelTo(Carbon::parse('2027-01-10 10:00:00'));
+        $this->reserva->update(['estado' => EstadoReserva::Cancelada]);
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('La reserva se encuentra en estado «Cancelada» y no admite reintegro.');
+
+        $this->reserva->fresh()->calcularReintegro();
+    }
+
+    // El cliente vio el monto a las 23:50 del día límite y confirmó pasada la medianoche.
+    public function test_si_el_plazo_vence_entre_ver_el_monto_y_confirmar_no_se_cancela(): void
+    {
+        $this->travelTo(Carbon::parse('2027-01-01 23:50:00'));
+        $reserva = $this->reserva->fresh();
+        $this->assertSame(750.0, $reserva->calcularReintegro());
+
+        $this->travelTo(Carbon::parse('2027-01-02 00:00:00'));
+
+        try {
+            $reserva->confirmarReintegro(now());
+            $this->fail('Se confirmó el reintegro con el plazo vencido.');
+        } catch (DomainException $excepcion) {
+            $this->assertSame(self::AVISO_PLAZO_VENCIDO, $excepcion->getMessage());
+        }
+
+        $this->assertSinCancelar();
+    }
+
+    // Plazo vencido: el mismo aviso de error que A1, con el motivo.
+    public function test_con_el_plazo_vencido_la_pantalla_muestra_el_aviso(): void
+    {
+        $this->travelTo(Carbon::parse('2027-01-02 00:00:00'));
+        $this->darAcceso();
+
+        $this->abrirPantalla()
+            ->assertSet('paso', 1)
+            ->assertSee('No se puede solicitar el reintegro')
+            ->assertSee(self::AVISO_PLAZO_VENCIDO)
+            ->assertSee('Volver a mi reserva')
+            ->assertDontSee('Confirmar reintegro');
+    }
+
+    public function test_si_el_plazo_vence_antes_de_confirmar_la_pantalla_lo_avisa_y_no_cancela(): void
+    {
+        $this->travelTo(Carbon::parse('2027-01-01 23:50:00'));
+        $this->darAcceso();
+
+        $pantalla = $this->abrirPantalla()
+            ->assertSet('paso', 2)
+            ->assertSee('Confirmar reintegro');
+
+        $this->travelTo(Carbon::parse('2027-01-02 00:00:00'));
+
+        $pantalla->call('confirmar')
+            ->assertSet('paso', 1)
+            ->assertSee('No se puede solicitar el reintegro')
+            ->assertSee(self::AVISO_PLAZO_VENCIDO)
+            ->assertDontSee('Reserva cancelada con reintegro del 100 %');
+
+        $this->assertSinCancelar();
+        Mail::assertNothingQueued();
+    }
+
+    public function test_mi_reserva_ofrece_el_reintegro_hasta_las_23_59_59_del_dia_limite(): void
+    {
+        $this->darAcceso();
+
+        $this->travelTo(Carbon::parse('2027-01-01 23:59:59'));
+        Livewire::test('consultar-reserva')
+            ->assertSeeHtml('href="/mi-reserva/000125-9/reintegro"');
+
+        $this->travelTo(Carbon::parse('2027-01-02 00:00:00'));
+        Livewire::test('consultar-reserva')
+            ->assertSee('Reserva 000125-9')
+            ->assertDontSeeHtml('/mi-reserva/000125-9/reintegro')
+            ->assertSee('El plazo para elegir entre el reintegro y la reprogramación venció el 01/01/2027.');
+    }
+
+    // Ni estado ni devolución: la reserva sigue esperando a CU-26.
+    private function assertSinCancelar(): void
+    {
+        $reserva = $this->reserva->fresh();
+        $this->assertSame(EstadoReserva::SinPermiso, $reserva->estado);
+        $this->assertNull($reserva->devolucion);
     }
 
     private function abrirPantalla()

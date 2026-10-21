@@ -42,6 +42,34 @@ class LiberarCupoRetenidoTest extends TestCase
         $this->assertSame(3, $this->excursion->fresh()->plazas_retenidas);
     }
 
+    // La demorada puede llegar mucho después: la cola estuvo detenida o alguien reintentó a mano una tarea fallida.
+    // Para entonces otro cliente retuvo plazas, y no se le tienen que descontar.
+    public function test_si_la_tarea_llega_25_horas_despues_no_descuenta_de_nuevo(): void
+    {
+        (new LiberarCupoRetenido($this->excursion->id_excursion, 2, 'retencion-1'))->handle();
+        $this->assertSame(3, $this->excursion->fresh()->plazas_retenidas);
+
+        $this->travel(25)->hours();
+        $this->excursion->retenerCupo(2);
+
+        (new LiberarCupoRetenido($this->excursion->id_excursion, 2, 'retencion-1'))->handle();
+
+        $this->assertSame(5, $this->excursion->fresh()->plazas_retenidas);
+    }
+
+    public function test_si_la_tarea_llega_29_dias_despues_no_descuenta_de_nuevo(): void
+    {
+        (new LiberarCupoRetenido($this->excursion->id_excursion, 2, 'retencion-1'))->handle();
+        $this->assertSame(3, $this->excursion->fresh()->plazas_retenidas);
+
+        $this->travel(29)->days();
+        $this->excursion->retenerCupo(2);
+
+        (new LiberarCupoRetenido($this->excursion->id_excursion, 2, 'retencion-1'))->handle();
+
+        $this->assertSame(5, $this->excursion->fresh()->plazas_retenidas);
+    }
+
     public function test_dos_retenciones_de_la_misma_excursion_se_liberan_cada_una(): void
     {
         (new LiberarCupoRetenido($this->excursion->id_excursion, 2, 'retencion-1'))->handle();

@@ -8,9 +8,10 @@ use App\Enums\EstadoSaldo;
 use App\Enums\MotivoDevolucion;
 use App\Enums\TipoNotificacion;
 use App\Enums\TipoPago;
-use App\Enums\TipoServicio;
 use App\Jobs\LiberarCupoRetenido;
 use App\Mail\NotificacionCliente;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Closure;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -54,6 +55,10 @@ class Reserva extends Model
     private const SEGUNDOS_CANDADO = 10;
 
     private const SEGUNDOS_ESPERA_CANDADO = 5;
+
+    // Las que todavía esperan la confirmación de los permisos (CU-26): «Pendiente», sin validar (CU-04), y «Sin Permiso»,
+    // sin reintegro (CU-17) ni reprogramación (CU-19). Si la fecha límite vence en uno de estos estados, se cancela.
+    private const ESTADOS_SIN_CONFIRMAR = [EstadoReserva::Pendiente, EstadoReserva::SinPermiso];
 
     protected $table = 'reserva';
 
@@ -247,7 +252,65 @@ class Reserva extends Model
         $this->fecha_limite_saldo = $this->estado_saldo === EstadoSaldo::Adeudado ? $fechaLimite : null;
     }
 
+    // CU-15 y CU-16: los datos del comprobante de este pago. Los pagos posteriores no cambian el saldo que informa.
+    // Se pasan arreglos al PDF y al correo para conservar los datos cuando el mensaje espera en la cola.
+    public function getDatosComprobante(Pago $pago): array
+    {
+        if (! $pago->exists || (int) $pago->id_reserva !== (int) $this->id_reserva) {
+            throw new InvalidArgumentException('El pago no pertenece a esta reserva.');
+        }
+
+        $montoTotal = round($this->calcularMontoTotal(), 2);
+        $montoAbonado = (float) $this->pagos()->where('id_pago', '<=', $pago->id_pago)->sum('monto');
+
+        return [
+            ...$pago->getComprobante()->getDatos(),
+            'reserva' => Arr::only($this->getDatos(), [
+                'numero_reserva', 'correo_electronico', 'noches_extra_antes', 'noches_extra_despues',
+            ]),
+            'excursion' => [
+                'paquete' => $this->excursion->paquete->nombre,
+                'fecha_salida' => $this->excursion->getFechaSalida(),
+            ],
+            'paquete' => $this->excursion->paquete->getDatosComprobante(),
+            'excursionistas' => $this->excursionistas
+                ->map(fn (Excursionista $integrante) => Arr::only($integrante->getDatos(), ['nombre', 'apellido']))
+                ->all(),
+            'noches_extra' => $this->noches_extra_antes + $this->noches_extra_despues,
+            'monto_total' => $montoTotal,
+            'pago' => $pago->getPago(),
+            'saldo_despues_pago' => round($montoTotal - $montoAbonado, 2),
+        ];
+    }
+
+    public function generarComprobantePdf(Pago $pago): string
+    {
+        return self::armarComprobantePdf($this->getDatosComprobante($pago));
+    }
+
+    // No consulta modelos: también genera el adjunto con los datos que se leyeron al encolar el correo (CU-13).
+    public static function armarComprobantePdf(array $datos): string
+    {
+        return Pdf::loadView('comprobantes.pago', ['datos' => $datos])
+            ->setPaper('a4')
+            ->setOption('isFontSubsettingEnabled', true)
+            ->output();
+    }
+
     /* ----------------------------- CU-18 Consultar ---------------------------- */
+
+    // A1. El dígito tiene que ser el que calcularDigitoVerificador() da para las seis cifras. Un número con otro
+    // formato tampoco es válido.
+    public static function validarNumeroReserva(string $numeroReserva): bool
+    {
+        if (preg_match('/^\d{'.self::CIFRAS_NUMERO_RESERVA.'}-\d$/', $numeroReserva) !== 1) {
+            return false;
+        }
+
+        [$cifras, $digito] = explode('-', $numeroReserva);
+
+        return self::calcularDigitoVerificador((int) $cifras) === (int) $digito;
+    }
 
     // Los correos se guardan en minúsculas y sin espacios en las puntas: el que escribe el cliente se convierte igual,
     // así encuentra su reserva aunque lo escriba con otras mayúsculas.
@@ -282,7 +345,9 @@ class Reserva extends Model
     }
 
     // «Modificar reserva» se ofrece con la misma anticipación que exige iniciarModificacion() (CU-20): a menos de 3 meses
-    // de la salida, la pantalla de modificar la rechazaría.
+    // de la salida, la pantalla de modificar la rechazaría. «Solicitar reintegro» y «Solicitar reprogramación», con la
+    // misma regla que exigen calcularReintegro() (CU-17) e iniciarReprogramacion() (CU-19): con el plazo vencido, las dos
+    // pantallas la rechazarían.
     public function getOpcionesHabilitadas(): array
     {
         return $this->determinarOpciones(
@@ -290,6 +355,8 @@ class Reserva extends Model
             $this->estado_saldo,
             $this->tieneValoracion(),
             $this->excursion->cumpleAnticipacionMinima(now()),
+            $this->admiteReintegro(),
+            $this->admiteReprogramacion(),
         );
     }
 
@@ -298,7 +365,7 @@ class Reserva extends Model
         return $this->valoracion()->exists();
     }
 
-    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion, bool $cumpleAnticipacionMinima): array
+    private function determinarOpciones(EstadoReserva $estado, EstadoSaldo $estadoSaldo, bool $tieneValoracion, bool $cumpleAnticipacionMinima, bool $admiteReintegro, bool $admiteReprogramacion): array
     {
         return match ($estado) {
             EstadoReserva::Confirmada => array_values(array_filter([
@@ -307,7 +374,10 @@ class Reserva extends Model
                 self::OPCION_CANCELAR,
             ])),
             EstadoReserva::Pendiente => [self::OPCION_CANCELAR],
-            EstadoReserva::SinPermiso => [self::OPCION_REINTEGRO, self::OPCION_REPROGRAMAR],
+            EstadoReserva::SinPermiso => array_values(array_filter([
+                $admiteReintegro ? self::OPCION_REINTEGRO : null,
+                $admiteReprogramacion ? self::OPCION_REPROGRAMAR : null,
+            ])),
             EstadoReserva::Finalizada => $tieneValoracion ? [] : [self::OPCION_VALORAR],
             default => [], // Cancelada
         };
@@ -332,7 +402,7 @@ class Reserva extends Model
         // A3. Sólo se informa: la cancelación por falta de pago es de CU-22. Una reserva con saldo adeudado siempre tiene
         // fecha límite; si faltara, el aviso sale sin la fecha.
         if (! $this->verificarFechaLimiteSaldo()) {
-            $fechaLimite = $this->fecha_limite_saldo === null ? '' : ' el '.$this->fecha_limite_saldo->format('d/m/Y');
+            $fechaLimite = $this->fecha_limite_saldo === null ? '' : ' el '.$this->fecha_limite_saldo->format('d/m/Y').' a las '.$this->fecha_limite_saldo->format('H:i');
 
             throw new DomainException('El plazo para pagar el saldo venció'.$fechaLimite.' y la reserva se cancela por falta de pago.');
         }
@@ -345,7 +415,8 @@ class Reserva extends Model
 
     // Pública porque también la usa la cancelación por falta de pago (CU-22), que le pasa la hora de la verificación;
     // CU-16 la llama sin hora y compara con la actual. La fecha límite vence a las 23:59:59 de ese día, como la guardan
-    // los seeders y fijarFechasLimite(): hasta ese segundo, todavía se puede pagar.
+    // los seeders y fijarFechasLimite(), salvo que los permisos se hayan validado el último día: ahí es la de las 72 horas
+    // (fijarFechaLimiteSaldoConfirmada()). Hasta ese segundo, todavía se puede pagar.
     public function verificarFechaLimiteSaldo(?Carbon $fecha_hora = null): bool
     {
         return $this->fecha_limite_saldo !== null && ($fecha_hora ?? now())->lessThanOrEqualTo($this->fecha_limite_saldo);
@@ -389,8 +460,8 @@ class Reserva extends Model
         return $canceladas;
     }
 
-    // Paso 2. Es la regla de tieneSaldoVencido() escrita en SQL: vencida es anterior a la hora recibida, así que a las
-    // 23:59:59 del día límite todavía no aparece y a las 00:00:00 del día siguiente, sí. Una fecha nula no cumple el «<».
+    // Paso 2. Es la regla de tieneSaldoVencido() escrita en SQL: vencida es anterior a la hora recibida, así que en el
+    // último segundo del plazo todavía no aparece y en el siguiente, sí. Una fecha nula no cumple el «<».
     // Laravel pasa la hora como «Y-m-d H:i:s», sin fracciones de segundo, igual en PostgreSQL que en SQLite: nunca toma
     // una reserva antes que verificarFechaLimiteSaldo(). Hay que filtrar por estado_saldo porque fecha_limite_saldo no se
     // borra al pagar el saldo (actualizarReserva()).
@@ -469,11 +540,13 @@ class Reserva extends Model
         return $this->excursionistas;
     }
 
-    // Pública porque también la va a necesitar la cancelación por falta de confirmación (CU-26). Vence a las 23:59:59 de
-    // ese día, como fecha_limite_saldo: hasta ese segundo, todavía se puede validar.
-    public function verificarFechaLimiteConfirmacion(): bool
+    // Vence a las 23:59:59 de ese día, como fecha_limite_saldo: hasta ese segundo, todavía se puede validar. Si la
+    // reserva pasó a «Sin Permiso» el último día, la fecha guardada es la de las 72 horas (fijarFechaLimiteSinPermiso()).
+    // Es el único lugar que dice cuándo vence el plazo: también lo usa la cancelación por falta de confirmación (CU-26),
+    // que le pasa la hora que recibe del Temporizador. CU-04 no la pasa y usa la actual.
+    public function verificarFechaLimiteConfirmacion(?Carbon $fecha_hora = null): bool
     {
-        return now()->lessThanOrEqualTo($this->fecha_limite_confirmacion);
+        return ($fecha_hora ?? now())->lessThanOrEqualTo($this->fecha_limite_confirmacion);
     }
 
     // Paso 3, para un integrante. Sólo asigna y guarda el permiso: la reserva cambia de estado en
@@ -508,7 +581,68 @@ class Reserva extends Model
         }
 
         $this->estado = $this->todosLosPermisosObtenidos() ? EstadoReserva::Confirmada : EstadoReserva::SinPermiso;
+
+        if ($this->estado === EstadoReserva::SinPermiso) {
+            $this->fijarFechaLimiteSinPermiso(now());
+        }
+
+        if ($this->estado === EstadoReserva::Confirmada) {
+            $this->fijarFechaLimiteSaldoConfirmada(now());
+        }
+
         $this->save();
+    }
+
+    // Regla de CU-26: si la reserva pasa a «Sin Permiso» con menos de un mes de anticipación, el plazo para elegir entre
+    // el reintegro (CU-17) y la reprogramación (CU-19) vence a las 72 horas de la notificación o el día anterior a la
+    // salida, lo que ocurra primero. Como CU-04 no valida después de la fecha límite, sólo pasa si se valida el último
+    // día: sin esta regla, el cliente tendría hasta las 23:59:59 de ese mismo día. El plazo se guarda en
+    // fecha_limite_confirmacion, la fecha con la que CU-17 y CU-19 dejan de admitir el pedido y CU-26 cancela.
+    private function fijarFechaLimiteSinPermiso(Carbon $fecha_hora): void
+    {
+        $plazo = $this->calcularPlazoExcepcional($fecha_hora);
+
+        if ($plazo !== null) {
+            $this->fecha_limite_confirmacion = $plazo;
+        }
+    }
+
+    // Regla de CU-16: el saldo se paga hasta un mes antes de la salida, pero si los permisos se validaron con menos de un
+    // mes de anticipación, el plazo vence a las 72 horas de la notificación o el día anterior a la salida, lo que ocurra
+    // primero. Como en «Sin Permiso», sólo pasa si se valida el último día: sin esta regla, el cliente tendría hasta las
+    // 23:59:59 de ese mismo día para pagar. El plazo se guarda en fecha_limite_saldo, la fecha con la que CU-16 deja de
+    // admitir el pago y CU-22 cancela. Con el saldo «Abonado» no hay nada que pagar y fecha_limite_saldo sigue en nulo.
+    // fecha_limite_confirmacion no cambia: la reserva ya quedó confirmada.
+    private function fijarFechaLimiteSaldoConfirmada(Carbon $fecha_hora): void
+    {
+        if ($this->estado_saldo !== EstadoSaldo::Adeudado) {
+            return;
+        }
+
+        $plazo = $this->calcularPlazoExcepcional($fecha_hora);
+
+        if ($plazo !== null) {
+            $this->fecha_limite_saldo = $plazo;
+        }
+    }
+
+    // El plazo de las reglas de CU-16 y CU-26 para una validación hecha a esa hora: las 72 horas o las 23:59:59 del día
+    // anterior a la salida, lo que ocurra primero. Devuelve null si se validó con un mes o más de anticipación, es decir,
+    // hasta las 00:00:00 del día límite: ahí siguen valiendo las fechas de fijarFechasLimite(). El correo sale apenas se
+    // guarda la validación (paso 6), así que se cuenta desde la hora de la validación. Con un mes de anticipación, las 72
+    // horas siempre llegan antes que el día anterior a la salida, pero se compara igual porque la regla lo dice.
+    private function calcularPlazoExcepcional(Carbon $fecha_hora): ?Carbon
+    {
+        $fechaSalida = $this->excursion->getFechaSalida();
+        $unMesAntes = $fechaSalida->copy()->subMonthsNoOverflow(config('reserva.meses_anticipacion_fechas_limite'));
+
+        if ($fecha_hora->lessThanOrEqualTo($unMesAntes)) {
+            return null;
+        }
+
+        return $fecha_hora->copy()
+            ->addHours(config('reserva.horas_plazo_excepcional'))
+            ->min($fechaSalida->copy()->subDay()->endOfDay());
     }
 
     // Paso 6 y A1: el correo de Notificar Cliente (CU-13) que corresponde al resultado de la validación. Usa la misma
@@ -558,6 +692,83 @@ class Reserva extends Model
         }
     }
 
+    /* ---------------- CU-26 Cancelar por falta de confirmación ---------------- */
+
+    // El mensaje del Temporizador (DS-26), pasos 1 a 5. Cada reserva se cancela y se notifica por separado: si una falla,
+    // se anota en el registro con su número y se sigue con las demás; la que falló vuelve a aparecer en la próxima
+    // verificación. El correo se pide después de guardar y fuera de la transacción, como en CU-17; si falla,
+    // notificarCliente() lo anota y la cancelación queda igual (A8 de CU-13). Devuelve cuántas canceló: 0 en A1.
+    public static function verificarVencimientosDePermisos(Carbon $fecha_hora_actual): int
+    {
+        $canceladas = 0;
+
+        foreach (self::buscarConfirmacionesVencidas($fecha_hora_actual) as $reserva) {
+            try {
+                if (! $reserva->ejecutarCancelacionPorVencimiento($fecha_hora_actual)) {
+                    continue;
+                }
+            } catch (Throwable $excepcion) {
+                Log::error('No se pudo cancelar por falta de confirmación de permisos la reserva '.$reserva->numero_reserva.': '
+                    .$excepcion->getMessage());
+
+                continue;
+            }
+
+            $canceladas++;
+            self::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, $reserva->numero_reserva, true);
+        }
+
+        return $canceladas;
+    }
+
+    // Paso 2. La base trae las reservas de los dos estados y el vencimiento lo decide verificarFechaLimiteConfirmacion(),
+    // la misma regla con la que CU-04 deja de admitir la validación: vencida es después del segundo guardado en
+    // fecha_limite_confirmacion (las 23:59:59 del día límite, o las 72 horas de una «Sin Permiso» del último día).
+    // Filtrar acá no pesa: son sólo las reservas que esperan la confirmación de los permisos.
+    public static function buscarConfirmacionesVencidas(Carbon $fecha_hora_actual): Collection
+    {
+        return self::whereIn('estado', self::ESTADOS_SIN_CONFIRMAR)
+            ->orderBy('id_reserva')
+            ->get()
+            ->filter(fn (self $reserva) => $reserva->tieneConfirmacionVencida($fecha_hora_actual))
+            ->values();
+    }
+
+    // Pasos 3 y 4: el ejecutarCancelacionConReintegro() del DS-26. Se aparta del diagrama porque el de CU-17 recibe el
+    // monto ya calculado y su calcularReintegro() sólo acepta «Sin Permiso» (A1 de CU-17), y CU-26 también cancela
+    // «Pendiente». Para no aflojar ese control, este método tiene el suyo (tieneConfirmacionVencida()), calcula el 100 %
+    // de lo abonado con sumarPagos() y se lo pasa al de CU-17, que registra la devolución con motivo «Reintegro»
+    // (generarDevolucion) y pasa la reserva a «Cancelada» (setEstado). El cupo no se toca: una reserva cancelada deja de
+    // contar en Excursion::sumarPlazasReservadas().
+    // Se vuelve a leer la reserva con su fila bloqueada y se controla todo de nuevo adentro: si mientras tanto el cliente
+    // pidió el reintegro o la reprogramación, el administrador validó los permisos u otra verificación ya la canceló, no
+    // hace nada. Así, correr la tarea dos veces no registra dos devoluciones. Devuelve si la canceló.
+    public function ejecutarCancelacionPorVencimiento(Carbon $fecha_hora_actual): bool
+    {
+        $cancelada = DB::transaction(function () use ($fecha_hora_actual) {
+            $actual = self::lockForUpdate()->find($this->id_reserva);
+
+            if ($actual === null || ! $actual->tieneConfirmacionVencida($fecha_hora_actual)) {
+                return false;
+            }
+
+            $actual->ejecutarCancelacionConReintegro($actual->sumarPagos(), $fecha_hora_actual);
+
+            return true;
+        });
+
+        $this->refresh();
+
+        return $cancelada;
+    }
+
+    // La condición de CU-26 para una reserva ya leída.
+    private function tieneConfirmacionVencida(Carbon $fecha_hora_actual): bool
+    {
+        return $this->validarEstado(self::ESTADOS_SIN_CONFIRMAR)
+            && ! $this->verificarFechaLimiteConfirmacion($fecha_hora_actual);
+    }
+
     /* -------------------------- CU-12 Reportar etapa -------------------------- */
 
     // A2 4.3. Sólo termina el viaje una reserva «Confirmada»: las demás no viajaron. Lo controla también acá, y no sólo
@@ -577,7 +788,7 @@ class Reserva extends Model
     public function calcularReembolso(Carbon $fecha_actual): float
     {
         if (! $this->validarEstado([EstadoReserva::Pendiente, EstadoReserva::Confirmada])) {
-            throw new \Exception('La reserva se encuentra en estado «'.$this->estado->value.'» y no admite cancelación por esta vía.');
+            throw new DomainException('La reserva se encuentra en estado «'.$this->estado->value.'» y no admite cancelación por esta vía.');
         }
 
         $fechaSalida = Carbon::parse($this->excursion->fecha_salida);
@@ -599,10 +810,28 @@ class Reserva extends Model
         return 0.0;
     }
 
-    public function confirmarCancelacion(Carbon $fecha_actual): void
+    // Lo que hace la pantalla al confirmar, con el monto que le mostró al cliente. El reembolso se calcula de nuevo sobre
+    // la reserva leída con su fila bloqueada: entre que el cliente vio el monto y confirmó, la reserva pudo cambiar de
+    // estado (por ejemplo, pasar a «Finalizada» con CU-12), recibir el pago del saldo (CU-16) o quedar a 30 días o menos
+    // de la salida. Si ya no admite la cancelación, o si el monto ya no es el que vio el cliente, no se cancela ni se
+    // registra la devolución: el cliente tiene que ver el monto nuevo y confirmar otra vez, así como CU-17 corta el
+    // reintegro si el plazo vence en el medio. Ni la segunda lectura ni la comparación del monto están en el DS-21.
+    public function confirmarCancelacion(float $monto_mostrado, Carbon $fecha_actual): void
     {
-        $montoReembolso = $this->calcularReembolso($fecha_actual);
-        $this->ejecutarCancelacionConReembolso($montoReembolso, $fecha_actual);
+        DB::transaction(function () use ($monto_mostrado, $fecha_actual) {
+            $actual = self::lockForUpdate()->findOrFail($this->id_reserva);
+
+            $montoReembolso = $actual->calcularReembolso($fecha_actual);
+
+            if (round($montoReembolso, 2) !== round($monto_mostrado, 2)) {
+                throw new DomainException('El monto a reembolsar cambió mientras revisabas la cancelación. Revisalo y confirmá de nuevo.');
+            }
+
+            $actual->ejecutarCancelacionConReembolso($montoReembolso, $fecha_actual);
+        });
+
+        // Quien la llamó (la pantalla) ve la reserva como quedó.
+        $this->refresh();
     }
 
     public function ejecutarCancelacionConReembolso(float $monto_reembolso, Carbon $fecha_actual): void
@@ -612,18 +841,65 @@ class Reserva extends Model
 
     /* --------------------------- CU-17 Solicitar Reintegro -------------------- */
 
+    // La regla del DS-17, la misma que admiteReprogramacion() de CU-19: se pide el reintegro sólo con la reserva «Sin
+    // Permiso» y dentro de la fecha límite de confirmación; al vencer, la cancela CU-26. El plazo lo decide
+    // verificarFechaLimiteConfirmacion(), así CU-17 y CU-19 cortan en el mismo segundo que CU-04 y CU-26: hasta las
+    // 23:59:59 del día límite todavía se puede, y desde las 00:00:00 del día siguiente ya no (si pasó a «Sin Permiso» el
+    // último día, el plazo es de 72 horas: fijarFechaLimiteSinPermiso()). También la usa getOpcionesHabilitadas() para
+    // ofrecer la opción en Mi reserva.
+    public function admiteReintegro(): bool
+    {
+        return $this->validarEstado([EstadoReserva::SinPermiso]) && $this->verificarFechaLimiteConfirmacion();
+    }
+
     public function calcularReintegro(): float
     {
-        if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
-            throw new \Exception('La reserva se encuentra en estado «'.$this->estado->value.'» y no admite reintegro.');
-        }
+        $this->verificarAdmiteReintegro();
 
         return $this->sumarPagos();
+    }
+
+    // Lo que hace la pantalla al confirmar. La regla se controla de nuevo sobre la reserva leída con su fila bloqueada: el
+    // plazo pudo vencer, o la reserva cambiar de estado, entre que el cliente vio el monto y confirmó. Si ya no admite el
+    // reintegro, no se cancela ni se registra la devolución. No está en el DS-17 y el control no va dentro de
+    // ejecutarCancelacionConReintegro() porque CU-26 también la usa, justo cuando el plazo ya venció. Devuelve el monto
+    // reintegrado.
+    public function confirmarReintegro(Carbon $fecha_actual): float
+    {
+        $montoReintegro = DB::transaction(function () use ($fecha_actual) {
+            $actual = self::lockForUpdate()->findOrFail($this->id_reserva);
+
+            $montoReintegro = $actual->calcularReintegro();
+            $actual->ejecutarCancelacionConReintegro($montoReintegro, $fecha_actual);
+
+            return $montoReintegro;
+        });
+
+        // Quien la llamó (la pantalla) ve la reserva como quedó.
+        $this->refresh();
+
+        return $montoReintegro;
     }
 
     public function ejecutarCancelacionConReintegro(float $monto_reintegro, Carbon $fecha_actual): void
     {
         $this->cancelarRegistrandoDevolucion($monto_reintegro, $fecha_actual, MotivoDevolucion::Reintegro);
+    }
+
+    // Si admiteReintegro() no se cumple, lanza DomainException con el aviso para el cliente, como
+    // verificarAdmiteReprogramacion() de CU-19: uno si la reserva no está «Sin Permiso» (A1) y otro si venció el plazo.
+    private function verificarAdmiteReintegro(): void
+    {
+        if ($this->admiteReintegro()) {
+            return;
+        }
+
+        if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
+            throw new DomainException('La reserva se encuentra en estado «'.$this->estado->value.'» y no admite reintegro.');
+        }
+
+        throw new DomainException('El plazo para elegir entre el reintegro y la reprogramación venció el '
+            .$this->fecha_limite_confirmacion->format('d/m/Y').': la reserva ya no admite reintegro.');
     }
 
     private function cancelarRegistrandoDevolucion(float $monto, Carbon $fecha, MotivoDevolucion $motivo): void
@@ -674,9 +950,17 @@ class Reserva extends Model
         return $consulta->whereHas('excursionistas', fn (Builder $integrante) => $integrante->where('equipo_camping', true));
     }
 
-    public function scopeConServicio(Builder $consulta, TipoServicio $tipo): Builder
+    // Los porteadores no son un servicio: son una cantidad del paquete.
+    public function scopeConPorteadores(Builder $consulta): Builder
     {
-        return $consulta->whereHas('excursion.paquete.servicios', fn (Builder $servicio) => $servicio->where('tipo', $tipo->value));
+        return $consulta->whereHas('excursion.paquete', fn (Builder $paquete) => $paquete->where('cantidad_porteadores', '>', 0));
+    }
+
+    // whereKey() escribe la columna con la tabla (servicio.id_servicio): paquete_servicio también tiene id_servicio, y
+    // sin la tabla la consulta sería ambigua.
+    public function scopeConServicio(Builder $consulta, int $idServicio): Builder
+    {
+        return $consulta->whereHas('excursion.paquete.servicios', fn (Builder $servicio) => $servicio->whereKey($idServicio));
     }
 
     /* ----------------------------- CU-20 Modificar ---------------------------- */
@@ -743,19 +1027,19 @@ class Reserva extends Model
 
     // Todo se hace sobre $actual, la reserva leída con su fila bloqueada, y no sobre esta instancia, que la pantalla leyó
     // antes: si mientras tanto se registró el pago del saldo (Pago::registrarPagoSaldo(), que bloquea la misma fila) o se
-    // canceló la reserva, $this tiene el estado viejo y fijarFechasLimite() usaría un estado_saldo que ya no es.
+    // canceló la reserva, $this tiene el estado viejo y fijarFechasLimite() usaría un estado_saldo que ya no es. Por eso
+    // cada caso de uso le pasa su control ($verificarAdmite), que se hace sobre $actual y lanza DomainException si la
+    // reserva ya no admite el cambio: así no se toca nada.
     //
     // Cruce con CU-16: R-16 sólo cobra el saldo con la reserva «Confirmada». Si el cliente modifica con un cobro abierto
     // en Mercado Pago, ese pago queda sin registrar y la devolución es manual, con la agencia (decisión del grupo del
     // 13/09). No se bloquea la modificación porque la base no tiene dónde guardar el cobro abierto.
-    private function cambiarDeExcursionPendiente(EstadoReserva $estado, string $mensaje, Excursion $destino): void
+    private function cambiarDeExcursionPendiente(Closure $verificarAdmite, Excursion $destino): void
     {
-        DB::transaction(function () use ($destino, $estado, $mensaje) {
+        DB::transaction(function () use ($destino, $verificarAdmite) {
             $actual = self::with('excursionistas')->lockForUpdate()->findOrFail($this->id_reserva);
 
-            if (! $actual->validarEstado([$estado])) {
-                throw new DomainException($mensaje);
-            }
+            $verificarAdmite($actual);
 
             $destino = Excursion::lockForUpdate()->findOrFail($destino->id_excursion);
 
@@ -784,20 +1068,28 @@ class Reserva extends Model
 
     public function modificarExcursion(Excursion $destino): void
     {
-        $this->cambiarDeExcursionPendiente(
-            EstadoReserva::Confirmada,
-            'La reserva no admite modificación.',
-            $destino
-        );
+        $this->cambiarDeExcursionPendiente(function (self $actual) {
+            if (! $actual->validarEstado([EstadoReserva::Confirmada])) {
+                throw new DomainException('La reserva no admite modificación.');
+            }
+        }, $destino);
     }
 
     /* ----------------------------- CU-19 Solicitar Reprogramación Por Falta de Permisos ---------------------------- */
 
+    // La regla del DS-19: se reprograma sólo una reserva «Sin Permiso» y dentro de la fecha límite de confirmación; al
+    // vencer, la cancela CU-26. El plazo lo decide verificarFechaLimiteConfirmacion(), la misma que usan CU-04 para
+    // validar y CU-26 para cancelar: hasta las 23:59:59 del día límite todavía se puede reprogramar, y desde las 00:00:00
+    // del día siguiente ya no (si pasó a «Sin Permiso» el último día, el plazo es de 72 horas:
+    // fijarFechaLimiteSinPermiso()). También la usa getOpcionesHabilitadas() para ofrecer la opción en Mi reserva.
+    public function admiteReprogramacion(): bool
+    {
+        return $this->validarEstado([EstadoReserva::SinPermiso]) && $this->verificarFechaLimiteConfirmacion();
+    }
+
     public function iniciarReprogramacion(): Collection
     {
-        if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
-            throw new DomainException('La reserva no admite reprogramación.');
-        }
+        $this->verificarAdmiteReprogramacion();
 
         return Excursion::buscarOtrasDelPaquete(
             $this->excursion->id_paquete,
@@ -811,13 +1103,27 @@ class Reserva extends Model
         return $this->armarResumenCambio($this->iniciarReprogramacion(), $fechaElegida);
     }
 
+    // La regla se controla de nuevo al confirmar, sobre la reserva bloqueada: el plazo pudo vencer entre que el cliente
+    // eligió el destino y confirmó. Si venció, no se cambia nada (ni plazas, ni estado, ni permisos, ni fechas).
     public function reprogramar(Excursion $destino): void
     {
-        $this->cambiarDeExcursionPendiente(
-            EstadoReserva::SinPermiso,
-            'La reserva no admite reprogramación.',
-            $destino
-        );
+        $this->cambiarDeExcursionPendiente(fn (self $actual) => $actual->verificarAdmiteReprogramacion(), $destino);
+    }
+
+    // Si admiteReprogramacion() no se cumple, lanza DomainException con el aviso para el cliente, como
+    // verificarAdmiteValidacionPermisos() de CU-04: uno si la reserva no está «Sin Permiso» y otro si venció el plazo.
+    private function verificarAdmiteReprogramacion(): void
+    {
+        if ($this->admiteReprogramacion()) {
+            return;
+        }
+
+        if (! $this->validarEstado([EstadoReserva::SinPermiso])) {
+            throw new DomainException('La reserva no admite reprogramación.');
+        }
+
+        throw new DomainException('El plazo para elegir entre el reintegro y la reprogramación venció el '
+            .$this->fecha_limite_confirmacion->format('d/m/Y').': la reserva ya no admite reprogramación.');
     }
 
     /* ------------------------- CU-13 Notificar cliente ------------------------ */
@@ -889,7 +1195,7 @@ class Reserva extends Model
         if (in_array($tipoNotificacion, [TipoNotificacion::PrimeraCompra, TipoNotificacion::PagoSaldo], true)) {
             $ultimoPago = $this->getUltimoPago();
             $datos['ultimo_pago'] = $ultimoPago->getPago();
-            $datos['comprobante'] = $ultimoPago->getComprobante()?->getDatos();
+            $datos['comprobante'] = $this->getDatosComprobante($ultimoPago);
         }
 
         if ($tipoNotificacion === TipoNotificacion::PrimeraCompra) {
@@ -908,12 +1214,15 @@ class Reserva extends Model
                 ->map(fn (Excursionista $excursionista) => $excursionista->nombre.' '.$excursionista->apellido)
                 ->values()
                 ->all();
-            // Lo que le devolvería CU-17 si elige el reintegro.
-            $datos['monto_reintegro'] = round($this->calcularReintegro(), 2);
+            // Lo que le devolvería CU-17 si elige el reintegro: todo lo abonado. No se llama a calcularReintegro(), que
+            // además controla el estado y el plazo: el correo sólo informa el monto.
+            $datos['monto_reintegro'] = $montoAbonado;
         }
 
         if ($tipoNotificacion === TipoNotificacion::CancelacionFaltaPermisos) {
             $datos['devolucion'] = $this->devolucion?->getDatos();
+            // Con CU-26 el correo da una sola causa, como dice el A7: venció el plazo de confirmación sin que la reserva
+            // quedara confirmada. Vale igual para una «Pendiente» sin validar que para una «Sin Permiso» que no eligió.
             $datos['cancelada_por_vencimiento'] = $canceladaPorVencimiento;
         }
 

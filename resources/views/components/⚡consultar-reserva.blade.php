@@ -29,7 +29,11 @@ new #[Title('Mi reserva')] class extends Component
     {
         return [
             'correo' => 'required|email',
-            'numeroReserva' => ['required', 'regex:/^\d{6}-\d$/'],
+            'numeroReserva' => ['bail', 'required', 'regex:/^\d{6}-\d$/', function ($atributo, $valor, $fallar) {
+                if (! Reserva::validarNumeroReserva($valor)) {
+                    $fallar('El dígito verificador del número de reserva no es correcto.');
+                }
+            }],
         ];
     }
 
@@ -226,6 +230,9 @@ new #[Title('Mi reserva')] class extends Component
                                 Ya valoraste los servicios de este viaje.
                             @elseif ($reserva->estado === EstadoReserva::Cancelada)
                                 Esta reserva está cancelada y no tiene opciones de gestión.
+                            @elseif ($reserva->estado === EstadoReserva::SinPermiso)
+                                {{-- Sin opciones, una reserva «Sin Permiso» sólo puede tener el plazo vencido: CU-26 la cancela. --}}
+                                El plazo para elegir entre el reintegro y la reprogramación venció el {{ $reserva->fecha_limite_confirmacion->format('d/m/Y') }}.
                             @else
                                 Una reserva «{{ $reserva->estado->value }}» no tiene opciones de gestión.
                             @endif

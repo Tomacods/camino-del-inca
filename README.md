@@ -76,7 +76,7 @@ Después:
    php artisan serve           # http://127.0.0.1:8000   (panel: http://127.0.0.1:8000/admin)
    npm run dev                 # recompila los estilos mientras se trabaja
    php artisan queue:work      # corre las tareas de la cola
-   php artisan schedule:work   # corre las tareas programadas: CU-22
+   php artisan schedule:work   # corre las tareas programadas: CU-22 y CU-26
    ```
 
    El sitio se abre en `http://127.0.0.1:8000` y no en `localhost:8000`: en Windows, `localhost` apunta primero a la
@@ -86,8 +86,18 @@ Después:
    retenidas hasta que se levante la cola. Si cambiás el código de una tarea (`app/Jobs`), cortá `queue:work` con
    Ctrl+C y volvé a levantarlo, porque guarda el código en memoria.
 
-   Sin `php artisan schedule:work`, las reservas confirmadas que no pagaron el saldo a tiempo nunca se cancelan (CU-22).
-   Para probarlo sin esperar a las 00:05, se corre a mano `php artisan reservas:cancelar-por-falta-de-pago`.
+   Sin `php artisan schedule:work`, las cancelaciones automáticas (actor Temporizador) nunca se hacen: ni las de las
+   reservas confirmadas que no pagaron el saldo a tiempo (CU-22) ni las de las pendientes o sin permiso cuya fecha
+   límite de confirmación venció (CU-26). Las dos corren a los 5 minutos de cada hora.
+   `php artisan schedule:list` muestra las tareas programadas y cuándo corre cada una.
+
+   Para probarlas sin esperar, se corren a mano. Cancelan lo que esté vencido en ese momento, en la base de
+   tu PC; los correos salen con `queue:work`, como los demás:
+
+   ```bash
+   php artisan reservas:cancelar-por-falta-de-pago            # CU-22
+   php artisan reservas:cancelar-por-falta-de-confirmacion   # CU-26
+   ```
 
 Si al abrir el sitio aparece *Connection refused* en el puerto 5432, PostgreSQL está detenido: ver
 [Problemas conocidos](docs/instalacion-windows.md#problemas-conocidos) en la guía de instalación.

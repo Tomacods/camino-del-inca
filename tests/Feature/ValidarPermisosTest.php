@@ -234,6 +234,157 @@ class ValidarPermisosTest extends TestCase
         $this->assertPermisos([EstadoPermiso::Pendiente, EstadoPermiso::Pendiente, EstadoPermiso::Pendiente]);
     }
 
+    // Regla de CU-26: pasó a «Sin Permiso» con menos de un mes de anticipación (la salida es el 18/01/2027), así que el
+    // plazo para elegir entre el reintegro y la reprogramación vence a las 72 horas de la notificación, y no a las
+    // 23:59:59 de ese mismo día. El correo «Permisos Rechazados» lo informa, y CU-17 y CU-19 lo respetan.
+    public function test_si_pasa_a_sin_permiso_el_ultimo_dia_tiene_72_horas_para_elegir(): void
+    {
+        Mail::fake();
+        $this->travelTo('2026-12-18 15:30:00');
+
+        $pagina = $this->abrirPagina();
+        $this->marcarTodos($pagina, EstadoPermiso::NoObtenido);
+        $pagina->callAction($this->accionConfirmar());
+
+        $reserva = $this->reserva->fresh();
+        $this->assertSame(EstadoReserva::SinPermiso, $reserva->estado);
+        $this->assertSame('2026-12-21 15:30:00', $reserva->fecha_limite_confirmacion->format('Y-m-d H:i:s'));
+        Mail::assertQueued(NotificacionCliente::class, function (NotificacionCliente $correo) {
+            $correo->assertSeeInHtml('Hasta el <strong>21/12/2026 a las 15:30</strong>', false);
+
+            return true;
+        });
+
+        $this->travelTo('2026-12-21 15:30:00');
+        $this->assertTrue($reserva->admiteReintegro());
+        $this->assertTrue($reserva->admiteReprogramacion());
+
+        $this->travelTo('2026-12-21 15:30:01');
+        $this->assertFalse($reserva->admiteReintegro());
+        $this->assertFalse($reserva->admiteReprogramacion());
+    }
+
+    // En fecha_limite_confirmacion, la regla de las 72 horas es sólo para una reserva que pasa a «Sin Permiso» con menos
+    // de un mes de anticipación.
+    #[DataProvider('validacionesQueNoCambianLaFechaLimite')]
+    public function test_en_los_demas_casos_la_fecha_limite_no_cambia(string $fechaHora, EstadoPermiso $permiso, EstadoReserva $estado): void
+    {
+        $this->travelTo($fechaHora);
+
+        $pagina = $this->abrirPagina();
+        $this->marcarTodos($pagina, $permiso);
+        $pagina->callAction($this->accionConfirmar());
+
+        $reserva = $this->reserva->fresh();
+        $this->assertSame($estado, $reserva->estado);
+        $this->assertSame('2026-12-18 23:59:59', $reserva->fecha_limite_confirmacion->format('Y-m-d H:i:s'));
+    }
+
+    public static function validacionesQueNoCambianLaFechaLimite(): array
+    {
+        return [
+            '«Sin Permiso» con más de un mes' => ['2026-10-13 10:00:00', EstadoPermiso::NoObtenido, EstadoReserva::SinPermiso],
+            '«Sin Permiso» justo al mes' => ['2026-12-18 00:00:00', EstadoPermiso::NoObtenido, EstadoReserva::SinPermiso],
+            '«Confirmada» el último día' => ['2026-12-18 15:30:00', EstadoPermiso::Obtenido, EstadoReserva::Confirmada],
+        ];
+    }
+
+    // «Lo que ocurra primero»: con un mes de anticipación, las 72 horas siempre llegan antes que el día anterior a la
+    // salida. Para ver ese otro tope, el plazo se alarga en la configuración.
+    public function test_el_plazo_para_elegir_no_pasa_del_dia_anterior_a_la_salida(): void
+    {
+        config(['reserva.horas_plazo_excepcional' => 24 * 40]);
+        $this->travelTo('2026-12-18 15:30:00');
+
+        $pagina = $this->abrirPagina();
+        $this->marcarTodos($pagina, EstadoPermiso::NoObtenido);
+        $pagina->callAction($this->accionConfirmar());
+
+        $this->assertSame('2027-01-17 23:59:59', $this->reserva->fresh()->fecha_limite_confirmacion->format('Y-m-d H:i:s'));
+    }
+
+    /* ------------------------- Fecha límite del saldo ------------------------- */
+
+    // Regla de CU-16: quedó «Confirmada» con el saldo adeudado y menos de un mes de anticipación (la salida es el
+    // 18/01/2027), así que el saldo se paga hasta las 72 horas de la notificación, y no hasta las 23:59:59 de ese mismo
+    // día. El correo «Permisos Obtenidos» lo informa, y CU-16 y CU-22 lo respetan.
+    public function test_si_queda_confirmada_el_ultimo_dia_tiene_72_horas_para_pagar_el_saldo(): void
+    {
+        Mail::fake();
+        $this->travelTo('2026-12-18 22:00:00');
+
+        $pagina = $this->abrirPagina();
+        $this->marcarTodos($pagina, EstadoPermiso::Obtenido);
+        $pagina->callAction($this->accionConfirmar());
+
+        $reserva = $this->reserva->fresh();
+        $this->assertSame(EstadoReserva::Confirmada, $reserva->estado);
+        $this->assertSame('2026-12-21 22:00:00', $reserva->fecha_limite_saldo->format('Y-m-d H:i:s'));
+        Mail::assertQueued(NotificacionCliente::class, function (NotificacionCliente $correo) {
+            $correo->assertSeeInHtml('hasta el 21/12/2026 a las 22:00');
+
+            return true;
+        });
+
+        $this->travelTo('2026-12-21 22:00:00');
+        $this->assertTrue($reserva->verificarFechaLimiteSaldo());
+
+        $this->travelTo('2026-12-21 22:00:01');
+        $this->assertFalse($reserva->verificarFechaLimiteSaldo());
+    }
+
+    // Con un mes o más de anticipación sigue el plazo de siempre: validar justo a las 00:00:00 del día límite todavía es
+    // con un mes, como en «Sin Permiso».
+    #[DataProvider('validacionesQueNoCambianElPlazoDelSaldo')]
+    public function test_si_queda_confirmada_con_un_mes_o_mas_el_plazo_del_saldo_no_cambia(string $fechaHora): void
+    {
+        $this->travelTo($fechaHora);
+
+        $pagina = $this->abrirPagina();
+        $this->marcarTodos($pagina, EstadoPermiso::Obtenido);
+        $pagina->callAction($this->accionConfirmar());
+
+        $reserva = $this->reserva->fresh();
+        $this->assertSame(EstadoReserva::Confirmada, $reserva->estado);
+        $this->assertSame('2026-12-18 23:59:59', $reserva->fecha_limite_saldo->format('Y-m-d H:i:s'));
+    }
+
+    public static function validacionesQueNoCambianElPlazoDelSaldo(): array
+    {
+        return [
+            'con más de un mes' => ['2026-10-13 10:00:00'],
+            'justo al mes' => ['2026-12-18 00:00:00'],
+        ];
+    }
+
+    // Con el saldo «Abonado» no hay nada que pagar: aunque se valide el último día, fecha_limite_saldo sigue en nulo.
+    public function test_si_queda_confirmada_el_ultimo_dia_con_el_saldo_abonado_no_tiene_fecha_limite_de_saldo(): void
+    {
+        $this->reserva->update(['estado_saldo' => EstadoSaldo::Abonado, 'fecha_limite_saldo' => null]);
+        $this->travelTo('2026-12-18 22:00:00');
+
+        $pagina = $this->abrirPagina();
+        $this->marcarTodos($pagina, EstadoPermiso::Obtenido);
+        $pagina->callAction($this->accionConfirmar());
+
+        $reserva = $this->reserva->fresh();
+        $this->assertSame(EstadoReserva::Confirmada, $reserva->estado);
+        $this->assertNull($reserva->fecha_limite_saldo);
+    }
+
+    // «Lo que ocurra primero», como en el plazo para elegir: para ver el tope, el plazo se alarga en la configuración.
+    public function test_el_plazo_del_saldo_no_pasa_del_dia_anterior_a_la_salida(): void
+    {
+        config(['reserva.horas_plazo_excepcional' => 24 * 40]);
+        $this->travelTo('2026-12-18 22:00:00');
+
+        $pagina = $this->abrirPagina();
+        $this->marcarTodos($pagina, EstadoPermiso::Obtenido);
+        $pagina->callAction($this->accionConfirmar());
+
+        $this->assertSame('2027-01-17 23:59:59', $this->reserva->fresh()->fecha_limite_saldo->format('Y-m-d H:i:s'));
+    }
+
     /* ------------------------- Validación en el servidor ---------------------- */
 
     public function test_no_se_puede_confirmar_si_falta_marcar_a_un_integrante(): void

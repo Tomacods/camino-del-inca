@@ -3,9 +3,11 @@
 namespace App\Mail;
 
 use App\Enums\TipoNotificacion;
+use App\Models\Reserva;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -60,5 +62,19 @@ class NotificacionCliente extends Mailable implements ShouldQueue
         return new Content(
             view: 'correos.notificacion-cliente',
         );
+    }
+
+    public function attachments(): array
+    {
+        if (! in_array($this->tipo, [TipoNotificacion::PrimeraCompra, TipoNotificacion::PagoSaldo], true)) {
+            return [];
+        }
+
+        return [
+            Attachment::fromData(
+                fn () => Reserva::armarComprobantePdf($this->datos['comprobante']),
+                'comprobante-'.$this->datos['comprobante']['numero_comprobante'].'.pdf',
+            )->withMime('application/pdf'),
+        ];
     }
 }

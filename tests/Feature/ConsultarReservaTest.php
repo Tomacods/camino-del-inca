@@ -137,9 +137,49 @@ class ConsultarReservaTest extends TestCase
 
     public function test_avisa_si_no_encuentra_la_reserva(): void
     {
-        $this->consultarReserva('999999-9')
+        $this->consultarReserva('999999-1')
             ->assertHasErrors(['numeroReserva'])
             ->assertSee('No encontramos una reserva con esos datos.');
+    }
+
+    // A1: el dígito de 000124 es 7.
+    public function test_avisa_si_el_digito_verificador_no_es_correcto(): void
+    {
+        $this->consultarReserva('000124-8')
+            ->assertHasErrors(['numeroReserva'])
+            ->assertSee('El dígito verificador del número de reserva no es correcto.')
+            ->assertDontSee('No encontramos una reserva con esos datos.');
+    }
+
+    public function test_con_el_digito_correcto_y_sin_reserva_avisa_que_no_la_encuentra(): void
+    {
+        $this->consultarReserva('000124-7')
+            ->assertHasErrors(['numeroReserva'])
+            ->assertSee('No encontramos una reserva con esos datos.')
+            ->assertDontSee('El dígito verificador del número de reserva no es correcto.');
+    }
+
+    public function test_con_el_digito_correcto_y_su_correo_entra_a_la_reserva(): void
+    {
+        $this->consultarReserva('000125-9')
+            ->assertHasNoErrors()
+            ->assertSee('Reserva 000125-9');
+    }
+
+    // Con formato inválido no se controla el dígito: un solo aviso. Se mira la lista de errores y no la pantalla,
+    // porque la pantalla muestra sólo el primero.
+    public function test_un_numero_con_formato_invalido_tiene_un_solo_aviso(): void
+    {
+        $errores = $this->consultarReserva('125-9')->errors()->get('numeroReserva');
+
+        $this->assertSame(['El número de reserva no tiene un formato válido.'], $errores);
+    }
+
+    public function test_validar_numero_reserva(): void
+    {
+        $this->assertTrue(Reserva::validarNumeroReserva('000125-9'));
+        $this->assertFalse(Reserva::validarNumeroReserva('000125-8'));
+        $this->assertFalse(Reserva::validarNumeroReserva('125-9'));
     }
 
     public function test_una_reserva_finalizada_sin_valoracion_ofrece_valorar_los_servicios(): void

@@ -110,11 +110,112 @@ class NotificarClienteTest extends TestCase
         ];
     }
 
+    #[DataProvider('tiposConComprobante')]
+    public function test_primera_compra_y_pago_de_saldo_adjuntan_el_pdf_del_ultimo_pago(TipoNotificacion $tipoNotificacion): void
+    {
+        Mail::fake();
+        $reserva = Reserva::buscarReserva('000125-9');
+        $pagoSaldo = Pago::registrarPagoSaldo($reserva, 'Tarjeta de débito');
+
+        Reserva::notificarCliente($tipoNotificacion, '000125-9');
+
+        $correo = $this->correoEnviado($tipoNotificacion, 'federico.rios@mail.com');
+        $adjuntos = $correo->attachments();
+        $this->assertCount(1, $adjuntos);
+        $this->assertSame('comprobante-'.$pagoSaldo->comprobante->numero_comprobante.'.pdf', $adjuntos[0]->as);
+        $this->assertSame('application/pdf', $adjuntos[0]->mime);
+        $contenido = $adjuntos[0]->attachWith(
+            fn () => $this->fail('El comprobante debe generarse desde los datos del correo.'),
+            fn ($datos) => $datos(),
+        );
+        $this->assertStringStartsWith('%PDF', $contenido);
+        $correo->assertSeeInHtml('Te adjuntamos el comprobante en PDF.');
+    }
+
+    #[DataProvider('tiposSinComprobante')]
+    public function test_los_otros_seis_tipos_no_adjuntan_un_pdf(TipoNotificacion $tipoNotificacion): void
+    {
+        Mail::fake();
+
+        // Esta reserva admite también Permisos Rechazados, que requiere al menos un permiso no obtenido.
+        Reserva::notificarCliente($tipoNotificacion, '000123-5');
+
+        $correo = $this->correoEnviado($tipoNotificacion, 'diego.morales@mail.com');
+        $this->assertSame([], $correo->attachments());
+        $correo->assertDontSeeInHtml('Te adjuntamos el comprobante en PDF.');
+    }
+
+    public static function tiposSinComprobante(): array
+    {
+        return [
+            'Cancelación de Reserva' => [TipoNotificacion::CancelacionReserva],
+            'Permisos Obtenidos' => [TipoNotificacion::PermisosObtenidos],
+            'Permisos Rechazados' => [TipoNotificacion::PermisosRechazados],
+            'Cancelación por Falta de Pago' => [TipoNotificacion::CancelacionFaltaPago],
+            'Etapa Final' => [TipoNotificacion::EtapaFinal],
+            'Cancelación por Falta de Permisos' => [TipoNotificacion::CancelacionFaltaPermisos],
+        ];
+    }
+
+    public function test_el_adjunto_se_genera_al_enviar_con_los_datos_guardados_al_encolar(): void
+    {
+        Mail::fake();
+        $reserva = Reserva::buscarReserva('000125-9');
+        $pago = $reserva->pagos()->sole();
+        $numeroComprobante = $pago->comprobante->numero_comprobante;
+
+        Reserva::notificarCliente(TipoNotificacion::PrimeraCompra, '000125-9');
+
+        // La cola serializa el mensaje, y el PDF todavía no está generado ni guardado como texto binario.
+        $correo = unserialize(serialize($this->correoEnviado(TipoNotificacion::PrimeraCompra, 'federico.rios@mail.com')));
+        $datosComprobante = $correo->datos['comprobante'];
+        $this->assertStringNotContainsString('%PDF', serialize($datosComprobante));
+
+        $reserva->update(['noches_extra_antes' => 1, 'correo_electronico' => 'nuevo@mail.com']);
+        $reserva->excursion->paquete->update(['nombre' => 'Paquete modificado', 'precio_base' => 9999]);
+        $reserva->excursionistas()->update(['nombre' => 'Nombre modificado']);
+        $pago->update(['medio_pago' => 'Medio modificado']);
+        $pago->comprobante->update(['numero_comprobante' => '0001-99999999']);
+
+        // Al salir de la cola, el adjunto no vuelve a consultar modelos que ahora contienen otros datos.
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        try {
+            $adjunto = $correo->attachments()[0];
+            $contenido = $adjunto->attachWith(
+                fn () => $this->fail('El comprobante debe generarse desde los datos del correo.'),
+                fn ($datos) => $datos(),
+            );
+            $this->assertSame([], DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+        }
+
+        $this->assertSame($datosComprobante, $correo->datos['comprobante']);
+        $this->assertSame('comprobante-'.$numeroComprobante.'.pdf', $adjunto->as);
+        $this->assertStringStartsWith('%PDF', $contenido);
+        $vistaComprobante = view('comprobantes.pago', ['datos' => $correo->datos['comprobante']])->render();
+        $this->assertStringContainsString('federico.rios@mail.com', $vistaComprobante);
+        $this->assertStringContainsString('Camino Inca Clásico', $vistaComprobante);
+        $this->assertStringContainsString('Federico Ríos', $vistaComprobante);
+        $this->assertStringContainsString($numeroComprobante, $vistaComprobante);
+        $this->assertStringNotContainsString('Paquete modificado', $vistaComprobante);
+        $this->assertStringNotContainsString('Nombre modificado', $vistaComprobante);
+        $this->assertStringNotContainsString('Medio modificado', $vistaComprobante);
+        $this->assertStringNotContainsString('nuevo@mail.com', $vistaComprobante);
+        $correo->assertSeeInHtml('Camino Inca Clásico');
+        $correo->assertDontSeeInHtml('Paquete modificado');
+        $correo->assertDontSeeInHtml('Nombre modificado');
+        $correo->assertDontSeeInHtml('Medio modificado');
+        $correo->assertDontSeeInHtml('nuevo@mail.com');
+    }
+
     // CU-21 con más de 30 días de anticipación: el 50 % de lo abonado. La fecha de cancelación es la del envío.
     public function test_cancelacion_de_reserva_con_reembolso(): void
     {
         Mail::fake();
-        Reserva::buscarReserva('000124-7')->confirmarCancelacion(now());
+        $reserva = Reserva::buscarReserva('000124-7');
+        $reserva->confirmarCancelacion($reserva->calcularReembolso(now()), now());
 
         Reserva::notificarCliente(TipoNotificacion::CancelacionReserva, '000124-7');
 
@@ -131,7 +232,8 @@ class NotificarClienteTest extends TestCase
     {
         Mail::fake();
         $this->travelTo('2026-12-25 10:00:00');
-        Reserva::buscarReserva('000124-7')->confirmarCancelacion(now());
+        $reserva = Reserva::buscarReserva('000124-7');
+        $reserva->confirmarCancelacion($reserva->calcularReembolso(now()), now());
 
         Reserva::notificarCliente(TipoNotificacion::CancelacionReserva, '000124-7');
 
@@ -153,6 +255,22 @@ class NotificarClienteTest extends TestCase
         $correo->assertSeeInHtml('Todos los integrantes obtuvieron el permiso');
         $correo->assertSeeInHtml('«Confirmada»');
         $correo->assertSeeInOrderInHtml(['Te queda un saldo de', $this->dolares($saldoPendiente), 'hasta el 01/01/2027']);
+    }
+
+    // Si los permisos se validaron el último día, el saldo vence a las 72 horas, a cualquier hora (CU-16): el correo da
+    // la fecha y la hora, en el texto y en la tabla.
+    public function test_permisos_obtenidos_muestra_la_fecha_y_la_hora_del_plazo_del_saldo(): void
+    {
+        Mail::fake();
+        Reserva::buscarReserva('000125-9')->update(['fecha_limite_saldo' => '2027-01-04 22:00:00']);
+
+        Reserva::notificarCliente(TipoNotificacion::PermisosObtenidos, '000125-9');
+
+        $correo = $this->correoEnviado(TipoNotificacion::PermisosObtenidos, 'federico.rios@mail.com');
+        $correo->assertSeeInOrderInHtml([
+            'que podés pagar desde Mi reserva hasta el 04/01/2027 a las 22:00.',
+            'Saldo pendiente', 'hasta el 04/01/2027 a las 22:00',
+        ]);
     }
 
     public function test_permisos_obtenidos_con_saldo_abonado_no_pide_saldo(): void
@@ -191,6 +309,19 @@ class NotificarClienteTest extends TestCase
         $correo->assertDontSeeInHtml('Saldo pendiente');
     }
 
+    // CU-04 valida hasta las 23:59:59 del día límite y el correo se pide después: si ya pasó la medianoche, igual sale con
+    // el monto del reintegro, aunque CU-17 ya no lo admita.
+    public function test_permisos_rechazados_sale_aunque_el_plazo_haya_vencido_al_enviarlo(): void
+    {
+        Mail::fake();
+        $this->travelTo('2026-12-05 00:00:00');
+
+        $this->assertTrue(Reserva::notificarCliente(TipoNotificacion::PermisosRechazados, '000123-5'));
+
+        $correo = $this->correoEnviado(TipoNotificacion::PermisosRechazados, 'diego.morales@mail.com');
+        $correo->assertSeeInHtml('reintegro de todo lo abonado: USD 870,00');
+    }
+
     // CU-22 todavía no existe: se simula su cambio de estado.
     public function test_cancelacion_por_falta_de_pago_avisa_que_la_sena_no_se_devuelve(): void
     {
@@ -203,7 +334,7 @@ class NotificarClienteTest extends TestCase
 
         $correo = $this->correoEnviado(TipoNotificacion::CancelacionFaltaPago, 'federico.rios@mail.com');
         $correo->assertHasSubject('Tu reserva 000125-9 fue cancelada por falta de pago');
-        $correo->assertSeeInHtml('el saldo no se pagó antes de la fecha límite, el 01/01/2027');
+        $correo->assertSeeInHtml('el saldo no se pagó antes de la fecha límite, el 01/01/2027 a las 23:59.');
         $correo->assertSeeInHtml('no es reembolsable');
     }
 
@@ -221,15 +352,21 @@ class NotificarClienteTest extends TestCase
     }
 
     // La causa la dice quien cancela: CU-17 (el cliente pidió el reintegro) o CU-26 (venció la fecha límite de
-    // confirmación). No se deduce de la fecha: aunque el cliente pida el reintegro después del 04/12/2026, el correo dice
-    // que lo pidió él. CU-26 todavía no existe: se simula con el mismo método del modelo.
+    // confirmación). No se deduce de la fecha: aunque el cliente lo pida en el último segundo del plazo, el correo dice
+    // que lo pidió él. Pasadas las 23:59:59 del 04/12/2026, CU-17 ya no admite el reintegro (SolicitarReintegroTest) y
+    // la cancela CU-26.
     #[DataProvider('causasFaltaDePermisos')]
     public function test_cancelacion_por_falta_de_permisos_reintegra_todo_e_informa_la_causa(string $fecha, bool $canceladaPorVencimiento, string $causa, string $otraCausa): void
     {
         Mail::fake();
         $this->travelTo($fecha);
         $reserva = Reserva::buscarReserva('000123-5');
-        $reserva->ejecutarCancelacionConReintegro($reserva->calcularReintegro(), now());
+
+        if ($canceladaPorVencimiento) {
+            $this->assertTrue($reserva->ejecutarCancelacionPorVencimiento(now()));
+        } else {
+            $reserva->confirmarReintegro(now());
+        }
 
         Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, '000123-5', canceladaPorVencimiento: $canceladaPorVencimiento);
 
@@ -247,9 +384,25 @@ class NotificarClienteTest extends TestCase
 
         return [
             'pedido del cliente (CU-17)' => ['2026-10-14 12:00:00', false, $pedido, $vencimiento],
-            'pedido del cliente después de la fecha límite' => ['2026-12-05 03:00:00', false, $pedido, $vencimiento],
+            'pedido del cliente en el último segundo del plazo' => ['2026-12-04 23:59:59', false, $pedido, $vencimiento],
             'vencimiento de la fecha límite (CU-26)' => ['2026-12-05 03:00:00', true, $vencimiento, $pedido],
         ];
+    }
+
+    // CU-26 también cancela reservas «Pendiente». El correo da la misma causa que a una «Sin Permiso», como dice el A7:
+    // venció el plazo sin que la reserva quedara confirmada. 000124-7 tiene los tres permisos sin registrar.
+    public function test_cancelacion_por_vencimiento_de_una_reserva_pendiente_da_la_misma_causa(): void
+    {
+        Mail::fake();
+        $this->travelTo('2026-12-19 00:05:00');
+        $this->assertTrue(Reserva::buscarReserva('000124-7')->ejecutarCancelacionPorVencimiento(now()));
+
+        Reserva::notificarCliente(TipoNotificacion::CancelacionFaltaPermisos, '000124-7', canceladaPorVencimiento: true);
+
+        $correo = $this->correoEnviado(TipoNotificacion::CancelacionFaltaPermisos, 'lucia.fernandez@mail.com');
+        $correo->assertSeeInHtml('porque el 18/12/2026 venció el plazo de confirmación sin que la reserva quedara confirmada.');
+        $correo->assertDontSeeInHtml('porque pediste el reintegro');
+        $correo->assertSeeInHtml('Te reintegramos todo lo abonado: un reintegro de <strong>USD 1.350,00</strong>', false);
     }
 
     /* ----------------------------- Destinatario ------------------------------- */

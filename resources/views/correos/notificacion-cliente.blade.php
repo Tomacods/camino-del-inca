@@ -52,6 +52,7 @@
                     <tr><td style="{{ $celdaTitulo }}">Precio final</td><td style="{{ $celdaDato }}">{{ $dolares($datos['monto_total']) }}</td></tr>
                     <tr><td style="{{ $celdaTitulo }}">Abonado ({{ $datos['ultimo_pago']['tipo_pago']->value }})</td><td style="{{ $celdaDato }}">{{ $dolares($datos['ultimo_pago']['monto']) }}, con {{ $datos['ultimo_pago']['medio_pago'] }}</td></tr>
                 </table>
+                <p style="margin:0 0 24px">Te adjuntamos el comprobante en PDF.</p>
                 @break
 
             @case(TipoNotificacion::PagoSaldo)
@@ -66,6 +67,7 @@
                     <tr><td style="{{ $celdaTitulo }}">Monto abonado</td><td style="{{ $celdaDato }}">{{ $dolares($datos['ultimo_pago']['monto']) }}, con {{ $datos['ultimo_pago']['medio_pago'] }}</td></tr>
                     <tr><td style="{{ $celdaTitulo }}">Saldo</td><td style="{{ $celdaDato }}">{{ $reserva['estado_saldo']->value }}</td></tr>
                 </table>
+                <p style="margin:0 0 24px">Te adjuntamos el comprobante en PDF.</p>
                 @break
 
             @case(TipoNotificacion::CancelacionReserva)
@@ -82,7 +84,7 @@
                 <p style="margin:0 0 16px">Todos los integrantes obtuvieron el permiso de ingreso al Camino Inca: tu reserva pasó a <strong>«{{ $reserva['estado']->value }}»</strong>.</p>
 
                 @if ($datos['saldo_por_pagar'] !== null)
-                    <p style="margin:0 0 24px">Te queda un saldo de <strong>{{ $dolares($datos['saldo_por_pagar']['monto']) }}</strong>, que podés pagar desde Mi reserva hasta el {{ $datos['saldo_por_pagar']['fecha_limite']->format('d/m/Y') }}.</p>
+                    <p style="margin:0 0 24px">Te queda un saldo de <strong>{{ $dolares($datos['saldo_por_pagar']['monto']) }}</strong>, que podés pagar desde Mi reserva hasta el {{ $datos['saldo_por_pagar']['fecha_limite']->format('d/m/Y') }} a las {{ $datos['saldo_por_pagar']['fecha_limite']->format('H:i') }}.</p>
                 @else
                     <p style="margin:0 0 24px">Tu reserva ya está pagada por completo.</p>
                 @endif
@@ -95,7 +97,7 @@
                         <li>{{ $integrante }}</li>
                     @endforeach
                 </ul>
-                <p style="margin:0 0 8px">Por eso tu reserva completa pasó a <strong>«{{ $reserva['estado']->value }}»</strong>. Hasta el <strong>{{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }}</strong> podés elegir, desde Mi reserva, una de estas opciones:</p>
+                <p style="margin:0 0 8px">Por eso tu reserva completa pasó a <strong>«{{ $reserva['estado']->value }}»</strong>. Hasta el <strong>{{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }} a las {{ $reserva['fecha_limite_confirmacion']->format('H:i') }}</strong> podés elegir, desde Mi reserva, una de estas opciones:</p>
                 <ul style="margin:0 0 16px;padding-left:20px">
                     <li>Pedir el reintegro de todo lo abonado: {{ $dolares($datos['monto_reintegro']) }}.</li>
                     <li>Reprogramar la reserva para otra salida.</li>
@@ -104,7 +106,7 @@
                 @break
 
             @case(TipoNotificacion::CancelacionFaltaPago)
-                <p style="margin:0 0 16px">Tu reserva <strong>{{ $reserva['numero_reserva'] }}</strong> fue cancelada el {{ $datos['fecha_envio']->format('d/m/Y') }} porque el saldo no se pagó antes de la fecha límite, el {{ $reserva['fecha_limite_saldo']->format('d/m/Y') }}.</p>
+                <p style="margin:0 0 16px">Tu reserva <strong>{{ $reserva['numero_reserva'] }}</strong> fue cancelada el {{ $datos['fecha_envio']->format('d/m/Y') }} porque el saldo no se pagó antes de la fecha límite, el {{ $reserva['fecha_limite_saldo']->format('d/m/Y') }} a las {{ $reserva['fecha_limite_saldo']->format('H:i') }}.</p>
                 <p style="margin:0 0 24px">La seña abonada ({{ $dolares($datos['monto_abonado']) }}) no es reembolsable.</p>
                 @break
 
@@ -117,7 +119,7 @@
                 <p style="margin:0 0 16px">
                     Tu reserva <strong>{{ $reserva['numero_reserva'] }}</strong> fue cancelada el {{ $datos['fecha_envio']->format('d/m/Y') }} por falta de permisos,
                     @if ($datos['cancelada_por_vencimiento'])
-                        porque el {{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }} venció el plazo para elegir entre el reintegro y la reprogramación.
+                        porque el {{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }} venció el plazo de confirmación sin que la reserva quedara confirmada.
                     @else
                         porque pediste el reintegro.
                     @endif
@@ -154,7 +156,7 @@
             </tr>
             <tr><td style="{{ $celdaTitulo }}">Abonado</td><td style="{{ $celdaDato }}">{{ $dolares($datos['monto_abonado']) }}</td></tr>
             @if ($datos['saldo_por_pagar'] !== null)
-                <tr><td style="{{ $celdaTitulo }}">Saldo pendiente</td><td style="{{ $celdaDato }}">{{ $dolares($datos['saldo_por_pagar']['monto']) }}, hasta el {{ $datos['saldo_por_pagar']['fecha_limite']->format('d/m/Y') }}</td></tr>
+                <tr><td style="{{ $celdaTitulo }}">Saldo pendiente</td><td style="{{ $celdaDato }}">{{ $dolares($datos['saldo_por_pagar']['monto']) }}, hasta el {{ $datos['saldo_por_pagar']['fecha_limite']->format('d/m/Y') }} a las {{ $datos['saldo_por_pagar']['fecha_limite']->format('H:i') }}</td></tr>
             @elseif ($reserva['estado_saldo'] === EstadoSaldo::Abonado)
                 <tr><td style="{{ $celdaTitulo }}">Saldo</td><td style="{{ $celdaDato }}">{{ $reserva['estado_saldo']->value }}</td></tr>
             @endif
