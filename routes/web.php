@@ -22,6 +22,7 @@ Route::livewire('/mi-reserva/{numeroReserva}/reintegro', 'solicitar-reintegro');
 Route::livewire('/mi-reserva/{numeroReserva}/modificar', 'modificar-reserva');
 Route::livewire('/mi-reserva/{numeroReserva}/pagar-saldo', 'pagar-saldo');
 Route::livewire('/mi-reserva/{numeroReserva}/reprogramar', 'reprogramar-reserva');
+Route::livewire('/mi-reserva/{numeroReserva}/valorar', 'valorar-servicios');
 // Dirección de vuelta de Mercado Pago del saldo (CU-16). block(), por lo mismo que /reservar/confirmada: si la vuelta
 // llega dos veces seguidas, la segunda espera a la primera y encuentra en la sesión el pago recién registrado.
 Route::livewire('/mi-reserva/{numeroReserva}/saldo-pagado', 'saldo-pagado')->block();
