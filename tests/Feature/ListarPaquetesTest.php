@@ -57,7 +57,7 @@ class ListarPaquetesTest extends TestCase
         $respuesta->assertSee('Camino Inca Clásico');
         $respuesta->assertSee('Camino Inca de 4 días');
         $respuesta->assertDontSee('Camino Inca de 4 días · 4 días');
-        $respuesta->assertSee('USD 750');
+        $respuesta->assertSee('USD 750,00');
         $respuesta->assertSee('15/02/2027');
     }
 

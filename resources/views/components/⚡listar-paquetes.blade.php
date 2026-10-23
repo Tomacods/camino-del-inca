@@ -86,6 +86,13 @@ new #[Title('Paquetes')] class extends Component
         Paquetes. <span class="text-texto-secundario">Elegí el que más te guste.</span>
     </h1>
 
+    @if (session('paquete_no_disponible'))
+        {{-- CU-06, flujo alternativo A1: el paquete que se quiso ver no existe o ya no está «Activo». --}}
+        <x-aviso tipo="error" class="mt-10" titulo="Ese paquete no está disponible actualmente">
+            Puede que se haya dado de baja. Elegí otro de la lista.
+        </x-aviso>
+    @endif
+
     {{-- CU-05, paso 3: el criterio es opcional; sin criterio se ve el listado completo. --}}
     <x-tarjeta class="mt-10">
         <form wire:submit="buscarPaquetes" class="grid gap-5 md:grid-cols-[1fr_auto]">
@@ -125,7 +132,7 @@ new #[Title('Paquetes')] class extends Component
                     <p class="text-[17px] text-texto-secundario">{{ $paquete['nombre_recorrido'] }}</p>
 
                     <p class="mt-4 text-[17px]">
-                        Desde <span class="font-semibold tabular-nums">USD {{ number_format($paquete['precio_base'], 0, ',', '.') }}</span>
+                        Desde <span class="font-semibold tabular-nums">USD {{ number_format((float) $paquete['precio_base'], 2, ',', '.') }}</span>
                         por persona
                     </p>
 

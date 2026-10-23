@@ -9,13 +9,21 @@ new #[Title('Paquete')] class extends Component
 {
     public int $idPaquete;
 
-    // CU-06, paso 1: el cliente llega desde el listado (CU-05) con la identificación del paquete.
+    // CU-06, paso 1: el cliente llega desde el listado (CU-05) con la identificación del paquete. Flujo alternativo A1:
+    // si el paquete no existe o ya no está «Activo» (por ejemplo, desde un enlace guardado), se informa y se redirige
+    // al listado, que muestra el aviso.
     public function mount(int $idPaquete): void
     {
         $this->idPaquete = $idPaquete;
+
+        if (! Paquete::buscarPorId($idPaquete)?->estaActivo()) {
+            session()->flash('paquete_no_disponible', true);
+
+            $this->redirect('/paquetes');
+        }
     }
 
-    // Pasos 2 y 3: el detalle sólo se muestra si el paquete existe y está «Activo». Si no, null (flujo alternativo A1).
+    // Pasos 2 y 3: el detalle del paquete, si existe y está «Activo».
     #[Computed]
     public function detalle(): ?array
     {
@@ -28,17 +36,10 @@ new #[Title('Paquete')] class extends Component
 ?>
 
 <div>
-    @if ($this->detalle === null)
-        {{-- CU-06, flujo alternativo A1: el paquete no existe o ya no está «Activo», por ejemplo desde un enlace guardado. --}}
-        <h1 class="text-5xl font-semibold">Paquete.</h1>
-
-        <x-aviso tipo="error" class="mt-10" titulo="Este paquete no está disponible actualmente">
-            Puede que se haya dado de baja. Mirá los otros paquetes que tenemos.
-        </x-aviso>
-
-        <x-boton href="/paquetes" class="mt-6">Ver los paquetes</x-boton>
-    @else
+    {{-- Sin detalle, mount() ya redirigió al listado (flujo alternativo A1). --}}
+    @if ($this->detalle !== null)
         @php($paquete = $this->detalle)
+        @php($dolares = fn ($monto) => 'USD '.number_format((float) $monto, 2, ',', '.'))
 
         <h1 class="text-5xl font-semibold">{{ $paquete['nombre'] }}</h1>
 
@@ -73,15 +74,15 @@ new #[Title('Paquete')] class extends Component
                 <dl class="divide-y divide-divisor text-[17px]">
                     <div class="flex justify-between gap-4 pb-3">
                         <dt class="text-texto-secundario">Precio base, por persona</dt>
-                        <dd class="font-semibold tabular-nums">USD {{ number_format($paquete['precio_base'], 0, ',', '.') }}</dd>
+                        <dd class="font-semibold tabular-nums">{{ $dolares($paquete['precio_base']) }}</dd>
                     </div>
                     <div class="flex justify-between gap-4 py-3">
                         <dt class="text-texto-secundario">Noche extra en Cusco, por persona</dt>
-                        <dd class="tabular-nums">USD {{ number_format($paquete['costo_noche_extra_cusco'], 0, ',', '.') }}</dd>
+                        <dd class="tabular-nums">{{ $dolares($paquete['costo_noche_extra_cusco']) }}</dd>
                     </div>
                     <div class="flex justify-between gap-4 pt-3">
                         <dt class="text-texto-secundario">Equipo de camping (opcional), por equipo</dt>
-                        <dd class="tabular-nums">USD {{ number_format($paquete['costo_equipo_camping'], 0, ',', '.') }}</dd>
+                        <dd class="tabular-nums">{{ $dolares($paquete['costo_equipo_camping']) }}</dd>
                     </div>
                 </dl>
             </x-tarjeta>

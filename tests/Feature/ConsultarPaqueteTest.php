@@ -20,7 +20,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
-// CU-06 Consultar Paquete: curso normal (pasos 1 a 4), flujos alternativos A1 y A2, y el promedio de valoraciones.
+// CU-06 Consultar Paquete: curso normal (pasos 1 a 4), flujos alternativos A1 y A2, el promedio de valoraciones y los
+// precios con centavos.
 class ConsultarPaqueteTest extends TestCase
 {
     use RefreshDatabase;
@@ -73,9 +74,9 @@ class ConsultarPaqueteTest extends TestCase
         $respuesta->assertSee('Hotel en Cusco');
         $respuesta->assertSee('Tren a Ollantaytambo');
         $respuesta->assertSee('6 porteadores');
-        $respuesta->assertSeeInOrder(['Precio base, por persona', 'USD 750']);
-        $respuesta->assertSeeInOrder(['Noche extra en Cusco, por persona', 'USD 60']);
-        $respuesta->assertSeeInOrder(['Equipo de camping (opcional), por equipo', 'USD 45']);
+        $respuesta->assertSeeInOrder(['Precio base, por persona', 'USD 750,00']);
+        $respuesta->assertSeeInOrder(['Noche extra en Cusco, por persona', 'USD 60,00']);
+        $respuesta->assertSeeInOrder(['Equipo de camping (opcional), por equipo', 'USD 45,00']);
     }
 
     public function test_muestra_las_salidas_disponibles_con_su_cupo_y_su_guia(): void
@@ -122,21 +123,46 @@ class ConsultarPaqueteTest extends TestCase
         $this->get('/paquetes/'.$this->paquete->id_paquete)->assertSee('Todavía no tiene valoraciones.');
     }
 
-    // Flujo alternativo A1.
-    public function test_un_paquete_inactivo_no_se_muestra(): void
+    // Revisión del PR: los precios con centavos se muestran con sus dos decimales.
+    public function test_muestra_los_precios_con_centavos(): void
+    {
+        $this->paquete->update([
+            'precio_base' => 750.49,
+            'costo_noche_extra_cusco' => 60.75,
+            'costo_equipo_camping' => 45.25,
+        ]);
+
+        $this->get('/paquetes/'.$this->paquete->id_paquete)
+            ->assertSee('USD 750,49')
+            ->assertSee('USD 60,75')
+            ->assertSee('USD 45,25');
+    }
+
+    // Flujo alternativo A1: se informa y se redirige al listado.
+    public function test_un_paquete_inactivo_redirige_al_listado_con_el_aviso(): void
     {
         $inactivo = $this->crearPaquete('Paquete dado de baja', EstadoPaquete::Inactivo);
 
-        $this->get('/paquetes/'.$inactivo->id_paquete)
-            ->assertOk()
-            ->assertSee('Este paquete no está disponible actualmente')
-            ->assertDontSee('Paquete dado de baja')
-            ->assertSee('href="/paquetes"', false);
+        $this->get('/paquetes/'.$inactivo->id_paquete)->assertRedirect('/paquetes');
+
+        $this->followingRedirects()
+            ->get('/paquetes/'.$inactivo->id_paquete)
+            ->assertSee('Ese paquete no está disponible actualmente')
+            ->assertDontSee('Paquete dado de baja');
     }
 
-    public function test_un_paquete_que_no_existe_muestra_el_mismo_aviso(): void
+    public function test_un_paquete_que_no_existe_redirige_al_listado_con_el_aviso(): void
     {
-        $this->get('/paquetes/999999')->assertSee('Este paquete no está disponible actualmente');
+        $this->get('/paquetes/999999')->assertRedirect('/paquetes');
+
+        $this->followingRedirects()
+            ->get('/paquetes/999999')
+            ->assertSee('Ese paquete no está disponible actualmente');
+    }
+
+    public function test_el_listado_no_muestra_el_aviso_si_no_hubo_redireccion(): void
+    {
+        $this->get('/paquetes')->assertDontSee('Ese paquete no está disponible actualmente');
     }
 
     private function crearPaquete(string $nombre, EstadoPaquete $estado = EstadoPaquete::Activo): Paquete
