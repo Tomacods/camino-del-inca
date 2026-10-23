@@ -18,6 +18,7 @@ use Filament\Forms\Components\Repeater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
+use RuntimeException;
 use Tests\TestCase;
 
 // CU-01 Crear Paquete (R-01), en el panel del administrador.
@@ -144,6 +145,76 @@ class CrearPaqueteTest extends TestCase
             ->fillForm($this->datosValidos(excursiones: [$this->salida('2027-03-01', cupo: 0)]))
             ->call('create')
             ->assertHasFormErrors(['excursiones.0.cupo']);
+    }
+
+    // Los máximos de las columnas (smallint y decimal(10,2)): PostgreSQL rechazaría un valor más grande.
+    public function test_los_numeros_no_superan_los_maximos_de_la_base(): void
+    {
+        $datos = $this->datosValidos(excursiones: [$this->salida('2027-03-01', cupo: 40000)]);
+        $datos['precio_base'] = 100000000;
+
+        $this->formulario()
+            ->fillForm($datos)
+            ->call('create')
+            ->assertHasFormErrors(['precio_base', 'excursiones.0.cupo']);
+    }
+
+    // Revisión del PR: si falla el guardado de una excursión, no queda un paquete «Activo» incompleto.
+    public function test_si_falla_una_excursion_no_queda_nada_guardado(): void
+    {
+        Excursion::creating(function (Excursion $excursion) {
+            if ($excursion->fecha_salida->format('Y-m-d') === '2027-03-08') {
+                throw new RuntimeException('La base rechazó la segunda excursión.');
+            }
+        });
+
+        try {
+            $this->formulario()->fillForm($this->datosValidos())->call('create');
+        } catch (RuntimeException) {
+            // El error sigue su curso; lo que importa es lo que quedó en la base.
+        }
+
+        $this->assertSame(0, Paquete::count());
+        $this->assertSame(0, Excursion::count());
+        $this->assertDatabaseCount('paquete_servicio', 0);
+    }
+
+    // Revisión del PR: otro pedido ocupa al guía después de la validación del formulario y antes de que se guarde.
+    // Se simula guardando esa otra excursión justo cuando se guarda la del paquete nuevo.
+    public function test_rechaza_al_guardar_si_otro_pedido_ocupo_al_guia(): void
+    {
+        $otro = Paquete::crearPaquete([
+            'id_recorrido' => $this->recorrido->id_recorrido,
+            'nombre' => 'Camino Inca Extendido',
+            'precio_base' => 950,
+            'costo_noche_extra_cusco' => 60,
+            'costo_equipo_camping' => 45,
+            'cantidad_porteadores' => 8,
+        ]);
+
+        $yaOcupado = false;
+
+        Excursion::created(function (Excursion $excursion) use ($otro, &$yaOcupado) {
+            if ($yaOcupado || $excursion->id_paquete === $otro->id_paquete) {
+                return;
+            }
+
+            $yaOcupado = true;
+
+            Excursion::create([
+                'id_paquete' => $otro->id_paquete,
+                'id_guia' => $this->guia->id_usuario,
+                'fecha_salida' => '2027-03-01',
+                'cupo' => 12,
+            ]);
+        });
+
+        $this->formulario()
+            ->fillForm($this->datosValidos(excursiones: [$this->salida('2027-03-01')]))
+            ->call('create')
+            ->assertNotified('No se creó el paquete');
+
+        $this->assertFalse(Paquete::where('nombre', 'Camino Inca Clásico')->exists());
     }
 
     // R-01: el guía ya conduce otra excursión (de otro paquete) en esas fechas.

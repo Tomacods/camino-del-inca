@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EstadoPaquete;
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -68,6 +69,42 @@ class Paquete extends Model
             'estado' => EstadoPaquete::Activo,
             'fecha_creacion' => today(),
         ]);
+    }
+
+    // R-01, dentro de la transacción que guarda el paquete y sus excursiones. El formulario ya revisó los guías, pero
+    // otro pedido puede ocupar a uno entre esa validación y el guardado: acá se bloquea a los guías y se vuelve a
+    // revisar. Si dos pedidos se cruzan, el segundo espera el bloqueo, ve la excursión del primero y se rechaza.
+    public function confirmarGuiasDisponibles(): void
+    {
+        $fecha = $this->buscarConflictoConGuiasBloqueados();
+
+        if ($fecha !== null) {
+            throw new DomainException('El guía de la salida del '.$fecha->format('d/m/Y')
+                .' ya conduce otra excursión en esas fechas.');
+        }
+    }
+
+    // Bloquea a los guías de sus salidas, en orden para que dos pedidos no se traben entre sí, y busca superposiciones
+    // con las excursiones ya guardadas de otros paquetes.
+    private function buscarConflictoConGuiasBloqueados(bool $soloFuturas = false): ?Carbon
+    {
+        $excursiones = $this->excursiones()
+            ->when($soloFuturas, fn ($consulta) => $consulta->whereDate('fecha_salida', '>=', today()))
+            ->get();
+
+        Guia::whereIn('id_usuario', $excursiones->pluck('id_guia')->unique()->all())
+            ->orderBy('id_usuario')
+            ->lockForUpdate()
+            ->get();
+
+        return Excursion::buscarConflictoDeGuia(
+            $excursiones->map(fn (Excursion $excursion) => [
+                'fecha_salida' => $excursion->fecha_salida->format('Y-m-d'),
+                'id_guia' => $excursion->id_guia,
+            ])->all(),
+            $this->recorrido->duracion_dias,
+            $this->id_paquete,
+        );
     }
 
     /* ------------------------------ CU-15 Pagar ------------------------------- */

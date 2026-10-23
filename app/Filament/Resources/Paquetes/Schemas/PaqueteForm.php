@@ -17,10 +17,15 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Carbon;
 
-// Los datos del R-01. El formulario valida el formato; las reglas de negocio (salidas los lunes y guías sin
-// superposiciones) las decide el modelo Excursion.
+// Los datos del R-01. El formulario valida el formato, con los máximos de las columnas (decimal(10,2) en los precios y
+// smallint en porteadores y cupo); las reglas de negocio (salidas los lunes y guías sin superposiciones) las decide el
+// modelo Excursion.
 class PaqueteForm
 {
+    private const PRECIO_MAXIMO = 99999999.99;
+
+    private const ENTERO_MAXIMO = 32767;
+
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
@@ -41,6 +46,7 @@ class PaqueteForm
                         ->label('Cantidad de porteadores')
                         ->integer()
                         ->minValue(0)
+                        ->maxValue(self::ENTERO_MAXIMO)
                         ->required(),
                 ]),
 
@@ -52,18 +58,21 @@ class PaqueteForm
                         ->prefix('USD')
                         ->numeric()
                         ->minValue(0.01)
+                        ->maxValue(self::PRECIO_MAXIMO)
                         ->required(),
                     TextInput::make('costo_noche_extra_cusco')
                         ->label('Noche extra en Cusco')
                         ->prefix('USD')
                         ->numeric()
                         ->minValue(0)
+                        ->maxValue(self::PRECIO_MAXIMO)
                         ->required(),
                     TextInput::make('costo_equipo_camping')
                         ->label('Equipo de camping')
                         ->prefix('USD')
                         ->numeric()
                         ->minValue(0)
+                        ->maxValue(self::PRECIO_MAXIMO)
                         ->required(),
                 ]),
 
@@ -102,6 +111,7 @@ class PaqueteForm
                                 ->label('Cupo')
                                 ->integer()
                                 ->minValue(1)
+                                ->maxValue(self::ENTERO_MAXIMO)
                                 ->required(),
                             Select::make('id_guia')
                                 ->label('Guía')
