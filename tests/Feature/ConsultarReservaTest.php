@@ -100,16 +100,15 @@ class ConsultarReservaTest extends TestCase
             ->assertSeeHtml('href="/mi-reserva/000125-9/modificar"');
     }
 
-    public function test_las_opciones_sin_pantalla_se_muestran_deshabilitadas(): void
+    // Con Valorar Servicios (CU-23), todas las opciones tienen su pantalla.
+    public function test_valorar_servicios_lleva_a_su_pantalla(): void
     {
         $this->crearReservaFinalizada('000118-1', 'paula.benitez@mail.com');
 
-        $componente = $this->consultarReserva('000118-1', 'paula.benitez@mail.com')
+        $this->consultarReserva('000118-1', 'paula.benitez@mail.com')
             ->assertSee('Reserva 000118-1')
-            ->assertSeeHtmlInOrder(['disabled="disabled"', 'Valorar servicios', 'Disponible próximamente']);
-
-        // Sólo Valorar: el resto de las opciones ya tiene pantalla.
-        $this->assertSame(1, substr_count($componente->html(), 'Disponible próximamente'));
+            ->assertSeeHtml('href="/mi-reserva/000118-1/valorar"')
+            ->assertDontSee('Disponible próximamente');
     }
 
     public function test_las_opciones_de_una_reserva_sin_permiso_son_enlaces(): void

@@ -217,12 +217,8 @@ new #[Title('Mi reserva')] class extends Component
                             <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/pagar-saldo">{{ $opcion }}</x-boton>
                         @elseif ($opcion === Reserva::OPCION_REPROGRAMAR)
                             <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/reprogramar">{{ $opcion }}</x-boton>
-                        @else
-                            {{-- Valorar todavía no tiene pantalla. --}}
-                            <x-boton disabled class="flex-col">
-                                {{ $opcion }}
-                                <span class="text-sm">Disponible próximamente</span>
-                            </x-boton>
+                        @elseif ($opcion === Reserva::OPCION_VALORAR)
+                            <x-boton variante="secundario" href="/mi-reserva/{{ $reserva->numero_reserva }}/valorar">{{ $opcion }}</x-boton>
                         @endif
                     @empty
                         <p class="text-[15px] text-texto-secundario">
