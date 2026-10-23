@@ -172,6 +172,14 @@ class Paquete extends Model
         ];
     }
 
+    // La consulta administrativa incluye todas las salidas; la disponibilidad del portal se mantiene en getDetalles().
+    public function getExcursionesParaConsulta(): array
+    {
+        return $this->excursiones()->with('guia')->orderBy('fecha_salida')->get()
+            ->map(fn (Excursion $excursion) => $excursion->getDetalle())
+            ->all();
+    }
+
     // El promedio no se guarda (es derivado, como dice el Documento de Normalización): sale del puntaje de experiencia
     // general de las valoraciones de las reservas de sus excursiones. Sin valoraciones devuelve null.
     public function calcularPromedioValoraciones(): ?float

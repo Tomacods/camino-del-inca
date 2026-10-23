@@ -50,7 +50,7 @@ CU-05 y CU-06 son compartidos: el flujo principal corresponde al cliente y el us
 como alternativa. En el panel, el administrador lista y consulta paquetes activos e inactivos, y filtra el listado
 por estado.
 
-Los ajustes de reglas y diagramas del portal de CU-05/CU-06, y el alcance administrativo que sigue pendiente, están en
+Los ajustes de reglas y diagramas de CU-05/CU-06, incluida la consulta administrativa, están en
 [cambios de diseño de CU-06](cambios-diseno-cu06.md). Sus comprobaciones están en
 [pruebas de CU-06](pruebas-consultar-paquete.md).
 

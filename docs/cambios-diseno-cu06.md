@@ -1,7 +1,9 @@
 # Cambios de diseño por CU-06 Consultar Paquete
 
-Ajustes de la revisión del PR #53 para que el Documento 3 y sus diagramas coincidan con el portal. Esta es la versión
-corregida para trasladar al Drive antes de la entrega del 09/11; el archivo del Drive todavía debe actualizarse.
+Ajustes de la revisión del PR #53 para que CU-06 y DS-06 coincidan con el portal y la consulta administrativa.
+La [revisión editable del Drive](https://docs.google.com/document/d/1ZrazgNyMoCciwDL_V759mS9zRsrALbYws8G-mhT2APs/edit)
+está en **Revisiones de código vs diseño** y complementa el Documento 3. Los archivos originales se conservan como
+antecedentes; las reglas y secuencias corregidas de esta revisión son la referencia para CU-06.
 
 ## CU-05 y CU-06: salidas disponibles para el cliente
 
@@ -130,6 +132,7 @@ Verificar estos métodos en el diagrama de clases, con los nombres y las firmas 
 | Paquete | `buscarPorId(int $idPaquete)` (estático) | `?Paquete` |
 | Paquete | `estaActivo()` | `bool` |
 | Paquete | `getDetalles()` | `array` |
+| Paquete | `getExcursionesParaConsulta()` | `array` |
 | Paquete | `calcularPromedioValoraciones()` | `?float` |
 | Recorrido | `getDatosRecorrido()` | `array` |
 | Recorrido | `contarEtapas()` | `int` |
@@ -139,18 +142,57 @@ Verificar estos métodos en el diagrama de clases, con los nombres y las firmas 
 | Excursion | `obtenerCupoDisponible()` | `int` |
 | Excursion | `getDetalle()` | `array` |
 
-## Consulta administrativa pendiente
+## Consulta administrativa
 
-CU-06 también permite al administrador consultar paquetes activos e inactivos después de iniciar sesión. El portal
-de este PR sólo resuelve el flujo del cliente. La consulta administrativa debe incorporarse al mismo recurso
-Filament de Paquetes que CU-01, junto con CU-02, CU-03 y el listado administrativo de CU-05, según el
-[reparto](reparto-casos-de-uso.md).
+Después de iniciar sesión, el administrador abre `/admin/paquetes`, puede filtrar por estado y consultar paquetes
+activos e inactivos mediante la acción **Ver**. El detalle muestra recorrido, duración, etapas, servicios, porteadores,
+precios, promedio y todas las excursiones ordenadas por fecha, con su cupo disponible y guía. Incluye las pasadas,
+las completas y las que no cumplen la anticipación: el filtro comercial de tres meses se aplica al portal.
+Sin excursiones o valoraciones se muestra el aviso correspondiente. El panel no ofrece reservar.
 
-Queda pendiente la vista del paquete con sus excursiones y cupo calculado por el modelo, y las pruebas de acceso
-por rol. El PR #54 incorpora el listado y la creación, pero no la vista de consulta. No dar por terminado CU-06
-completo hasta cubrir esa alternativa.
+`Paquete::getExcursionesParaConsulta()` obtiene las excursiones sin el filtro del portal y reutiliza
+`Excursion::getDetalle()`; el cupo se sigue calculando con `obtenerCupoDisponible()`.
+`PaqueteResource::canViewAny()` y `canView()` exigen el rol Administrador. El guía recibe 403 tanto en el listado
+como en el detalle por URL directa; el visitante debe iniciar sesión. La sesión administrativa no permite
+consultar paquetes inactivos por la ruta pública.
 
-Las comprobaciones del portal están en [pruebas de CU-06](pruebas-consultar-paquete.md).
+```mermaid
+sequenceDiagram
+    actor Administrador
+    participant Panel as Paquetes (Filament)
+    participant Paquete
+    participant Excursion
+    participant Guia
+    Administrador->>Panel: Abrir un paquete después de iniciar sesión
+    Panel->>Panel: canViewAny() y canView(registro)
+    alt Rol no autorizado
+        Panel-->>Administrador: 403
+    else Administrador
+        Panel->>Paquete: Obtener registro activo o inactivo
+        Panel->>Paquete: calcularPromedioValoraciones()
+        Panel->>Paquete: getExcursionesParaConsulta()
+        Note over Paquete: Todas las excursiones ordenadas por fecha
+        loop Cada excursión del paquete
+            Paquete->>Excursion: getDetalle()
+            Excursion->>Excursion: getFechaSalida() y obtenerCupoDisponible()
+            Excursion->>Guia: getNombreCompleto()
+            Guia-->>Excursion: nombre completo
+            Excursion-->>Paquete: fecha_salida, cupo_disponible, guia
+        end
+        Paquete-->>Panel: Datos y excursiones
+        Panel-->>Administrador: Mostrar detalle sin opción de reserva
+    end
+```
+
+### Integración con CU-01 (PR #54)
+
+El recurso se comparte con CU-01, CU-02, CU-03 y CU-05, según el [reparto](reparto-casos-de-uso.md).
+El PR #54 agrega listado y creación en las mismas clases. Al resolver ese solapamiento, conservar `ViewPaquete`,
+`PaqueteInfolist`, `canView()`, la ruta `view` y la acción **Ver**; agregar el formulario, la ruta `create` y la
+acción de alta de CU-01, y cambiar `canCreate() = false` por su autorización exclusiva para Administrador.
+Después se ejecutan las pruebas de ambos casos. Esta revisión no modifica ni integra el PR #54.
+
+Las comprobaciones del portal y del panel están en [pruebas de CU-06](pruebas-consultar-paquete.md).
 
 ## Fuentes revisadas
 

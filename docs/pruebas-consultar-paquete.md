@@ -1,7 +1,7 @@
 # Pruebas de CU-06 Consultar Paquete
 
 Las reglas y la corrección del DS-06 están en [cambios de diseño](cambios-diseno-cu06.md).
-El alcance de estas pruebas es el portal del cliente del PR #53.
+El alcance de estas pruebas incluye el portal del cliente y la consulta administrativa del PR #53.
 
 ## Pruebas automáticas
 
@@ -23,10 +23,11 @@ El alcance de estas pruebas es el portal del cliente del PR #53.
 Las dos pruebas del límite usan lunes reales y recorren el detalle y el formulario de reserva. No reemplazan los
 modelos por simulaciones. Las pruebas existentes de CU-05 cubren además la búsqueda por fecha y sus errores de formato.
 
-## Comprobación manual en navegador
+## Comprobación en navegador
 
-Pendiente de ejecutar después de integrar los cambios. Preparar un paquete activo con sus servicios y excursiones,
-un paquete inactivo, una salida con cupo, otra sin cupo y una salida futura a menos de tres meses.
+Ejecutada sobre PostgreSQL en una base exclusiva de revisión, con datos de prueba: paquete activo con servicios,
+paquete inactivo, paquete sin salidas ni valoraciones, importes fraccionarios y excursiones pasadas, completas,
+a menos de tres meses y reservables. El portal se revisó en escritorio y a 390 píxeles CSS de ancho.
 
 | Paso | Resultado esperado |
 |---|---|
@@ -39,23 +40,44 @@ un paquete inactivo, una salida con cupo, otra sin cupo y una salida futura a me
 | Abrir un paquete sin valoraciones y otro con valoraciones | Muestra el aviso o el promedio correspondiente |
 | Revisar escritorio y pantalla angosta | Precios, tarjetas, fechas y botones se leen y se pueden usar |
 
-## Alcance administrativo
+## Consulta administrativa y permisos
 
-La consulta administrativa de paquetes activos e inactivos y sus permisos por rol sigue pendiente en el recurso de
-Paquetes de Filament. Estas pruebas del portal no permiten darla por validada.
+`tests/Feature/ConsultarPaquetePanelTest.php` agrega seis pruebas:
+
+| Caso | Qué comprueba |
+|---|---|
+| Listado administrativo | Muestra activos e inactivos y aplica el filtro por estado |
+| Detalle administrativo | Recorrido, etapas, servicios, porteadores, tres precios con centavos y promedio |
+| Todas las salidas | Incluye pasadas, próximas y completas, ordenadas por fecha; descuenta retenciones e integrantes de las tres clases de reservas que ocupan cupo |
+| Ausencia de datos | Informa cuando no hay excursiones ni valoraciones |
+| Rol Guía | Recibe 403 al abrir listado o detalle por URL directa, también para un paquete inactivo |
+| Visitante | Debe iniciar sesión para entrar al panel; el portal sigue siendo público |
+
+La sesión de administrador tampoco habilita paquetes inactivos en la ruta pública.
 
 ## Resultado de la revisión del 23/10/2026
 
 | Comprobación | Resultado |
 |---|---|
-| `php artisan migrate:fresh --seed` | Correcto en SQLite en memoria |
-| Suite completa | 611 pruebas y 2693 aserciones, sin fallos |
-| `php vendor/bin/pint` | Correcto |
-| PostgreSQL | Pendiente: no se pudo establecer la conexión en este entorno |
-| Navegador | Pendiente de la comprobación manual indicada arriba |
+| Migraciones con seed | Correctas en PostgreSQL, base exclusiva de revisión |
+| Suite completa en SQLite | 617 pruebas y 2735 aserciones; 0 fallos (101,4 s) |
+| Suite completa en PostgreSQL | 617 pruebas y 2735 aserciones; 0 fallos (374,8 s) |
+| CU-06, portal y panel | 17 pruebas y 87 aserciones; 0 fallos |
+| Pint | Correcto |
+| Navegador | Portal, enlace a CU-14, avisos A1 y sin salidas, escritorio y móvil; panel con activos, inactivos, filtro y todas las excursiones; guía con 403 en listado y detalle |
 
-El lanzador estándar de `php artisan test` no pudo correr limpiamente en la copia aislada por las restricciones de
-permisos y la ausencia del archivo de entorno. La suite completa se ejecutó con PHPUnit directamente, manteniendo
-las mismas suites, variables y opciones de `phpunit.xml`. Para evitar el chequeo de lectura bloqueado por el
-entorno, se adelantó la carga de `vendor/autoload.php` con `auto_prepend_file` y se omitió solamente el atributo
-`bootstrap` en una copia temporal de la configuración. Esa copia y los archivos temporales no se suben al PR.
+### Ejecución y entorno
+
+Se ejecutó PHPUnit directamente con las mismas suites y variables de `phpunit.xml`. En la copia aislada, el chequeo
+de lectura del lanzador estándar falla: se adelantó `vendor/autoload.php` con `auto_prepend_file` y se omitió solamente
+el atributo `bootstrap` en una copia temporal de la configuración. No se cambió la configuración del repositorio.
+
+La corrida de PostgreSQL usó `camino_cu06_review_20261023`; la base de desarrollo no se modificó. Para el navegador se
+publicaron en la copia temporal los recursos de Filament y Livewire como archivos estáticos, porque el entorno
+bloquea el chequeo de lectura de las respuestas de archivos dinámicos. No fue necesario cambiar código del producto.
+Los lanzadores, datos adicionales, recursos publicados y configuraciones temporales no se suben al PR.
+
+La [revisión del Drive](https://docs.google.com/document/d/1ZrazgNyMoCciwDL_V759mS9zRsrALbYws8G-mhT2APs/edit)
+registra las reglas y la corrección de DS-06 en **Revisiones de código vs diseño**. Tras aprobar e integrar el PR #53,
+CU-06 queda cubierto en el portal y el panel. Al integrar CU-01 (#54), conservar la consulta y sus permisos como indica
+[la nota de integración](cambios-diseno-cu06.md#integración-con-cu-01-pr-54).
