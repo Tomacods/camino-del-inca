@@ -5,7 +5,9 @@ namespace App\Filament\Resources\Paquetes;
 use App\Enums\Rol;
 use App\Filament\Resources\Paquetes\Pages\CreatePaquete;
 use App\Filament\Resources\Paquetes\Pages\ListPaquetes;
+use App\Filament\Resources\Paquetes\Pages\ViewPaquete;
 use App\Filament\Resources\Paquetes\Schemas\PaqueteForm;
+use App\Filament\Resources\Paquetes\Schemas\PaqueteInfolist;
 use App\Filament\Resources\Paquetes\Tables\PaquetesTable;
 use App\Models\Paquete;
 use BackedEnum;
@@ -13,8 +15,8 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
-// El catálogo de paquetes del administrador: Crear Paquete (CU-01). Modificar (CU-02) y Eliminar (CU-03) se suman acá.
 class PaqueteResource extends Resource
 {
     protected static ?string $model = Paquete::class;
@@ -29,13 +31,16 @@ class PaqueteResource extends Resource
 
     protected static ?string $slug = 'paquetes';
 
-    // El guía también entra al panel, pero los paquetes los administra sólo el administrador
     public static function canViewAny(): bool
     {
         return auth()->user()?->rol === Rol::Administrador;
     }
 
-    // Sin esto, un guía podría abrir el formulario escribiendo la dirección a mano
+    public static function canView(Model $record): bool
+    {
+        return static::canViewAny();
+    }
+
     public static function canCreate(): bool
     {
         return static::canViewAny();
@@ -44,6 +49,11 @@ class PaqueteResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return PaqueteForm::configure($schema);
+    }
+
+    public static function infolist(Schema $schema): Schema
+    {
+        return PaqueteInfolist::configure($schema);
     }
 
     public static function table(Table $table): Table
@@ -56,6 +66,7 @@ class PaqueteResource extends Resource
         return [
             'index' => ListPaquetes::route('/'),
             'create' => CreatePaquete::route('/crear'),
+            'view' => ViewPaquete::route('/{record}'),
         ];
     }
 }

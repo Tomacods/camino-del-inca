@@ -13,25 +13,15 @@ use Illuminate\Database\Eloquent\Model;
 // CU-01 Crear Paquete
 class CreatePaquete extends CreateRecord
 {
-    // El panel no usa transacciones. Esta página sí: el paquete, sus servicios y sus excursiones se guardan juntos, y si
-    // algo falla no queda un paquete «Activo» incompleto.
+    // Paquete, servicios y excursiones se guardan juntos; los bloqueos de los guías duran hasta el final.
     protected ?bool $hasDatabaseTransactions = true;
 
     protected static string $resource = PaqueteResource::class;
 
-    // El modelo crea el paquete en estado «Activo». Los servicios y las excursiones los guarda después Filament, con las
-    // relaciones del formulario, en la misma transacción.
     protected function handleRecordCreation(array $data): Model
     {
-        return Paquete::crearPaquete($data);
-    }
-
-    // Ya guardadas las excursiones y todavía dentro de la transacción, el paquete confirma que sus guías sigan libres.
-    // Si otro pedido ocupó a uno mientras tanto, se deshace todo.
-    protected function afterCreate(): void
-    {
         try {
-            $this->getRecord()->confirmarGuiasDisponibles();
+            Paquete::confirmarGuiasDisponibles(array_values($this->data['excursiones']), (int) $data['id_recorrido']);
         } catch (DomainException $excepcion) {
             Notification::make()
                 ->title('No se creó el paquete')
@@ -39,11 +29,13 @@ class CreatePaquete extends CreateRecord
                 ->danger()
                 ->send();
 
+            // Todavía no se escribió ningún registro: el formulario conserva sus datos y admite otro intento.
             throw (new Halt)->rollBackDatabaseTransaction();
         }
+
+        return Paquete::crearPaquete($data);
     }
 
-    // Después de crearlo se vuelve al listado, donde aparece primero.
     protected function getRedirectUrl(): string
     {
         return static::getResource()::getUrl('index');

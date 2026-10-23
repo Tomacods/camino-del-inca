@@ -60,8 +60,7 @@ class Paquete extends Model
 
     /* --------------------------- CU-01 Crear paquete --------------------------- */
 
-    // R-01: al crearse, el paquete queda «Activo», listo para recibir reservas. Los servicios y las excursiones los
-    // guarda después el formulario del panel, con sus relaciones.
+    // El paquete queda activo. Filament guarda sus servicios y excursiones en la misma transacción.
     public static function crearPaquete(array $datos): self
     {
         return self::create([
@@ -71,40 +70,23 @@ class Paquete extends Model
         ]);
     }
 
-    // R-01, dentro de la transacción que guarda el paquete y sus excursiones. El formulario ya revisó los guías, pero
-    // otro pedido puede ocupar a uno entre esa validación y el guardado: acá se bloquea a los guías y se vuelve a
-    // revisar. Si dos pedidos se cruzan, el segundo espera el bloqueo, ve la excursión del primero y se rechaza.
-    public function confirmarGuiasDisponibles(): void
+    // Dentro de la transacción de CU-01, antes de guardar el paquete o sus excursiones. Dos altas con el mismo guía
+    // se turnan: la segunda espera y comprueba las salidas que confirmó la primera. Los bloqueos se toman en orden
+    // y antes de insertar las claves foráneas, para evitar convertir bloqueos compartidos en exclusivos.
+    public static function confirmarGuiasDisponibles(array $salidas, int $idRecorrido): void
     {
-        $fecha = $this->buscarConflictoConGuiasBloqueados();
+        Guia::whereIn('id_usuario', array_unique(array_column($salidas, 'id_guia')))
+            ->orderBy('id_usuario')
+            ->lockForUpdate()
+            ->get();
+
+        $recorrido = Recorrido::findOrFail($idRecorrido);
+        $fecha = Excursion::buscarConflictoDeGuia($salidas, $recorrido->duracion_dias);
 
         if ($fecha !== null) {
             throw new DomainException('El guía de la salida del '.$fecha->format('d/m/Y')
                 .' ya conduce otra excursión en esas fechas.');
         }
-    }
-
-    // Bloquea a los guías de sus salidas, en orden para que dos pedidos no se traben entre sí, y busca superposiciones
-    // con las excursiones ya guardadas de otros paquetes.
-    private function buscarConflictoConGuiasBloqueados(bool $soloFuturas = false): ?Carbon
-    {
-        $excursiones = $this->excursiones()
-            ->when($soloFuturas, fn ($consulta) => $consulta->whereDate('fecha_salida', '>=', today()))
-            ->get();
-
-        Guia::whereIn('id_usuario', $excursiones->pluck('id_guia')->unique()->all())
-            ->orderBy('id_usuario')
-            ->lockForUpdate()
-            ->get();
-
-        return Excursion::buscarConflictoDeGuia(
-            $excursiones->map(fn (Excursion $excursion) => [
-                'fecha_salida' => $excursion->fecha_salida->format('Y-m-d'),
-                'id_guia' => $excursion->id_guia,
-            ])->all(),
-            $this->recorrido->duracion_dias,
-            $this->id_paquete,
-        );
     }
 
     /* ------------------------------ CU-15 Pagar ------------------------------- */
@@ -186,5 +168,59 @@ class Paquete extends Model
             ...$this->recorrido->getDatosRecorrido(),
             'excursiones' => Excursion::getExcursionesDisponibles($this->id_paquete),
         ];
+    }
+
+    /* ------------------------ CU-06 Consultar paquete ------------------------ */
+
+    public static function buscarPorId(int $idPaquete): ?self
+    {
+        return self::find($idPaquete);
+    }
+
+    public function estaActivo(): bool
+    {
+        return $this->estado === EstadoPaquete::Activo;
+    }
+
+    // Todo lo que muestra el detalle del paquete (paso 3), ya calculado para que la vista no haga consultas.
+    public function getDetalles(): array
+    {
+        return [
+            'id_paquete' => $this->id_paquete,
+            'nombre' => $this->nombre,
+            ...$this->recorrido->getDatosRecorrido(),
+            'cantidad_etapas' => $this->recorrido->contarEtapas(),
+            'servicios' => $this->servicios
+                ->map(fn (Servicio $servicio) => $servicio->getServiciosIncluidos())
+                ->all(),
+            'cantidad_porteadores' => $this->cantidad_porteadores,
+            'precio_base' => $this->precio_base,
+            'costo_noche_extra_cusco' => $this->costo_noche_extra_cusco,
+            'costo_equipo_camping' => $this->costo_equipo_camping,
+            'promedio_valoraciones' => $this->calcularPromedioValoraciones(),
+            'excursiones' => Excursion::getExcursionesDisponibles($this->id_paquete)
+                ->map(fn (Excursion $excursion) => $excursion->getDetalle())
+                ->all(),
+        ];
+    }
+
+    // La consulta administrativa incluye todas las salidas; la disponibilidad del portal se mantiene en getDetalles().
+    public function getExcursionesParaConsulta(): array
+    {
+        return $this->excursiones()->with('guia')->orderBy('fecha_salida')->get()
+            ->map(fn (Excursion $excursion) => $excursion->getDetalle())
+            ->all();
+    }
+
+    // El promedio no se guarda (es derivado, como dice el Documento de Normalización): sale del puntaje de experiencia
+    // general de las valoraciones de las reservas de sus excursiones. Sin valoraciones devuelve null.
+    public function calcularPromedioValoraciones(): ?float
+    {
+        $promedio = Valoracion::whereHas(
+            'reserva.excursion',
+            fn ($consulta) => $consulta->where('id_paquete', $this->id_paquete)
+        )->avg('puntaje_experiencia_general');
+
+        return $promedio === null ? null : round((float) $promedio, 1);
     }
 }
