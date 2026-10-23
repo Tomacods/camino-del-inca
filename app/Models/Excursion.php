@@ -152,6 +152,60 @@ class Excursion extends Model
         });
     }
 
+    /* --------------------------- CU-01 Crear paquete --------------------------- */
+
+    // R-01: las salidas son siempre los lunes.
+    public static function esDiaDeSalida(Carbon $fecha): bool
+    {
+        return $fecha->isMonday();
+    }
+
+    // R-01: un guía no puede conducir dos excursiones cuyos períodos de recorrido se superpongan, sean del mismo paquete
+    // o de otro. Recibe las salidas del paquete (fecha y guía), la duración de su recorrido y, si el paquete ya está
+    // guardado, su identificación; devuelve la fecha de la primera salida cuyo guía no está libre, o null si no hay
+    // superposiciones.
+    public static function buscarConflictoDeGuia(array $salidas, int $duracionDias, ?int $idPaquete = null): ?Carbon
+    {
+        $revisadas = [];
+
+        foreach ($salidas as $salida) {
+            // Si falta la fecha o el guía, el error lo informa la validación de ese campo.
+            if (blank($salida['fecha_salida'] ?? null) || blank($salida['id_guia'] ?? null)) {
+                continue;
+            }
+
+            $inicio = Carbon::parse($salida['fecha_salida'])->startOfDay();
+            $fin = $inicio->copy()->addDays($duracionDias - 1);
+            $idGuia = (int) $salida['id_guia'];
+
+            // Las salidas del mismo paquete ya vienen en $salidas.
+            $ocupadoEnOtraExcursion = self::where('id_guia', $idGuia)
+                ->when($idPaquete !== null, fn ($consulta) => $consulta->where('id_paquete', '!=', $idPaquete))
+                ->get()
+                ->contains(fn (Excursion $otra) => $otra->seSuperponeCon($inicio, $fin));
+
+            $ocupadoEnElFormulario = collect($revisadas)
+                ->contains(fn (array $otra) => $otra['id_guia'] === $idGuia
+                    && $inicio->lessThanOrEqualTo($otra['fin'])
+                    && $otra['inicio']->lessThanOrEqualTo($fin));
+
+            if ($ocupadoEnOtraExcursion || $ocupadoEnElFormulario) {
+                return $inicio;
+            }
+
+            $revisadas[] = ['id_guia' => $idGuia, 'inicio' => $inicio, 'fin' => $fin];
+        }
+
+        return null;
+    }
+
+    // Dos períodos se superponen si cada uno empieza antes de que termine el otro (el último día cuenta).
+    public function seSuperponeCon(Carbon $inicio, Carbon $fin): bool
+    {
+        return $inicio->lessThanOrEqualTo($this->getUltimoDiaRecorrido())
+            && $this->getFechaSalida()->lessThanOrEqualTo($fin);
+    }
+
     /* ------------------------------ CU-15 Pagar ------------------------------- */
 
     // Asocia la reserva a esta excursión y la guarda.

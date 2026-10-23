@@ -54,6 +54,9 @@ Los ajustes de reglas y diagramas de CU-05/CU-06, incluida la consulta administr
 [cambios de diseño de CU-06](cambios-diseno-cu06.md). Sus comprobaciones están en
 [pruebas de CU-06](pruebas-consultar-paquete.md).
 
+Los ajustes de CU-01 posteriores a la integración de CU-06 están en
+[cambios de diseño de CU-01](cambios-diseno-cu01.md), con las firmas, el diagrama de clases y el orden de los bloqueos.
+La cobertura y las comprobaciones pendientes están en [pruebas de CU-01](pruebas-crear-paquete.md).
 La parte administrativa de CU-01, CU-02, CU-03, CU-05 y CU-06 se implementa en un único recurso de Paquetes en
 Filament: listado con filtro Activo/Inactivo, vista del paquete con sus excursiones y cupo disponible, creación,
 edición y baja lógica. El cupo se calcula con la misma regla del modelo que usa el portal. Los cinco casos siguen

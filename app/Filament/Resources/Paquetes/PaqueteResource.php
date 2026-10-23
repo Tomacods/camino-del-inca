@@ -3,8 +3,10 @@
 namespace App\Filament\Resources\Paquetes;
 
 use App\Enums\Rol;
+use App\Filament\Resources\Paquetes\Pages\CreatePaquete;
 use App\Filament\Resources\Paquetes\Pages\ListPaquetes;
 use App\Filament\Resources\Paquetes\Pages\ViewPaquete;
+use App\Filament\Resources\Paquetes\Schemas\PaqueteForm;
 use App\Filament\Resources\Paquetes\Schemas\PaqueteInfolist;
 use App\Filament\Resources\Paquetes\Tables\PaquetesTable;
 use App\Models\Paquete;
@@ -41,7 +43,12 @@ class PaqueteResource extends Resource
 
     public static function canCreate(): bool
     {
-        return false;
+        return static::canViewAny();
+    }
+
+    public static function form(Schema $schema): Schema
+    {
+        return PaqueteForm::configure($schema);
     }
 
     public static function infolist(Schema $schema): Schema
@@ -58,6 +65,7 @@ class PaqueteResource extends Resource
     {
         return [
             'index' => ListPaquetes::route('/'),
+            'create' => CreatePaquete::route('/crear'),
             'view' => ViewPaquete::route('/{record}'),
         ];
     }
