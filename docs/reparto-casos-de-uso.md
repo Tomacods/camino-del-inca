@@ -1,8 +1,8 @@
 # Reparto de casos de uso
 
 Reparto en cuatro áreas, una por integrante (decidido por el grupo el 05/10). Las áreas agrupan casos de uso que tocan
-las mismas pantallas y las mismas clases, para que cada uno pueda avanzar sin pisar a los demás. **Falta definir** los
-responsables de las tareas que cruzan todas las áreas, salvo la de base de datos.
+las mismas pantallas y las mismas clases, para que cada uno pueda avanzar sin pisar a los demás. De las tareas que
+cruzan todas las áreas, **falta definir** el responsable de la integración.
 
 Dónde se programa cada caso de uso:
 
@@ -111,8 +111,8 @@ principio sólo envíe la confirmación de la reserva.
 |---|---|---|
 | Integración | Cuida que `main` funcione; arma la etiqueta estable de los viernes | |
 | Base de datos | Integra los cambios de esquema; mantiene el Documento de Normalización al día | Tomás |
-| Documento de prueba (TP7) | Junta los casos de prueba de cada área | |
-| Manual de usuario (TP7) | No técnico: capturas y pasos, para cualquier lector | |
+| Documento de prueba (TP7) | Junta los casos de prueba de cada área | Tomás |
+| Manual de usuario (TP7) | No técnico: capturas y pasos, para cualquier lector | Tomás |
 
 Todos programan su área; estas tareas se suman, no reemplazan.
 
