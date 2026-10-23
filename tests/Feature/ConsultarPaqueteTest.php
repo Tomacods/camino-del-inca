@@ -18,10 +18,11 @@ use App\Models\Usuario;
 use App\Models\Valoracion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 // CU-06 Consultar Paquete: curso normal (pasos 1 a 4), flujos alternativos A1 y A2, el promedio de valoraciones y los
-// precios con centavos.
+// precios con centavos y el límite de tres meses compartido con CU-14.
 class ConsultarPaqueteTest extends TestCase
 {
     use RefreshDatabase;
@@ -103,6 +104,58 @@ class ConsultarPaqueteTest extends TestCase
 
         $this->get('/paquetes/'.$this->paquete->id_paquete)
             ->assertSee('href="/reservar/'.$this->paquete->id_paquete.'/2027-02-15"', false);
+    }
+
+    // El límite se compara por día, también cuando el cliente consulta de noche.
+    public function test_el_detalle_y_cu14_comparten_el_limite_de_tres_meses(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-25 23:59:00'));
+        $this->crearExcursion($this->paquete, '2027-01-25');
+        $this->crearExcursion($this->paquete, '2027-02-01');
+
+        $this->get('/paquetes/'.$this->paquete->id_paquete)
+            ->assertSee('25/01/2027')
+            ->assertSee('01/02/2027');
+
+        $this->get('/reservar/'.$this->paquete->id_paquete.'/2027-01-25')
+            ->assertOk()
+            ->assertSee('Titular de la reserva');
+
+        $this->travelTo(Carbon::parse('2026-10-26 00:01:00'));
+
+        $this->get('/paquetes/'.$this->paquete->id_paquete)
+            ->assertDontSee('25/01/2027')
+            ->assertSee('01/02/2027');
+
+        $this->get('/paquetes')
+            ->assertDontSee('25/01/2027')
+            ->assertSee('01/02/2027');
+
+        Livewire::test('listar-paquetes')
+            ->set('criterio', '25/01/2027')
+            ->call('buscarPaquetes')
+            ->assertHasNoErrors()
+            ->assertSee('No encontramos paquetes');
+
+        $this->get('/reservar/'.$this->paquete->id_paquete.'/2027-01-25')
+            ->assertSee('Esta salida ya no se puede reservar')
+            ->assertDontSee('Titular de la reserva');
+    }
+
+    public function test_el_limite_de_tres_meses_no_se_desborda_al_mes_siguiente(): void
+    {
+        // El 30/11 más tres meses es el 28/02. La salida del lunes 01/03 ya se puede reservar.
+        $this->travelTo(Carbon::parse('2026-11-30 12:00:00'));
+        $this->crearExcursion($this->paquete, '2027-02-22');
+        $this->crearExcursion($this->paquete, '2027-03-01');
+
+        $this->get('/paquetes/'.$this->paquete->id_paquete)
+            ->assertDontSee('22/02/2027')
+            ->assertSee('01/03/2027');
+
+        $this->get('/reservar/'.$this->paquete->id_paquete.'/2027-03-01')
+            ->assertOk()
+            ->assertSee('Titular de la reserva');
     }
 
     public function test_calcula_el_promedio_con_las_valoraciones_de_sus_reservas(): void
