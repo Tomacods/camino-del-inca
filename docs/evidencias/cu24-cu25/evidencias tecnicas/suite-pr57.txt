@@ -1,0 +1,678 @@
+
+   PASS  Tests\Unit\ExampleTest
+  ✓ that true is true                                                                                            0.01s
+
+   PASS  Tests\Feature\CancelarReservaPorFaltaDeConfirmacionTest
+  ✓ una reserva pendiente vencida se cancela con reintegro del 100 y se notifica                                 0.80s
+  ✓ una reserva sin permiso vencida se cancela con reintegro de todo lo abonado                                  0.06s
+  ✓ a las 23 59 59 del dia limite no se cancela y a las 00 00 00 del siguiente si                                0.06s
+  ✓ el plazo de 72 horas se cancela en la corrida de la hora siguiente                                           0.06s
+  ✓ las reservas confirmadas canceladas o finalizadas no se tocan                                                0.06s
+  ✓ sin reservas vencidas no cambia nada y no sale ningun correo                                                 0.06s
+  ✓ las plazas de la reserva cancelada vuelven al cupo disponible                                                0.06s
+  ✓ correr la verificacion dos veces deja una sola devolucion y un solo correo                                   0.06s
+  ✓ si la reserva ya no corresponde al cancelarla no hace nada                                                   0.06s
+  ✓ si el correo falla la reserva queda cancelada y se procesan las demas                                        0.13s
+  ✓ si una reserva no se puede cancelar se anota y se sigue con las demas                                        0.07s
+  ✓ el comando cancela las reservas vencidas                                                                     0.07s
+  ✓ el comando esta en el schedule cada hora sin superponerse                                                    0.06s
+
+   PASS  Tests\Feature\CancelarReservaPorFaltaDePagoTest
+  ✓ cancela sin devolucion libera el cupo y notifica al titular                                                  0.07s
+  ✓ despues de cancelar ya no se registra el pago del saldo                                                      0.06s
+  ✓ sin reservas vencidas no cambia nada ni envia correos                                                        0.06s
+  ✓ a las 235959 del dia limite no cancela y un segundo despues si                                               0.06s
+  ✓ con el plazo de 72 horas a la hora limite no cancela y un segundo despues si                                 0.07s
+  ✓ la busqueda coincide con la regla de la fecha limite                                                         0.06s
+  ✓ la verificacion usa la hora que recibe y no la del reloj                                                     0.07s
+  ✓ no cancela lo que no es de este caso de uso with data set "saldo abonado con la fecha vencida"               0.06s
+  ✓ no cancela lo que no es de este caso de uso with data set "sin fecha límite de saldo"                        0.06s
+  ✓ no cancela lo que no es de este caso de uso with data set "pendiente"                                        0.06s
+  ✓ no cancela lo que no es de este caso de uso with data set "sin permiso"                                      0.06s
+  ✓ no cancela lo que no es de este caso de uso with data set "cancelada"                                        0.06s
+  ✓ no cancela lo que no es de este caso de uso with data set "finalizada"                                       0.06s
+  ✓ cancela todas las vencidas y deja intactas las demas                                                         0.08s
+  ✓ una reserva que falla no frena a las demas                                                                   0.07s
+  ✓ si la verificacion corre dos veces cancela y notifica una sola vez                                           0.06s
+  ✓ si la reserva cambio despues de buscarla no la cancela with data set "pagó el saldo"                         0.06s
+  ✓ si la reserva cambio despues de buscarla no la cancela with data set "ya la canceló otra verificación"       0.06s
+  ✓ si el correo no se puede encolar la reserva queda cancelada y se anota                                       0.06s
+  ✓ el comando informa cuantas reservas cancelo                                                                  0.06s
+  ✓ el comando sin reservas vencidas lo informa                                                                  0.06s
+  ✓ el comando esta en el schedule cada hora sin superponerse                                                    0.05s
+
+   PASS  Tests\Feature\CancelarReservaTest
+  ✓ sin acceso en la sesion vuelve a mi reserva                                                                  0.15s
+  ✓ la pantalla lleva del resumen a la cancelacion                                                               0.10s
+  ✓ a 30 dias o menos de la salida no genera devolucion                                                          0.08s
+  ✓ con una reserva que no admite cancelacion muestra el aviso                                                   0.07s
+  ✓ si la reserva cambia de estado antes de confirmar no se cancela                                              0.08s
+  ✓ si la reserva se finaliza entre la lectura y la confirmacion no se cancela                                   0.06s
+  ✓ si el saldo se paga entre la lectura y la confirmacion no se cancela con el monto viejo                      0.06s
+  ✓ si el reembolso deja de corresponder entre la lectura y la confirmacion no se cancela                        0.06s
+  ✓ si el monto cambia antes de confirmar la pantalla muestra el nuevo y pide confirmar otra vez                 0.09s
+  ✓ si la confirmacion llega dos veces registra una sola devolucion y un solo correo                             0.09s
+  ✓ el navegador no puede cambiar la reserva                                                                     0.10s
+  ✓ al confirmar se encola el correo de cancelacion al titular                                                   0.08s
+  ✓ el correo lleva la devolucion ya registrada                                                                  0.08s
+  ✓ a 30 dias o menos el correo sale sin devolucion                                                              0.08s
+  ✓ el asunto del correo informa el numero de reserva                                                            0.09s
+  ✓ si no se puede encolar el correo la reserva igual queda cancelada                                            0.10s
+
+   PASS  Tests\Feature\ComprobantePdfTest
+  ✓ reune los datos del comprobante del viaje y del pago                                                         0.18s
+  ✓ el saldo del comprobante de sena no cambia al pagar el saldo el mismo dia                                    0.17s
+  ✓ el pago total tiene saldo cero en el comprobante                                                             0.19s
+  ✓ la vista muestra los datos del comprobante sin consultar la base                                             0.18s
+  ✓ la vista indica sin noches extra cuando no se contrataron                                                    0.14s
+  ✓ el comprobante de sena y el de total ocupan una pagina with data set " seña de 000125-9"                     0.82s
+  ✓ el comprobante de sena y el de total ocupan una pagina with data set " total de 000126-0"                    0.82s
+  ✓ el comprobante con seis integrantes ocupa una pagina                                                         0.72s
+  ✓ rechaza un pago que pertenece a otra reserva                                                                 0.26s
+
+   PASS  Tests\Feature\ConsultarReservaTest
+  ✓ la reserva llega a la vista con sus relaciones cargadas                                                      0.20s
+  ✓ muestra los integrantes con el estado de su permiso                                                          0.17s
+  ✓ muestra el medio de cada pago                                                                                0.17s
+  ✓ las opciones con pantalla se muestran como enlaces                                                           0.14s
+  ✓ a menos de 3 meses de la salida no ofrece modificar la reserva                                               0.15s
+  ✓ justo a 3 meses de la salida todavia ofrece modificar la reserva                                             0.19s
+  ✓ las opciones sin pantalla se muestran deshabilitadas                                                         0.16s
+  ✓ las opciones de una reserva sin permiso son enlaces                                                          0.15s
+  ✓ pagar saldo lleva a su pantalla                                                                              0.13s
+  ✓ encuentra la reserva aunque el correo tenga otras mayusculas                                                 0.12s
+  ✓ avisa si no encuentra la reserva                                                                             0.13s
+  ✓ avisa si el digito verificador no es correcto                                                                0.13s
+  ✓ con el digito correcto y sin reserva avisa que no la encuentra                                               0.13s
+  ✓ con el digito correcto y su correo entra a la reserva                                                        0.16s
+  ✓ un numero con formato invalido tiene un solo aviso                                                           0.15s
+  ✓ validar numero reserva                                                                                       0.07s
+  ✓ una reserva finalizada sin valoracion ofrece valorar los servicios                                           0.13s
+  ✓ una reserva finalizada con valoracion no ofrece valorar                                                      0.17s
+
+   PASS  Tests\Feature\DescargarComprobanteTest
+  ✓ cu15 descarga el comprobante mostrado con nombre y contenido pdf                                             0.89s
+  ✓ cu15 sin reserva confirmada en la sesion no descarga                                                         0.28s
+  ✓ cu15 si la sesion pierde la reserva no descarga                                                              0.34s
+  ✓ cu16 descarga el comprobante del saldo y no el de la sena                                                    1.30s
+  ✓ cu16 sin acceso en la sesion no descarga                                                                     0.33s
+  ✓ cu16 con el acceso de otra reserva no descarga                                                               0.32s
+  ✓ cu16 si la sesion pierde el acceso no descarga                                                               0.34s
+
+   PASS  Tests\Feature\ExampleTest
+  ✓ the application returns a successful response                                                                0.07s
+
+   PASS  Tests\Feature\ExcursionTest
+  ✓ suma los excursionistas de las reservas pendientes confirmadas y sin permiso                                 0.09s
+  ✓ no suma las reservas canceladas ni finalizadas                                                               0.08s
+  ✓ no suma las reservas de otra excursion                                                                       0.09s
+  ✓ el cupo disponible descuenta las plazas reservadas y las retenidas                                           0.09s
+  ✓ tiene cupo si la cantidad es justo el cupo disponible                                                        0.08s
+  ✓ no tiene cupo si la cantidad supera el cupo disponible                                                       0.09s
+  ✓ admite reserva si la salida es exactamente a tres meses                                                      0.09s
+  ✓ admite reserva si la salida es despues de tres meses                                                         0.07s
+  ✓ no admite reserva si la salida es un dia antes de los tres meses                                             0.10s
+  ✓ no admite reserva si el paquete esta inactivo                                                                0.16s
+  ✓ los meses de anticipacion salen de la configuracion                                                          0.10s
+  ✓ cumple la anticipacion minima a tres meses exactos                                                           0.09s
+  ✓ no cumple la anticipacion minima un dia antes                                                                0.10s
+  ✓ busca la excursion del paquete en esa fecha de salida                                                        0.10s
+  ✓ no encuentra una fecha de salida que el paquete no tiene                                                     0.09s
+  ✓ retiene el cupo si alcanza justo                                                                             0.12s
+  ✓ no retiene el cupo si no alcanza                                                                             0.14s
+  ✓ al retener tiene en cuenta lo que retuvo otro cliente                                                        0.13s
+  ✓ no retiene cero plazas                                                                                       0.11s
+  ✓ no retiene una cantidad negativa de plazas                                                                   0.09s
+  ✓ libera el cupo retenido                                                                                      0.09s
+  ✓ liberar mas de lo retenido deja las plazas retenidas en cero                                                 0.10s
+  ✓ no libera cero plazas                                                                                        0.16s
+  ✓ no libera una cantidad negativa de plazas                                                                    0.15s
+
+   PASS  Tests\Feature\GenerarReservaTest
+  ✓ con la sena registra la reserva pendiente con el saldo adeudado                                              0.23s
+  ✓ registra un excursionista por integrante con el permiso pendiente                                            0.12s
+  ✓ con la sena registra el pago de la mitad con su comprobante                                                  0.14s
+  ✓ con el total el saldo queda abonado y sin fecha limite                                                       0.16s
+  ✓ las plazas pasan de retenidas a reservadas                                                                   0.09s
+  ✓ la tarea demorada que llega despues no descuenta de nuevo                                                    0.08s
+  ✓ si la retencion vencio no registra nada                                                                      0.08s
+  ✓ el mismo pago dos veces registra una sola reserva                                                            0.10s
+  ✓ si la retencion ya se libero no registra nada aunque no haya vencido                                         0.10s
+  ✓ si algo falla en el medio no queda nada guardado                                                             0.09s
+  ✓ si algo falla el candado queda libre para el siguiente pago                                                  0.13s
+  ✓ el saldo no registra una reserva                                                                             0.12s
+  ✓ dos reservas seguidas reciben numeros consecutivos                                                           0.15s
+  ✓ la reserva generada se encuentra con el correo y el numero                                                   0.12s
+
+   PASS  Tests\Feature\HitosDelCaminoTest
+  ✓ la portada muestra los cinco hitos en orden y termina en el boton                                            0.13s
+  ✓ los hitos son etapas del recorrido de 4 dias en el mismo orden                                               0.14s
+  ✓ las fotos del recorrido existen y llevan sus creditos                                                        0.14s
+  ✓ el boton lleva a los paquetes o a la direccion que se le indica                                              0.60s
+
+   PASS  Tests\Feature\IniciarRecorridoTest
+  ✓ el guia inicia el recorrido de su excursion el dia de salida                                                 0.64s
+  ✓ el aviso dice la fecha y la hora del inicio                                                                  0.35s
+  ✓ la confirmacion muestra el paquete el recorrido y la salida                                                  0.23s
+  ✓ la tabla muestra el inicio del recorrido                                                                     0.28s
+  ✓ el listado no consulta el recorrido por cada excursion                                                       0.18s
+  ✓ se puede iniciar una excursion sin integrantes confirmados                                                   0.28s
+  ✓ el guia inicia el recorrido desde la pagina de integrantes                                                   0.22s
+  ✓ un recorrido ya iniciado no muestra la accion                                                                0.20s
+  ✓ un recorrido ya iniciado no cambia la hora original                                                          0.09s
+  ✓ si se inicio en otra pestana no cambia la hora                                                               0.24s
+  ✓ antes del dia de salida no muestra la accion                                                                 0.18s
+  ✓ despues del ultimo dia del recorrido no muestra la accion                                                    0.16s
+  ✓ antes del dia de salida no se registra                                                                       0.08s
+  ✓ despues del ultimo dia del recorrido no se registra                                                          0.11s
+  ✓ el guia lo puede iniciar hasta el ultimo dia del recorrido                                                   0.28s
+  ✓ si confirma pasada la medianoche del ultimo dia no se registra                                               0.20s
+  ✓ el dia se controla en cada pedido y no al abrir la lista                                                     0.22s
+  ✓ si el guia cancela la confirmacion no cambia nada                                                            0.23s
+  ✓ el guia no puede iniciar la excursion de otro guia                                                           0.32s
+  ✓ el otro guia si puede iniciar la suya                                                                        0.38s
+  ✓ el administrador no ve ni ejecuta la accion                                                                  0.16s
+  ✓ iniciar dos veces seguidas no pisa la primera hora                                                           0.13s
+  ✓ el recorrido no esta iniciado mientras no tenga fecha y hora de inicio                                       0.11s
+  ✓ el ultimo dia del recorrido sale de su duracion                                                              0.10s
+  ✓ es dia del recorrido a cualquier hora del primero al ultimo dia                                              0.08s
+  ✓ no es dia del recorrido el dia anterior a la salida ni el siguiente al ultimo                                0.07s
+  ✓ admite el inicio solo en los dias del recorrido y sin iniciar                                                0.07s
+  ✓ iniciar recorrido actualiza la misma instancia                                                               0.08s
+
+   PASS  Tests\Feature\LiberarCupoRetenidoTest
+  ✓ libera las plazas de la retencion                                                                            0.10s
+  ✓ la misma retencion se libera una sola vez                                                                    0.10s
+  ✓ si la tarea llega 25 horas despues no descuenta de nuevo                                                     0.12s
+  ✓ si la tarea llega 29 dias despues no descuenta de nuevo                                                      0.11s
+  ✓ dos retenciones de la misma excursion se liberan cada una                                                    0.12s
+  ✓ ya liberada dice si la retencion se libero                                                                   0.12s
+
+   PASS  Tests\Feature\ListarIntegrantesTest
+  ✓ el guia ve solo sus excursiones                                                                              0.25s
+  ✓ primero las proximas salidas y despues las pasadas                                                           0.22s
+  ✓ el listado cuenta solo los integrantes de reservas confirmadas                                               0.32s
+  ✓ cada excursion lleva a su pagina de integrantes                                                              0.20s
+  ✓ el listado no consulta los integrantes por cada excursion                                                    0.18s
+  ✓ el guia ve el encabezado de la excursion                                                                     0.19s
+  ✓ el guia ve los integrantes de las reservas confirmadas agrupados por reserva                                 0.14s
+  ✓ no se ven los integrantes de reservas en otros estados                                                       0.14s
+  ✓ la excursion solo devuelve las reservas confirmadas                                                          0.10s
+  ✓ los datos de un integrante                                                                                   0.11s
+  ✓ mostrar los integrantes no consulta por cada reserva                                                         0.18s
+  ✓ los datos de la pagina no se pueden cambiar desde el navegador                                               0.14s
+  ✓ una excursion sin reservas confirmadas muestra el aviso                                                      0.14s
+  ✓ una excursion realizada muestra el aviso                                                                     0.14s
+  ✓ un guia sin excursiones ve el listado vacio con un mensaje                                                   0.14s
+  ✓ el guia entra a sus excursiones                                                                              0.36s
+  ✓ un guia no puede abrir los integrantes de una excursion de otro guia                                         0.10s
+  ✓ el otro guia ve solo la suya                                                                                 0.14s
+  ✓ el administrador no entra                                                                                    0.10s
+
+   PASS  Tests\Feature\ListarPaquetesTest
+  ✓ muestra los datos resumen de cada paquete                                                                    0.11s
+  ✓ muestra solo los paquetes activos                                                                            0.09s
+  ✓ ordena los paquetes del mas nuevo al mas antiguo                                                             0.09s
+  ✓ muestra solo las salidas futuras que tienen cupo                                                             0.08s
+  ✓ cada salida lleva al formulario de reserva                                                                   0.09s
+  ✓ avisa cuando no hay paquetes activos                                                                         0.08s
+  ✓ busca por nombre sin importar mayusculas ni tildes                                                           0.13s
+  ✓ busca por fecha de salida                                                                                    0.15s
+  ✓ una fecha sin cupo no coincide                                                                               0.15s
+  ✓ una fecha que ya paso no coincide                                                                            0.10s
+  ✓ sin criterio muestra todos los paquetes                                                                      0.11s
+  ✓ avisa cuando ningun paquete coincide                                                                         0.11s
+  ✓ rechaza una fecha con formato invalido                                                                       0.13s
+  ✓ la busqueda aplicada no se puede cambiar desde el navegador                                                  0.08s
+  ✓ ver todos vuelve al listado completo                                                                         0.10s
+
+   PASS  Tests\Feature\ListarReservasTest
+  ✓ el scope trae solo las reservas de paquetes con porteadores                                                  0.07s
+  ✓ el filtro con porteadores muestra solo esas reservas                                                         0.21s
+  ✓ el scope trae solo las reservas de paquetes con ese servicio                                                 0.06s
+  ✓ el filtro de hotel muestra solo las reservas con ese hotel                                                   0.17s
+  ✓ con hotel y camping tienen que cumplirse los dos                                                             0.24s
+  ✓ con un hotel y un camping de paquetes distintos no queda ninguna                                             0.25s
+  ✓ el filtro de hotel solo ofrece hoteles                                                                       0.14s
+
+   PASS  Tests\Feature\ModificarReservaTest
+  ✓ el cambio pasa la reserva al destino y la deja pendiente                                                     0.07s
+  ✓ quien llama ve la reserva como quedo                                                                         0.07s
+  ✓ con el saldo abonado el cambio deja la fecha limite del saldo en null                                        0.06s
+  ✓ si el saldo se paga despues de leer la reserva el cambio no le pone fecha limite                             0.06s
+  ✓ si la reserva se cancela despues de leerla el cambio no se hace                                              0.06s
+  ✓ solo una reserva confirmada se puede modificar with data set " pendiente"                                    0.06s
+  ✓ solo una reserva confirmada se puede modificar with data set " sin permiso"                                  0.07s
+  ✓ solo una reserva confirmada se puede modificar with data set " cancelada"                                    0.08s
+  ✓ solo una reserva confirmada se puede modificar with data set " finalizada"                                   0.07s
+  ✓ con la salida a menos de 3 meses no se puede modificar                                                       0.06s
+  ✓ con la salida justo a 3 meses se puede modificar                                                             0.07s
+  ✓ la lista tiene solo las otras salidas a 3 meses con lugar para todos                                         0.07s
+  ✓ la lista descuenta las plazas retenidas                                                                      0.06s
+  ✓ elegir una salida sin lugar para todos avisa que no esta disponible                                          0.07s
+  ✓ elegir una salida a menos de 3 meses avisa que no esta disponible                                            0.08s
+  ✓ elegir la misma salida avisa que no esta disponible                                                          0.07s
+  ✓ el resumen trae las salidas y las nuevas fechas limite                                                       0.07s
+  ✓ con el saldo abonado el resumen no trae fecha limite del saldo                                               0.08s
+  ✓ si otra reserva ocupa el ultimo lugar antes de confirmar el cambio no se hace                                0.07s
+  ✓ al confirmar no se cambia a una salida que ya no cumple la anticipacion                                      0.09s
+  ✓ sin acceso en la sesion vuelve a mi reserva                                                                  0.09s
+  ✓ con el acceso de otra reserva vuelve a mi reserva                                                            0.08s
+  ✓ la pantalla lleva del listado al resumen y a la confirmacion                                                 0.15s
+  ✓ una fecha mal escrita avisa que la excursion no esta disponible                                              0.28s
+  ✓ con una reserva que no admite el cambio muestra el aviso sin la lista                                        0.11s
+
+   PASS  Tests\Feature\NotificarClienteTest
+  ✓ primera compra lleva el numero de reserva y el comprobante                                                   0.79s
+  ✓ pago de saldo confirma el pago total con su comprobante                                                      0.80s
+  ✓ el comprobante es el del ultimo pago with data set " primera compra"                                         0.74s
+  ✓ el comprobante es el del ultimo pago with data set " pago de saldo"                                          0.78s
+  ✓ primera compra y pago de saldo adjuntan el pdf del ultimo pago with data set " primera compra"               1.36s
+  ✓ primera compra y pago de saldo adjuntan el pdf del ultimo pago with data set " pago de saldo"                1.28s
+  ✓ los otros seis tipos no adjuntan un pdf with data set " cancelación de reserva"                              0.16s
+  ✓ los otros seis tipos no adjuntan un pdf with data set " permisos obtenidos"                                  0.16s
+  ✓ los otros seis tipos no adjuntan un pdf with data set " permisos rechazados"                                 0.15s
+  ✓ los otros seis tipos no adjuntan un pdf with data set " cancelación por falta de pago"                       0.14s
+  ✓ los otros seis tipos no adjuntan un pdf with data set " etapa final"                                         0.14s
+  ✓ los otros seis tipos no adjuntan un pdf with data set " cancelación por falta de permisos"                   0.14s
+  ✓ el adjunto se genera al enviar con los datos guardados al encolar                                            1.16s
+  ✓ cancelacion de reserva con reembolso                                                                         0.17s
+  ✓ cancelacion de reserva sin devolucion                                                                        0.16s
+  ✓ permisos obtenidos con saldo adeudado informa el saldo y su fecha limite                                     0.24s
+  ✓ permisos obtenidos muestra la fecha y la hora del plazo del saldo                                            0.15s
+  ✓ permisos obtenidos con saldo abonado no pide saldo                                                           0.22s
+  ✓ permisos rechazados nombra a quienes no obtuvieron el permiso y las opciones                                 0.16s
+  ✓ permisos rechazados sale aunque el plazo haya vencido al enviarlo                                            0.14s
+  ✓ cancelacion por falta de pago avisa que la sena no se devuelve                                               0.15s
+  ✓ etapa final invita a valorar los servicios                                                                   0.15s
+  ✓ cancelacion por falta de permisos reintegra todo e informa la causa with data set "pedido del cliente ( c u… 0.14s
+  ✓ cancelacion por falta de permisos reintegra todo e informa la causa with data set "pedido del cliente en el… 0.15s
+  ✓ cancelacion por falta de permisos reintegra todo e informa la causa with data set "vencimiento de la fecha…  0.14s
+  ✓ cancelacion por vencimiento de una reserva pendiente da la misma causa                                       0.14s
+  ✓ va solo al correo de la reserva                                                                              0.15s
+  ✓ el correo no lleva el documento de los integrantes                                                           0.13s
+  ✓ una reserva que no existe no envia nada                                                                      0.13s
+  ✓ el correo va en la cola con reintentos                                                                       0.13s
+  ✓ si el envio falla la reserva conserva su estado y el correo se reintenta                                     0.17s
+  ✓ si no se puede poner en la cola no lanza y la reserva conserva su estado                                     0.13s
+  ✓ si falla al juntar los datos no lanza y lo anota                                                             0.13s
+
+   PASS  Tests\Feature\PagarReservaTest
+  ✓ sin reserva en curso avisa sin error                                                                         0.09s
+  ✓ con la retencion vigente muestra la reserva y el contador                                                    0.07s
+  ✓ muestra el total y el monto de cada opcion                                                                   0.07s
+  ✓ elegir la sena muestra el monto a pagar y habilita el pago                                                   0.08s
+  ✓ elegir el total muestra el monto a pagar                                                                     0.10s
+  ✓ el saldo u otro texto no se eligen                                                                           0.11s
+  ✓ confirmar el pago deriva a mercado pago con el monto y la referencia                                         0.09s
+  ✓ confirmar el total pide el monto completo                                                                    0.09s
+  ✓ sin elegir como pagar no se deriva a mercado pago                                                            0.08s
+  ✓ con la retencion vencida no se deriva a mercado pago                                                         0.09s
+  ✓ una pantalla abierta para otra reserva no deriva a mercado pago                                              0.08s
+  ✓ elegir como pagar en una pantalla que ya no esta en curso solo avisa                                         0.08s
+  ✓ varias acciones en un mismo pedido no mezclan el monto con el tipo de pago                                   0.08s
+  ✓ si mercado pago falla avisa y los lugares siguen guardados                                                   0.09s
+  ✓ si mercado pago no responde avisa sin derivar                                                                0.09s
+  ✓ muestra el aviso de pago rechazado                                                                           0.07s
+  ✓ sin rechazo no muestra el aviso                                                                              0.07s
+  ✓ cancelar libera los lugares una sola vez                                                                     0.08s
+  ✓ si vencio al abrir la pantalla libera los lugares                                                            0.07s
+  ✓ si la tarea demorada ya libero los lugares no descuenta de nuevo                                             0.07s
+  ✓ si vence con la pantalla abierta libera los lugares al comprobar                                             0.08s
+  ✓ antes de vencer comprobar no libera nada                                                                     0.08s
+  ✓ una pantalla abierta para otra reserva no libera la que esta en curso al cancelar                            0.09s
+  ✓ una pantalla abierta para otra reserva no libera la que esta en curso al comprobar                           0.08s
+  ✓ si la reserva se cancelo en otra pestana avisa que ya no esta en curso                                       0.07s
+
+   PASS  Tests\Feature\PagarSaldoTest
+  ✓ sin acceso en la sesion vuelve a mi reserva                                                                  0.09s
+  ✓ con el acceso de otra reserva vuelve a mi reserva                                                            0.07s
+  ✓ con acceso muestra el saldo y la fecha limite                                                                0.08s
+  ✓ el correo de la sesion puede tener otras mayusculas                                                          0.08s
+  ✓ con el saldo abonado avisa que no tiene saldo pendiente                                                      0.08s
+  ✓ una reserva pendiente avisa que no tiene saldo pendiente                                                     0.07s
+  ✓ con el total pagado avisa que no tiene saldo pendiente y no el vencimiento                                   0.07s
+  ✓ con la fecha limite vencida avisa el vencimiento                                                             0.07s
+  ✓ con el plazo de 72 horas se paga despues del dia limite original                                             0.08s
+  ✓ confirmar el pago deriva a mercado pago con el saldo                                                         0.08s
+  ✓ a mercado pago se le pide el saldo con dos decimales                                                         0.08s
+  ✓ con la fecha limite mas cerca el pedido vence en ella                                                        0.08s
+  ✓ la vigencia del pedido sale de la configuracion                                                              0.08s
+  ✓ si el saldo se pago con la pantalla abierta no deriva a mercado pago                                         0.09s
+  ✓ si vence el plazo con la pantalla abierta no deriva a mercado pago                                           0.08s
+  ✓ si perdio el acceso con la pantalla abierta no deriva a mercado pago                                         0.08s
+  ✓ si mercado pago falla avisa sin derivar                                                                      0.08s
+  ✓ si mercado pago no responde avisa y se puede reintentar                                                      0.08s
+  ✓ muestra el aviso de pago rechazado                                                                           0.08s
+  ✓ el aviso de rechazo del pago de la reserva no se muestra aca                                                 0.07s
+  ✓ cancelar vuelve a mi reserva sin tocar el saldo                                                              0.08s
+
+   PASS  Tests\Feature\PagoMercadoPagoTest
+  ✓ derivar pago pide el cobro en dolares y devuelve la direccion de mercado pago                                0.06s
+  ✓ si mercado pago rechaza el pedido derivar pago lo anota con el motivo y lanza la excepcion                   0.05s
+  ✓ si la respuesta de error no es json igual lo anota                                                           0.05s
+  ✓ si mercado pago no responde derivar pago lo anota y lanza la excepcion                                       0.05s
+  ✓ consultar transaccion con el pago aprobado con tarjeta de credito                                            0.05s
+  ✓ consultar transaccion sin referencia ni medio de pago no da error                                            0.05s
+  ✓ consultar transaccion con el pago rechazado                                                                  0.05s
+  ✓ consultar transaccion traduce el medio de pago                                                               0.05s
+  ✓ consultar transaccion devuelve null si mercado pago no conoce el pago                                        0.05s
+  ✓ consultar transaccion devuelve null si mercado pago no responde                                              0.05s
+  ✓ la referencia va y vuelve con la sena                                                                        0.05s
+  ✓ la referencia va y vuelve con el total                                                                       0.05s
+  ✓ una referencia sin el formato no se lee                                                                      0.05s
+  ✓ la referencia del saldo va y vuelve                                                                          0.05s
+  ✓ una referencia que no es la del saldo no se lee                                                              0.05s
+  ✓ la referencia del saldo no registra una reserva nueva                                                        0.05s
+
+   PASS  Tests\Feature\PagoTest
+  ✓ con el total se paga el monto completo                                                                       0.06s
+  ✓ con la sena se paga la mitad                                                                                 0.05s
+  ✓ la sena conserva los centavos                                                                                0.05s
+  ✓ el porcentaje de la sena sale de la configuracion                                                            0.05s
+  ✓ el saldo no se calcula aca                                                                                   0.06s
+
+   PASS  Tests\Feature\PaqueteTest
+  ✓ un integrante sin extras paga el precio base                                                                 0.05s
+  ✓ la reserva del prototipo                                                                                     0.05s
+  ✓ las noches extra se cobran por integrante                                                                    0.05s
+  ✓ el equipo de camping se cobra por equipo                                                                     0.05s
+
+   PASS  Tests\Feature\PortalInicioTest
+  ✓ la pagina de inicio usa el layout del portal                                                                 0.06s
+  ✓ la portada muestra los minutos de la retencion de la configuracion                                           0.06s
+  ✓ con un minuto de retencion la portada lo escribe en singular                                                 0.06s
+  ✓ el chip de estado escribe el estado                                                                          0.15s
+
+   PASS  Tests\Feature\RealizarReservaTest
+  ✓ el curso normal llega al resumen sin guardar nada en la base                                                 0.24s
+  ✓ anterior vuelve al integrante ya cargado                                                                     0.16s
+  ✓ si baja la cantidad se descartan los integrantes que sobran                                                  0.21s
+  ✓ avisa si la salida no cumple la anticipacion minima                                                          0.07s
+  ✓ avisa si la salida no existe                                                                                 0.07s
+  ✓ avisa sin error si la fecha esta mal escrita                                                                 0.10s
+  ✓ un paquete que no es un numero da 404                                                                        0.07s
+  ✓ avisa si el paquete esta inactivo                                                                            0.07s
+  ✓ avisa si no quedan lugares al entrar                                                                         0.07s
+  ✓ no acepta mas integrantes que los lugares disponibles                                                        0.09s
+  ✓ vuelve a validar el cupo al avanzar                                                                          0.15s
+  ✓ avisa si el correo no tiene un formato valido                                                                0.09s
+  ✓ el correo queda en minusculas y sin espacios en las puntas                                                   0.09s
+  ✓ avisa que datos del integrante faltan                                                                        0.10s
+  ✓ el documento solo admite letras y numeros                                                                    0.09s
+  ✓ no acepta un documento repetido en el grupo                                                                  0.21s
+  ✓ volver con anterior no traba al integrante anterior                                                          0.19s
+  ✓ el documento repetido se marca al avanzar desde el posterior                                                 0.25s
+  ✓ no acepta mas de dos noches extra en total                                                                   0.23s
+  ✓ cancelar lleva al inicio                                                                                     0.09s
+  ✓ confirmar retiene el cupo y deriva al pago                                                                   0.22s
+  ✓ si otro cliente ocupa los lugares antes de confirmar no retiene nada                                         0.21s
+  ✓ confirmar con otra reserva en curso libera primero la anterior                                               0.21s
+  ✓ no se puede confirmar desde la pantalla 1                                                                    0.09s
+  ✓ no se puede confirmar con integrantes sin cargar                                                             0.22s
+  ✓ el plazo de la retencion sale de la configuracion                                                            0.20s
+  ✓ cancelar en el formulario deja intacta la reserva en curso                                                   0.09s
+  ✓ si ya tiene lugares guardados para esta salida lo avisa en vez del formulario                                0.07s
+  ✓ si retuvo los ultimos lugares y vuelve atras ve sus lugares y no sin cupo                                    0.07s
+  ✓ cancelarla libera los lugares y deja el formulario listo con el cupo actualizado                             0.09s
+  ✓ si la reserva en curso de esta salida ya vencio la libera y muestra el formulario                            0.08s
+  ✓ una reserva en curso de otra salida no cambia nada                                                           0.08s
+  ✓ el navegador no puede cambiar el paso                                                                        0.09s
+
+   PASS  Tests\Feature\ReportarEtapaTest
+  ✓ el guia reporta la primera etapa y las siguientes en orden                                                   0.30s
+  ✓ el aviso dice la etapa actual y la siguiente                                                                 0.18s
+  ✓ la confirmacion muestra las etapas la ultima reportada y la siguiente                                        0.13s
+  ✓ la primera confirmacion dice que no hay etapa reportada                                                      0.13s
+  ✓ la tabla muestra la etapa actual                                                                             0.22s
+  ✓ la salida en curso aparece antes que las futuras                                                             0.12s
+  ✓ la salida iniciada sin etapas reportadas aparece antes que las futuras                                       0.12s
+  ✓ el guia reporta desde la pagina de integrantes                                                               0.19s
+  ✓ el listado no consulta las etapas por cada excursion                                                         0.13s
+  ✓ se puede reportar despues del ultimo dia del recorrido                                                       0.18s
+  ✓ sin iniciar el recorrido no muestra la accion                                                                0.13s
+  ✓ sin iniciar el recorrido no se registra                                                                      0.06s
+  ✓ sin iniciar el recorrido la accion forzada no registra                                                       0.18s
+  ✓ la etapa final finaliza solo las reservas confirmadas                                                        0.18s
+  ✓ la etapa final envia un correo etapa final a cada titular finalizado                                         0.17s
+  ✓ el aviso dice que el recorrido termino y cuantas reservas se finalizaron                                     0.16s
+  ✓ la confirmacion de la etapa final adelanta lo que va a pasar                                                 0.13s
+  ✓ una excursion sin reservas confirmadas tambien termina                                                       0.16s
+  ✓ despues de la etapa final la accion desaparece                                                               0.19s
+  ✓ despues de la etapa final no se puede reportar mas                                                           0.07s
+  ✓ despues de la etapa final la pagina de integrantes avisa que termino                                         0.15s
+  ✓ sin reservas confirmadas y sin terminar el aviso no cambia                                                   0.09s
+  ✓ un correo que no se puede enviar no deshace la finalizacion                                                  0.18s
+  ✓ el mismo reporte dos veces no avanza dos etapas                                                              0.07s
+  ✓ si se reporto en otra pestana no avanza otra etapa                                                           0.16s
+  ✓ la etapa final dos veces no duplica los correos                                                              0.23s
+  ✓ no se pueden saltear etapas                                                                                  0.06s
+  ✓ no se puede volver a una etapa anterior                                                                      0.07s
+  ✓ si el guia cancela la confirmacion no cambia nada                                                            0.16s
+  ✓ el guia no puede reportar la excursion de otro guia                                                          0.18s
+  ✓ el otro guia si puede reportar la suya                                                                       0.16s
+  ✓ el administrador no ve ni ejecuta la accion                                                                  0.08s
+  ✓ las etapas vienen en el orden del recorrido                                                                  0.07s
+  ✓ la siguiente etapa es la primera mientras no se reporte ninguna                                              0.07s
+  ✓ la siguiente etapa sigue el orden y no hay otra despues de la final                                          0.07s
+  ✓ es etapa final solo con la ultima etapa reportada                                                            0.07s
+  ✓ recuperar etapa actual devuelve las etapas la actual y la siguiente                                          0.06s
+  ✓ admite el reporte con el recorrido iniciado y sin la etapa final                                             0.06s
+  ✓ actualizar etapa actual actualiza la misma instancia                                                         0.07s
+  ✓ reportar la etapa final devuelve las reservas finalizadas                                                    0.07s
+  ✓ finalizar reserva pasa una confirmada a finalizada                                                           0.06s
+  ✓ finalizar reserva no acepta una que no este confirmada                                                       0.06s
+
+   PASS  Tests\Feature\ReprogramarReservaTest
+  ✓ la reprogramacion pasa la reserva al destino y la deja pendiente                                             0.09s
+  ✓ quien llama ve la reserva como quedo                                                                         0.06s
+  ✓ con el saldo abonado la reprogramacion deja la fecha limite del saldo en null                                0.06s
+  ✓ solo una reserva sin permiso se puede reprogramar with data set " pendiente"                                 0.06s
+  ✓ solo una reserva sin permiso se puede reprogramar with data set " confirmada"                                0.06s
+  ✓ solo una reserva sin permiso se puede reprogramar with data set " cancelada"                                 0.06s
+  ✓ solo una reserva sin permiso se puede reprogramar with data set " finalizada"                                0.06s
+  ✓ si la reserva se cancela despues de leerla no se reprograma                                                  0.06s
+  ✓ con la salida actual a menos de 3 meses igual se puede reprogramar                                           0.06s
+  ✓ la lista tiene solo las otras salidas a 3 meses con lugar para todos                                         0.06s
+  ✓ sin salidas posibles la lista viene vacia                                                                    0.06s
+  ✓ elegir una salida sin lugar para todos avisa que no esta disponible                                          0.06s
+  ✓ elegir una salida a menos de 3 meses avisa que no esta disponible                                            0.06s
+  ✓ elegir la misma salida avisa que no esta disponible                                                          0.06s
+  ✓ el resumen trae las salidas y las nuevas fechas limite                                                       0.06s
+  ✓ con el saldo abonado el resumen no trae fecha limite del saldo                                               0.06s
+  ✓ si otra reserva ocupa el ultimo lugar antes de confirmar no se reprograma                                    0.06s
+  ✓ al confirmar no se reprograma a una salida que ya no cumple la anticipacion                                  0.06s
+  ✓ dentro del plazo se ofrece la opcion y se puede reprogramar                                                  0.06s
+  ✓ con el plazo vencido no se ofrece la opcion y no se inicia la reprogramacion                                 0.06s
+  ✓ con el plazo vencido y otro estado avisa por el estado                                                       0.06s
+  ✓ si el plazo vence entre elegir el destino y confirmar no se reprograma                                       0.06s
+  ✓ a las 23 59 59 del dia limite todavia se puede reprogramar                                                   0.07s
+  ✓ a las 00 00 00 del dia siguiente ya no se puede reprogramar                                                  0.06s
+  ✓ sin acceso en la sesion vuelve a mi reserva                                                                  0.07s
+  ✓ con el acceso de otra reserva vuelve a mi reserva                                                            0.07s
+  ✓ la pantalla lleva del listado al resumen y a la confirmacion                                                 0.11s
+  ✓ una fecha mal escrita avisa que la excursion no esta disponible                                              0.15s
+  ✓ con una reserva que no admite la reprogramacion muestra el aviso sin la lista                                0.08s
+  ✓ sin salidas posibles la pantalla ofrece el reintegro                                                         0.08s
+  ✓ si no confirma la reserva sigue sin permiso                                                                  0.11s
+  ✓ con el plazo vencido la pantalla muestra el aviso sin la lista                                               0.08s
+  ✓ si el plazo vence antes de confirmar la pantalla lo avisa y no reprograma                                    0.10s
+  ✓ con el plazo vencido mi reserva no ofrece reprogramar ni reintegro                                           0.08s
+  ✓ dentro del plazo mi reserva ofrece reprogramar                                                               0.08s
+
+   PASS  Tests\Feature\ReservaConfirmadaTest
+  ✓ con el pago aprobado registra la reserva y vuelve sin parametros                                             0.58s
+  ✓ la pantalla muestra el numero de reserva y el comprobante                                                    0.61s
+  ✓ con la sena muestra el saldo pendiente y su fecha limite                                                     0.62s
+  ✓ con el pago rechazado no registra la reserva y vuelve al pago con el aviso                                   0.12s
+  ✓ no se le cree a la direccion si mercado pago dice que se rechazo                                             0.06s
+  ✓ un pago de otra retencion no registra la reserva en curso                                                    0.07s
+  ✓ con la retencion vencida no registra la reserva y muestra el numero de operacion                             0.07s
+  ✓ la misma vuelta dos veces registra una sola reserva                                                          0.59s
+  ✓ si mercado pago no responde ofrece reintentar y al reintentar registra                                       0.63s
+  ✓ sin numero de operacion no consulta a mercado pago y vuelve al pago                                          0.10s
+  ✓ sin nada en la sesion avisa sin error                                                                        0.08s
+  ✓ con una referencia que no es del sistema se comporta como sin pago                                           0.08s
+  ✓ con una reserva registrada y otra en curso volver sin pagar lleva al pago de la nueva                        0.59s
+  ✓ con una reserva registrada y otra en curso una referencia que no es del sistema lleva al pago                0.61s
+  ✓ con solo la reserva registrada volver sin pagar la sigue mostrando                                           0.64s
+  ✓ con la reserva registrada envia el correo primera compra al titular                                          0.10s
+  ✓ la misma vuelta dos veces envia un solo correo                                                               0.09s
+  ✓ si la reserva no se registra no envia ningun correo                                                          0.07s
+  ✓ si el correo no se puede encolar la reserva queda registrada                                                 0.09s
+
+   PASS  Tests\Feature\ReservaTest
+  ✓ acepta ninguna noche extra                                                                                   0.07s
+  ✓ acepta una noche antes y una despues                                                                         0.05s
+  ✓ acepta las dos noches antes del recorrido                                                                    0.05s
+  ✓ rechaza mas de dos noches en total                                                                           0.05s
+  ✓ rechaza noches negativas                                                                                     0.05s
+  ✓ el maximo de noches sale de la configuracion                                                                 0.05s
+  ✓ calcula el monto total de una reserva guardada                                                               0.06s
+  ✓ con la sena pagada el saldo es la otra mitad                                                                 0.06s
+  ✓ calcula el digito verificador con modulo 11                                                                  0.05s
+  ✓ el digito verificador puede dar 10                                                                           0.05s
+  ✓ sin reservas el primer numero es el 1                                                                        0.05s
+  ✓ el numero sigue al ultimo emitido                                                                            0.05s
+  ✓ saltea los numeros con resto 10                                                                              0.05s
+  ✓ con la sena las dos fechas limite vencen un mes antes de la salida                                           0.05s
+  ✓ con el total abonado no hay fecha limite de saldo                                                            0.05s
+  ✓ la fecha limite no se pasa al mes siguiente                                                                  0.05s
+  ✓ el plazo de las fechas limite sale de la configuracion                                                       0.06s
+
+   PASS  Tests\Feature\SaldoPagadoTest
+  ✓ con el pago aprobado registra el saldo y vuelve sin parametros                                               0.60s
+  ✓ la pantalla muestra el comprobante del saldo                                                                 0.61s
+  ✓ el medio de pago es el que informa mercado pago                                                              0.61s
+  ✓ despues de pagar mi reserva muestra el saldo abonado y no ofrece pagarlo                                     0.60s
+  ✓ con el pago rechazado no registra nada y vuelve al pago con el aviso                                         0.11s
+  ✓ no se le cree a la direccion si mercado pago dice que se rechazo                                             0.07s
+  ✓ un pago del saldo de otra reserva no registra nada                                                           0.08s
+  ✓ un pago de una reserva nueva no registra el saldo                                                            0.09s
+  ✓ el saldo de esta reserva no se registra desde la direccion de otra                                           0.08s
+  ✓ con el saldo ya pagado un segundo pago no se registra y muestra su numero de operacion                       0.61s
+  ✓ la misma vuelta desde otra sesion no dice que el pago quedo sin registrar                                    0.59s
+  ✓ si otra pestana registra el saldo mientras tanto avisa que ya estaba pagado                                  0.11s
+  ✓ el numero de operacion ya registrado no sirve en la direccion de otra reserva                                0.57s
+  ✓ si el cliente pago a tiempo se registra aunque vuelva despues de la fecha limite                             0.59s
+  ✓ con la reserva cancelada mientras pagaba no registra el saldo                                                0.10s
+  ✓ con la reserva cambiada de excursion mientras pagaba no registra el saldo                                    0.08s
+  ✓ la misma vuelta dos veces registra un solo pago y muestra el comprobante                                     0.62s
+  ✓ si mercado pago no responde ofrece reintentar y al reintentar registra                                       0.61s
+  ✓ sin acceso en la sesion registra el pago y no muestra los datos de la reserva                                0.62s
+  ✓ con el acceso de otra reserva no muestra los datos de esta                                                   0.60s
+  ✓ sin numero de operacion no consulta a mercado pago y vuelve al pago del saldo                                0.10s
+  ✓ despues de pagar volver sin numero de operacion sigue mostrando el comprobante                               0.58s
+  ✓ el saldo pagado de otra reserva no se muestra aca                                                            0.59s
+  ✓ con el saldo registrado envia el correo pago de saldo al titular                                             0.09s
+  ✓ si el saldo no se registra no envia ningun correo                                                            0.07s
+  ✓ si el correo no se puede encolar el saldo queda registrado                                                   0.09s
+
+   PASS  Tests\Feature\SaldoPendienteTest
+  ✓ iniciar pago saldo devuelve el saldo y la fecha limite                                                       0.08s
+  ✓ el saldo conserva los centavos y se redondea a dos decimales                                                 0.06s
+  ✓ con el saldo abonado no hay saldo pendiente                                                                  0.06s
+  ✓ una reserva pendiente no tiene saldo para pagar                                                              0.06s
+  ✓ una reserva cancelada no tiene saldo para pagar                                                              0.06s
+  ✓ sin nada por pagar no hay saldo pendiente aunque diga adeudado                                               0.06s
+  ✓ al dia siguiente de la fecha limite avisa el vencimiento                                                     0.06s
+  ✓ con el total pagado y sin fecha limite no hay saldo pendiente                                                0.06s
+  ✓ con el saldo pagado y la fecha limite pasada no hay saldo pendiente                                          0.06s
+  ✓ con el plazo vencido la reserva no se cancela aca                                                            0.06s
+  ✓ la fecha limite vence a las 23 59 59 de ese dia                                                              0.07s
+  ✓ sin fecha limite no se puede pagar el saldo                                                                  0.06s
+  ✓ actualizar reserva deja el saldo abonado y lo guarda                                                         0.06s
+  ✓ registrar pago saldo registra el saldo con su comprobante                                                    0.06s
+  ✓ registrar pago saldo dos veces registra un solo pago                                                         0.06s
+  ✓ registrar pago saldo con el saldo abonado no registra nada aunque quede saldo                                0.06s
+  ✓ registrar pago saldo sin nada por pagar no registra nada                                                     0.06s
+  ✓ registrar pago saldo con la reserva cancelada no registra nada                                               0.06s
+  ✓ registrar pago saldo con la reserva pendiente no registra nada                                               0.06s
+  ✓ si el cliente pago a tiempo se registra aunque vuelva despues de la fecha limite                             0.06s
+
+   PASS  Tests\Feature\SesionTest
+  ✓ el administrador inicia sesion con su correo y su contrasena                                                 0.13s
+  ✓ el guia inicia sesion con su correo y su contrasena                                                          0.11s
+  ✓ rechaza una contrasena incorrecta                                                                            0.30s
+  ✓ rechaza un correo que no esta registrado                                                                     0.30s
+  ✓ pide el correo y la contrasena                                                                               0.10s
+  ✓ sin sesion el panel pide iniciarla                                                                           0.06s
+  ✓ el administrador ve las reservas y no las excursiones del guia                                               0.17s
+  ✓ el guia ve sus excursiones y no las reservas                                                                 0.19s
+  ✓ cierra la sesion y el panel vuelve a pedirla                                                                 0.09s
+
+   PASS  Tests\Feature\SolicitarReintegroTest
+  ✓ sin acceso en la sesion vuelve a mi reserva                                                                  0.09s
+  ✓ la pantalla lleva del resumen al reintegro                                                                   0.19s
+  ✓ con una reserva que no esta sin permiso muestra el aviso                                                     0.15s
+  ✓ si la reserva cambia de estado antes de confirmar no se cancela                                              0.19s
+  ✓ si la confirmacion llega dos veces registra una sola devolucion                                              0.23s
+  ✓ el navegador no puede cambiar la reserva                                                                     0.15s
+  ✓ al confirmar se encola el correo de falta de permisos pedido por el cliente                                  0.15s
+  ✓ el asunto del correo informa el numero de reserva                                                            0.16s
+  ✓ si no se puede encolar el correo el reintegro igual queda registrado                                         0.17s
+  ✓ dentro del plazo se ofrece el reintegro y se puede confirmar                                                 0.10s
+  ✓ a las 23 59 59 del dia limite todavia se puede pedir el reintegro                                            0.12s
+  ✓ a las 00 00 00 del dia siguiente ya no se puede pedir el reintegro                                           0.17s
+  ✓ con el plazo vencido y otro estado avisa por el estado                                                       0.11s
+  ✓ si el plazo vence entre ver el monto y confirmar no se cancela                                               0.11s
+  ✓ con el plazo vencido la pantalla muestra el aviso                                                            0.12s
+  ✓ si el plazo vence antes de confirmar la pantalla lo avisa y no cancela                                       0.10s
+  ✓ mi reserva ofrece el reintegro hasta las 23 59 59 del dia limite                                             0.13s
+
+   PASS  Tests\Feature\ValidarPermisosTest
+  ✓ si todos obtuvieron el permiso la reserva queda confirmada                                                   0.28s
+  ✓ si uno no obtuvo el permiso la reserva completa queda sin permiso                                            0.19s
+  ✓ cancelar no guarda nada                                                                                      0.20s
+  ✓ una reserva que no esta pendiente no admite validacion with data set " confirmada"                           0.14s
+  ✓ una reserva que no esta pendiente no admite validacion with data set " cancelada"                            0.12s
+  ✓ una reserva que no esta pendiente no admite validacion with data set " sin permiso"                          0.13s
+  ✓ el modelo rechaza validar una reserva que no esta pendiente with data set " confirmada"                      0.08s
+  ✓ el modelo rechaza validar una reserva que no esta pendiente with data set " cancelada"                       0.10s
+  ✓ el modelo rechaza validar una reserva que no esta pendiente with data set " sin permiso"                     0.09s
+  ✓ el modelo no registra permisos si la reserva no esta pendiente with data set " confirmada"                   0.11s
+  ✓ el modelo no registra permisos si la reserva no esta pendiente with data set " cancelada"                    0.09s
+  ✓ el modelo no registra permisos si la reserva no esta pendiente with data set " sin permiso"                  0.08s
+  ✓ el modelo no cambia el estado si la reserva no esta pendiente with data set " confirmada"                    0.07s
+  ✓ el modelo no cambia el estado si la reserva no esta pendiente with data set " cancelada"                     0.08s
+  ✓ el modelo no cambia el estado si la reserva no esta pendiente with data set " sin permiso"                   0.09s
+  ✓ con el plazo de confirmacion vencido no se valida                                                            0.16s
+  ✓ el ultimo segundo del plazo todavia se puede validar                                                         0.07s
+  ✓ el modelo no registra ni confirma con el plazo vencido                                                       0.08s
+  ✓ si el plazo vence con la pagina abierta no se valida                                                         0.21s
+  ✓ si pasa a sin permiso el ultimo dia tiene 72 horas para elegir                                               0.23s
+  ✓ en los demas casos la fecha limite no cambia with data set "« sin permiso» con más de un mes"                0.20s
+  ✓ en los demas casos la fecha limite no cambia with data set "« sin permiso» justo al mes"                     0.24s
+  ✓ en los demas casos la fecha limite no cambia with data set "« confirmada» el último día"                     0.27s
+  ✓ el plazo para elegir no pasa del dia anterior a la salida                                                    0.24s
+  ✓ si queda confirmada el ultimo dia tiene 72 horas para pagar el saldo                                         0.25s
+  ✓ si queda confirmada con un mes o mas el plazo del saldo no cambia with data set "con más de un mes"          0.24s
+  ✓ si queda confirmada con un mes o mas el plazo del saldo no cambia with data set "justo al mes"               0.19s
+  ✓ si queda confirmada el ultimo dia con el saldo abonado no tiene fecha limite de saldo                        0.19s
+  ✓ el plazo del saldo no pasa del dia anterior a la salida                                                      0.17s
+  ✓ no se puede confirmar si falta marcar a un integrante                                                        0.15s
+  ✓ el modelo no admite confirmaciones parciales                                                                 0.07s
+  ✓ un documento de otra reserva se rechaza                                                                      0.12s
+  ✓ el modelo rechaza un documento de otra reserva                                                               0.07s
+  ✓ documentos numericos parecidos no se confunden                                                               0.14s
+  ✓ un documento con punto no rompe la pantalla                                                                  0.13s
+  ✓ el modelo rechaza un documento que solo es igual como numero                                                 0.07s
+  ✓ el valor pendiente se rechaza                                                                                0.16s
+  ✓ el modelo rechaza el valor pendiente                                                                         0.06s
+  ✓ los permisos registrados no se pueden cambiar desde el navegador                                             0.08s
+  ✓ si la reserva se cancela con la pagina abierta no se valida nada                                             0.15s
+  ✓ si la validacion llega dos veces la segunda no avisa un error                                                0.21s
+  ✓ el resultado anticipado usa la misma regla que la validacion                                                 0.06s
+  ✓ marcar un integrante no vuelve a consultar la excursion ni el paquete                                        0.11s
+  ✓ un guia no puede entrar a la pagina                                                                          0.08s
+  ✓ el administrador entra a la pagina                                                                           0.15s
+  ✓ la accion validar permisos solo se ve con la reserva pendiente                                               0.27s
+  ✓ el cupo disponible no cambia                                                                                 0.17s
+  ✓ con todos los permisos obtenidos envia el correo permisos obtenidos                                          0.16s
+  ✓ con un permiso rechazado envia el correo permisos rechazados                                                 0.16s
+  ✓ si no se valida no se envia ningun correo                                                                    0.15s
+  ✓ si el servicio de correo falla el correo queda en la cola y la reserva validada                              0.18s
+  ✓ si el correo no se puede encolar la reserva queda validada y el aviso lo dice                                0.16s
+
+  Tests:    607 passed (2692 assertions)
+  Duration: 91.83s
