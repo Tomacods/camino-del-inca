@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use App\Enums\EstadoPaquete;
+use App\Enums\EstadoReserva;
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -68,6 +71,76 @@ class Paquete extends Model
             'estado' => EstadoPaquete::Activo,
             'fecha_creacion' => today(),
         ]);
+    }
+
+    /* ------------------------- CU-02 y CU-03 Modificar y eliminar ------------------------- */
+
+    // R-02 y R-03: un paquete con reservas «Pendiente», «Confirmada» o «Sin Permiso» en alguna de sus excursiones no se
+    // modifica ni se da de baja. Así el cupo de una excursión nunca cambia con plazas ya ocupadas.
+    public function tieneReservasActivas(): bool
+    {
+        return Reserva::whereIn('estado', [EstadoReserva::Pendiente, EstadoReserva::Confirmada, EstadoReserva::SinPermiso])
+            ->whereHas('excursion', fn ($consulta) => $consulta->where('id_paquete', $this->id_paquete))
+            ->exists();
+    }
+
+    public function sePuedeModificar(): bool
+    {
+        return ! $this->tieneReservasActivas();
+    }
+
+    // R-02: el nombre, los porteadores y los precios. El recorrido no cambia. Los servicios y las excursiones los guarda
+    // después el formulario del panel, con sus relaciones.
+    public function modificarPaquete(array $datos): void
+    {
+        $this->exigirSinReservasActivas();
+
+        $this->update(Arr::only($datos, [
+            'nombre',
+            'cantidad_porteadores',
+            'precio_base',
+            'costo_noche_extra_cusco',
+            'costo_equipo_camping',
+        ]));
+    }
+
+    // R-03: baja lógica. El paquete deja de mostrarse en el portal y no recibe reservas, pero no se borra.
+    public function darDeBaja(): void
+    {
+        $this->exigirSinReservasActivas();
+
+        $this->update(['estado' => EstadoPaquete::Inactivo]);
+    }
+
+    // R-02: vuelve a «Activo» si, mientras estuvo dado de baja, ningún guía de sus salidas futuras quedó asignado a otra
+    // excursión superpuesta.
+    public function reactivar(): void
+    {
+        $salidas = $this->excursiones()
+            ->whereDate('fecha_salida', '>=', today())
+            ->get()
+            ->map(fn (Excursion $excursion) => [
+                'fecha_salida' => $excursion->fecha_salida->format('Y-m-d'),
+                'id_guia' => $excursion->id_guia,
+            ])
+            ->all();
+
+        $fecha = Excursion::buscarConflictoDeGuia($salidas, $this->recorrido->duracion_dias, $this->id_paquete);
+
+        if ($fecha !== null) {
+            throw new DomainException('El guía de la salida del '.$fecha->format('d/m/Y')
+                .' ya conduce otra excursión en esas fechas. Cambiá el guía y volvé a intentarlo.');
+        }
+
+        $this->update(['estado' => EstadoPaquete::Activo]);
+    }
+
+    // R-02 y R-03: lo usan modificarPaquete() y darDeBaja(), y también la página de edición antes de guardar nada.
+    public function exigirSinReservasActivas(): void
+    {
+        if ($this->tieneReservasActivas()) {
+            throw new DomainException('Tiene reservas en estado «Pendiente», «Confirmada» o «Sin Permiso».');
+        }
     }
 
     /* ------------------------------ CU-15 Pagar ------------------------------- */

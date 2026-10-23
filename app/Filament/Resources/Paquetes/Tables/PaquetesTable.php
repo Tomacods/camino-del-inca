@@ -3,6 +3,10 @@
 namespace App\Filament\Resources\Paquetes\Tables;
 
 use App\Enums\EstadoPaquete;
+use App\Filament\Resources\Paquetes\Actions\DarDeBajaPaquete;
+use App\Filament\Resources\Paquetes\Actions\ReactivarPaquete;
+use App\Models\Paquete;
+use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -39,6 +43,15 @@ class PaquetesTable
                     ->options(collect(EstadoPaquete::cases())
                         ->mapWithKeys(fn (EstadoPaquete $estado) => [$estado->value => $estado->value])
                         ->all()),
+            ])
+            ->recordActions([
+                // R-02: con reservas activas el botón se ve deshabilitado y explica por qué.
+                EditAction::make()
+                    ->label('Modificar')
+                    ->disabled(fn (Paquete $record) => ! $record->sePuedeModificar())
+                    ->tooltip(fn (Paquete $record) => $record->sePuedeModificar() ? null : 'Tiene reservas activas'),
+                DarDeBajaPaquete::accionDarDeBaja(),
+                ReactivarPaquete::accionReactivar(),
             ]);
     }
 }

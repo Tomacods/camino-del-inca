@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Paquetes\Schemas;
 
 use App\Models\Excursion;
 use App\Models\Guia;
+use App\Models\Paquete;
 use App\Models\Recorrido;
 use App\Models\Servicio;
 use Closure;
@@ -17,8 +18,8 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Carbon;
 
-// Los datos del R-01. El formulario valida el formato; las reglas de negocio (salidas los lunes y guías sin
-// superposiciones) las decide el modelo Excursion.
+// Los datos del R-01, para crear (CU-01) y modificar (CU-02). El formulario valida el formato; las reglas de negocio
+// (salidas los lunes y guías sin superposiciones) las decide el modelo Excursion.
 class PaqueteForm
 {
     public static function configure(Schema $schema): Schema
@@ -32,10 +33,12 @@ class PaqueteForm
                         ->required()
                         ->maxLength(80)
                         ->unique(ignoreRecord: true),
+                    // R-02: el recorrido no se modifica, porque define la duración y las etapas de las excursiones.
                     Select::make('id_recorrido')
                         ->label('Recorrido')
                         ->relationship('recorrido', 'nombre')
                         ->required()
+                        ->disabledOn('edit')
                         ->helperText('Define la duración del viaje y las etapas que reporta el guía.'),
                     TextInput::make('cantidad_porteadores')
                         ->label('Cantidad de porteadores')
@@ -79,15 +82,19 @@ class PaqueteForm
                 ]),
 
             Section::make('Excursiones')
-                ->description('Cada una con su fecha de salida (siempre un lunes), su cupo y su guía.')
+                ->description('Cada una con su fecha de salida (siempre un lunes), su cupo y su guía. Al modificar el paquete, '
+                    .'la fecha de las excursiones que ya existen no cambia: se puede cambiar su cupo y su guía, o agregar otras.')
                 ->schema([
                     Repeater::make('excursiones')
                         ->hiddenLabel()
                         ->relationship()
                         ->schema([
+                            // R-02: en las excursiones que ya existen, la fecha queda fija y no se vuelve a validar.
                             DatePicker::make('fecha_salida')
                                 ->label('Fecha de salida')
                                 ->displayFormat('d/m/Y')
+                                ->disabled(fn (?Excursion $record): bool => $record !== null)
+                                ->validatedWhenNotDehydrated(false)
                                 ->required()
                                 ->after('today')
                                 ->distinct()
@@ -114,15 +121,21 @@ class PaqueteForm
                         ->defaultItems(1)
                         ->minItems(1)
                         ->addActionLabel('Agregar excursión')
+                        // R-02 no prevé quitar excursiones: al modificar sólo se agregan.
+                        ->deletable(fn (string $operation): bool => $operation === 'create')
                         ->rules([
-                            fn (Get $get): Closure => function (string $attribute, $value, Closure $fail) use ($get) {
+                            fn (Get $get, ?Paquete $record): Closure => function (string $attribute, $value, Closure $fail) use ($get, $record) {
                                 $recorrido = Recorrido::find($get('id_recorrido'));
 
                                 if ($recorrido === null) {
                                     return;
                                 }
 
-                                $fecha = Excursion::buscarConflictoDeGuia(array_values($value ?? []), $recorrido->duracion_dias);
+                                $fecha = Excursion::buscarConflictoDeGuia(
+                                    array_values($value ?? []),
+                                    $recorrido->duracion_dias,
+                                    $record?->id_paquete,
+                                );
 
                                 if ($fecha !== null) {
                                     $fail('El guía de la salida del '.$fecha->format('d/m/Y').' ya conduce otra excursión en esas fechas.');

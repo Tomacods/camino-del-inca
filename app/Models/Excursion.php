@@ -161,9 +161,9 @@ class Excursion extends Model
     }
 
     // R-01: un guía no puede conducir dos excursiones cuyos períodos de recorrido se superpongan, sean del mismo paquete
-    // o de otro. Recibe las salidas del formulario (fecha y guía) y la duración del recorrido elegido, y devuelve la
-    // fecha de la primera salida cuyo guía no está libre, o null si no hay superposiciones.
-    public static function buscarConflictoDeGuia(array $salidas, int $duracionDias): ?Carbon
+    // o de otro. Recibe las salidas del paquete (fecha y guía), la duración de su recorrido y, al modificarlo (CU-02), su
+    // identificación; devuelve la fecha de la primera salida cuyo guía no está libre, o null si no hay superposiciones.
+    public static function buscarConflictoDeGuia(array $salidas, int $duracionDias, ?int $idPaquete = null): ?Carbon
     {
         $revisadas = [];
 
@@ -177,7 +177,12 @@ class Excursion extends Model
             $fin = $inicio->copy()->addDays($duracionDias - 1);
             $idGuia = (int) $salida['id_guia'];
 
-            $ocupadoEnOtraExcursion = self::where('id_guia', $idGuia)->get()
+            // Las salidas del mismo paquete ya vienen en $salidas. Las de paquetes dados de baja no cuentan porque no se
+            // ofrecen: si se reactiva uno, se vuelve a revisar (R-02).
+            $ocupadoEnOtraExcursion = self::where('id_guia', $idGuia)
+                ->when($idPaquete !== null, fn ($consulta) => $consulta->where('id_paquete', '!=', $idPaquete))
+                ->whereHas('paquete', fn ($consulta) => $consulta->where('estado', EstadoPaquete::Activo))
+                ->get()
                 ->contains(fn (Excursion $otra) => $otra->seSuperponeCon($inicio, $fin));
 
             $ocupadoEnElFormulario = collect($revisadas)

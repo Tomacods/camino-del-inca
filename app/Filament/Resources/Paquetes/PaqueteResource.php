@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Paquetes;
 
 use App\Enums\Rol;
 use App\Filament\Resources\Paquetes\Pages\CreatePaquete;
+use App\Filament\Resources\Paquetes\Pages\EditPaquete;
 use App\Filament\Resources\Paquetes\Pages\ListPaquetes;
 use App\Filament\Resources\Paquetes\Schemas\PaqueteForm;
 use App\Filament\Resources\Paquetes\Tables\PaquetesTable;
@@ -13,8 +14,9 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
-// El catálogo de paquetes del administrador: Crear Paquete (CU-01). Modificar (CU-02) y Eliminar (CU-03) se suman acá.
+// El catálogo de paquetes del administrador: Crear (CU-01), Modificar y reactivar (CU-02) y Eliminar (CU-03).
 class PaqueteResource extends Resource
 {
     protected static ?string $model = Paquete::class;
@@ -41,6 +43,12 @@ class PaqueteResource extends Resource
         return static::canViewAny();
     }
 
+    // Si tiene reservas activas, la página de edición avisa y vuelve al listado (R-02): acá sólo se controla el rol.
+    public static function canEdit(Model $record): bool
+    {
+        return static::canViewAny();
+    }
+
     public static function form(Schema $schema): Schema
     {
         return PaqueteForm::configure($schema);
@@ -56,6 +64,7 @@ class PaqueteResource extends Resource
         return [
             'index' => ListPaquetes::route('/'),
             'create' => CreatePaquete::route('/crear'),
+            'edit' => EditPaquete::route('/{record}/modificar'),
         ];
     }
 }
