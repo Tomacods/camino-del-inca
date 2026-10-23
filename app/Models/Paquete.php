@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class Paquete extends Model
@@ -73,6 +74,42 @@ class Paquete extends Model
         ]);
     }
 
+    // R-01, dentro de la transacción que guarda el paquete y sus excursiones. El formulario ya revisó los guías, pero
+    // otro pedido puede ocupar a uno entre esa validación y el guardado: acá se bloquea a los guías y se vuelve a
+    // revisar. Si dos pedidos se cruzan, el segundo espera el bloqueo, ve la excursión del primero y se rechaza.
+    public function confirmarGuiasDisponibles(): void
+    {
+        $fecha = $this->buscarConflictoConGuiasBloqueados();
+
+        if ($fecha !== null) {
+            throw new DomainException('El guía de la salida del '.$fecha->format('d/m/Y')
+                .' ya conduce otra excursión en esas fechas.');
+        }
+    }
+
+    // Bloquea a los guías de sus salidas, en orden para que dos pedidos no se traben entre sí, y busca superposiciones
+    // con las excursiones ya guardadas de otros paquetes.
+    private function buscarConflictoConGuiasBloqueados(bool $soloFuturas = false): ?Carbon
+    {
+        $excursiones = $this->excursiones()
+            ->when($soloFuturas, fn ($consulta) => $consulta->whereDate('fecha_salida', '>=', today()))
+            ->get();
+
+        Guia::whereIn('id_usuario', $excursiones->pluck('id_guia')->unique()->all())
+            ->orderBy('id_usuario')
+            ->lockForUpdate()
+            ->get();
+
+        return Excursion::buscarConflictoDeGuia(
+            $excursiones->map(fn (Excursion $excursion) => [
+                'fecha_salida' => $excursion->fecha_salida->format('Y-m-d'),
+                'id_guia' => $excursion->id_guia,
+            ])->all(),
+            $this->recorrido->duracion_dias,
+            $this->id_paquete,
+        );
+    }
+
     /* ------------------------- CU-02 y CU-03 Modificar y eliminar ------------------------- */
 
     // R-02 y R-03: un paquete con reservas «Pendiente», «Confirmada» o «Sin Permiso» en alguna de sus excursiones no se
@@ -107,37 +144,36 @@ class Paquete extends Model
     // R-03: baja lógica. El paquete deja de mostrarse en el portal y no recibe reservas, pero no se borra.
     public function darDeBaja(): void
     {
-        $this->exigirSinReservasActivas();
+        DB::transaction(function () {
+            $this->exigirSinReservasActivas();
 
-        $this->update(['estado' => EstadoPaquete::Inactivo]);
+            $this->update(['estado' => EstadoPaquete::Inactivo]);
+        });
     }
 
     // R-02: vuelve a «Activo» si, mientras estuvo dado de baja, ningún guía de sus salidas futuras quedó asignado a otra
-    // excursión superpuesta.
+    // excursión superpuesta. Con los guías bloqueados, como al crear y al modificar.
     public function reactivar(): void
     {
-        $salidas = $this->excursiones()
-            ->whereDate('fecha_salida', '>=', today())
-            ->get()
-            ->map(fn (Excursion $excursion) => [
-                'fecha_salida' => $excursion->fecha_salida->format('Y-m-d'),
-                'id_guia' => $excursion->id_guia,
-            ])
-            ->all();
+        DB::transaction(function () {
+            $fecha = $this->buscarConflictoConGuiasBloqueados(soloFuturas: true);
 
-        $fecha = Excursion::buscarConflictoDeGuia($salidas, $this->recorrido->duracion_dias, $this->id_paquete);
+            if ($fecha !== null) {
+                throw new DomainException('El guía de la salida del '.$fecha->format('d/m/Y')
+                    .' ya conduce otra excursión en esas fechas. Cambiá el guía y volvé a intentarlo.');
+            }
 
-        if ($fecha !== null) {
-            throw new DomainException('El guía de la salida del '.$fecha->format('d/m/Y')
-                .' ya conduce otra excursión en esas fechas. Cambiá el guía y volvé a intentarlo.');
-        }
-
-        $this->update(['estado' => EstadoPaquete::Activo]);
+            $this->update(['estado' => EstadoPaquete::Activo]);
+        });
     }
 
     // R-02 y R-03: lo usan modificarPaquete() y darDeBaja(), y también la página de edición antes de guardar nada.
+    // Bloquea primero las excursiones del paquete, como la retención de cupo (CU-14): dentro de una transacción, una
+    // reserva nueva espera a que termine el cambio.
     public function exigirSinReservasActivas(): void
     {
+        $this->excursiones()->lockForUpdate()->get();
+
         if ($this->tieneReservasActivas()) {
             throw new DomainException('Tiene reservas en estado «Pendiente», «Confirmada» o «Sin Permiso».');
         }

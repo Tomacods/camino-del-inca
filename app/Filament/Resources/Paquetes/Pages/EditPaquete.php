@@ -12,6 +12,9 @@ use Illuminate\Database\Eloquent\Model;
 // CU-02 Modificar Paquete
 class EditPaquete extends EditRecord
 {
+    // Como al crear: el paquete, sus servicios y sus excursiones se guardan juntos o no se guarda nada.
+    protected ?bool $hasDatabaseTransactions = true;
+
     protected static string $resource = PaqueteResource::class;
 
     // R-02: un paquete con reservas activas no se modifica. Si se llega por la dirección, se avisa y se vuelve al listado.
@@ -37,7 +40,7 @@ class EditPaquete extends EditRecord
         } catch (DomainException $excepcion) {
             $this->avisarQueNoSePuedeModificar($excepcion->getMessage());
 
-            throw new Halt;
+            throw (new Halt)->rollBackDatabaseTransaction();
         }
     }
 
@@ -46,6 +49,18 @@ class EditPaquete extends EditRecord
         $record->modificarPaquete($data);
 
         return $record;
+    }
+
+    // R-02: la reasignación de guía tiene la misma validación que R-01, también contra otros pedidos que se crucen.
+    protected function afterSave(): void
+    {
+        try {
+            $this->getRecord()->confirmarGuiasDisponibles();
+        } catch (DomainException $excepcion) {
+            $this->avisarQueNoSePuedeModificar($excepcion->getMessage());
+
+            throw (new Halt)->rollBackDatabaseTransaction();
+        }
     }
 
     protected function getRedirectUrl(): string

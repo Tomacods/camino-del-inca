@@ -162,6 +162,34 @@ class ModificarPaqueteTest extends TestCase
         $this->assertEquals($this->rosa->id_usuario, $this->excursion->refresh()->id_guia);
     }
 
+    // Otro pedido ocupa al guía nuevo después de la validación y antes de que se guarde: no se guarda nada.
+    public function test_rechaza_al_guardar_si_otro_pedido_ocupo_al_guia(): void
+    {
+        $otro = $this->crearPaquete('Camino Inca Extendido');
+        $yaOcupado = false;
+
+        Excursion::updated(function (Excursion $excursion) use ($otro, &$yaOcupado) {
+            if ($yaOcupado || $excursion->id_excursion !== $this->excursion->id_excursion) {
+                return;
+            }
+
+            $yaOcupado = true;
+
+            $this->crearExcursion($otro, '2027-03-01', $this->luis);
+        });
+
+        $this->formulario()
+            ->fillForm([
+                'nombre' => 'Camino Inca Clásico 2027',
+                'excursiones.record-'.$this->excursion->id_excursion.'.id_guia' => $this->luis->id_usuario,
+            ])
+            ->call('save')
+            ->assertNotified('Este paquete no se puede modificar');
+
+        $this->assertSame('Camino Inca Clásico', $this->paquete->refresh()->nombre);
+        $this->assertEquals($this->rosa->id_usuario, $this->excursion->refresh()->id_guia);
+    }
+
     public function test_con_reservas_activas_vuelve_al_listado_sin_modificar(): void
     {
         $this->crearReserva(EstadoReserva::Pendiente);
