@@ -137,4 +137,58 @@ class Paquete extends Model
             'excursiones' => Excursion::getExcursionesDisponibles($this->id_paquete),
         ];
     }
+
+    /* ------------------------ CU-06 Consultar paquete ------------------------ */
+
+    public static function buscarPorId(int $idPaquete): ?self
+    {
+        return self::find($idPaquete);
+    }
+
+    public function estaActivo(): bool
+    {
+        return $this->estado === EstadoPaquete::Activo;
+    }
+
+    // Todo lo que muestra el detalle del paquete (paso 3), ya calculado para que la vista no haga consultas.
+    public function getDetalles(): array
+    {
+        return [
+            'id_paquete' => $this->id_paquete,
+            'nombre' => $this->nombre,
+            ...$this->recorrido->getDatosRecorrido(),
+            'cantidad_etapas' => $this->recorrido->contarEtapas(),
+            'servicios' => $this->servicios
+                ->map(fn (Servicio $servicio) => $servicio->getServiciosIncluidos())
+                ->all(),
+            'cantidad_porteadores' => $this->cantidad_porteadores,
+            'precio_base' => $this->precio_base,
+            'costo_noche_extra_cusco' => $this->costo_noche_extra_cusco,
+            'costo_equipo_camping' => $this->costo_equipo_camping,
+            'promedio_valoraciones' => $this->calcularPromedioValoraciones(),
+            'excursiones' => Excursion::getExcursionesDisponibles($this->id_paquete)
+                ->map(fn (Excursion $excursion) => $excursion->getDetalle())
+                ->all(),
+        ];
+    }
+
+    // La consulta administrativa incluye todas las salidas; la disponibilidad del portal se mantiene en getDetalles().
+    public function getExcursionesParaConsulta(): array
+    {
+        return $this->excursiones()->with('guia')->orderBy('fecha_salida')->get()
+            ->map(fn (Excursion $excursion) => $excursion->getDetalle())
+            ->all();
+    }
+
+    // El promedio no se guarda (es derivado, como dice el Documento de Normalización): sale del puntaje de experiencia
+    // general de las valoraciones de las reservas de sus excursiones. Sin valoraciones devuelve null.
+    public function calcularPromedioValoraciones(): ?float
+    {
+        $promedio = Valoracion::whereHas(
+            'reserva.excursion',
+            fn ($consulta) => $consulta->where('id_paquete', $this->id_paquete)
+        )->avg('puntaje_experiencia_general');
+
+        return $promedio === null ? null : round((float) $promedio, 1);
+    }
 }
