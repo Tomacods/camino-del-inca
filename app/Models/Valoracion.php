@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\CategoriaValoracion;
 use App\Enums\EstadoReserva;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -40,6 +41,50 @@ class Valoracion extends Model
     public function detalles(): HasMany
     {
         return $this->hasMany(DetalleValoracion::class, 'id_valoracion', 'id_valoracion');
+    }
+
+    /* ------------------- Filtros del listado (CU-08) ------------------- */
+
+    // Los mismos criterios que el listado de reservas (CU-07): paquete, servicios, guía, porteadores y equipo de camping.
+
+    public function scopeDePaquete(Builder $consulta, int $idPaquete): Builder
+    {
+        return $consulta->whereHas('reserva.excursion', fn (Builder $excursion) => $excursion->where('id_paquete', $idPaquete));
+    }
+
+    public function scopeDeGuia(Builder $consulta, int $idGuia): Builder
+    {
+        return $consulta->whereHas('reserva.excursion', fn (Builder $excursion) => $excursion->where('id_guia', $idGuia));
+    }
+
+    // whereKey() escribe la columna con la tabla (servicio.id_servicio), porque paquete_servicio también la tiene.
+    public function scopeConServicio(Builder $consulta, int $idServicio): Builder
+    {
+        return $consulta->whereHas('reserva.excursion.paquete.servicios', fn (Builder $servicio) => $servicio->whereKey($idServicio));
+    }
+
+    // Los porteadores no son un servicio: son una cantidad del paquete.
+    public function scopeConPorteadores(Builder $consulta): Builder
+    {
+        return $consulta->whereHas('reserva.excursion.paquete', fn (Builder $paquete) => $paquete->where('cantidad_porteadores', '>', 0));
+    }
+
+    // El equipo de camping sólo se valora si algún integrante lo llevó (R-23).
+    public function scopeConEquipoCamping(Builder $consulta): Builder
+    {
+        return $consulta->whereHas('detalles', fn (Builder $detalle) => $detalle->where('categoria', CategoriaValoracion::EquipoDeCamping->value));
+    }
+
+    // El puntaje de una categoría o, sin categoría, el de la experiencia general.
+    public function scopeConPuntaje(Builder $consulta, ?CategoriaValoracion $categoria, int $puntaje): Builder
+    {
+        if ($categoria === null) {
+            return $consulta->where('puntaje_experiencia_general', $puntaje);
+        }
+
+        return $consulta->whereHas('detalles', fn (Builder $detalle) => $detalle
+            ->where('categoria', $categoria->value)
+            ->where('puntaje', $puntaje));
     }
 
     /* --------------------------- CU-23 Valorar servicios --------------------------- */
