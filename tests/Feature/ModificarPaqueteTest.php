@@ -232,6 +232,119 @@ class ModificarPaqueteTest extends TestCase
         $this->assertEquals(12, $this->excursion->refresh()->cupo);
     }
 
+    public function test_una_fecha_manipulada_no_permite_reasignar_un_guia_ocupado(): void
+    {
+        $this->crearExcursion($this->crearPaquete('Otro paquete'), '2027-03-01', $this->luis);
+        $item = 'excursiones.record-'.$this->excursion->id_excursion;
+
+        $this->formulario()
+            ->fillForm([
+                "{$item}.fecha_salida" => '2027-03-15',
+                "{$item}.id_guia" => $this->luis->id_usuario,
+            ])
+            ->call('save')
+            ->assertHasFormErrors(['excursiones']);
+
+        $this->assertSame('2027-03-01', $this->excursion->refresh()->fecha_salida->format('Y-m-d'));
+        $this->assertEquals($this->rosa->id_usuario, $this->excursion->id_guia);
+    }
+
+    public function test_la_fecha_real_tambien_evita_un_conflicto_falso(): void
+    {
+        $this->crearExcursion($this->crearPaquete('Otro paquete'), '2027-03-15', $this->luis);
+        $item = 'excursiones.record-'.$this->excursion->id_excursion;
+
+        $this->formulario()
+            ->fillForm([
+                "{$item}.fecha_salida" => '2027-03-15',
+                "{$item}.id_guia" => $this->luis->id_usuario,
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('2027-03-01', $this->excursion->refresh()->fecha_salida->format('Y-m-d'));
+        $this->assertEquals($this->luis->id_usuario, $this->excursion->id_guia);
+    }
+
+    public function test_un_formulario_desactualizado_no_borra_la_excursion_agregada_desde_otra_pestana(): void
+    {
+        $formularioAnterior = $this->formulario();
+
+        $this->formulario()
+            ->fillForm([
+                'excursiones.nueva.fecha_salida' => '2027-03-08',
+                'excursiones.nueva.cupo' => 10,
+                'excursiones.nueva.id_guia' => $this->rosa->id_usuario,
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $formularioAnterior
+            ->fillForm(['nombre' => 'Edición desactualizada', 'servicios' => [$this->camping->id_servicio]])
+            ->call('save')
+            ->assertNotified('Este paquete no se puede modificar');
+
+        $this->assertSame(2, $this->paquete->excursiones()->count());
+        $this->assertTrue($this->paquete->excursiones()->whereDate('fecha_salida', '2027-03-08')->exists());
+        $this->assertSame('Camino Inca Clásico', $this->paquete->refresh()->nombre);
+        $this->assertEquals([$this->hotel->id_servicio], $this->paquete->servicios()->pluck('servicio.id_servicio')->all());
+
+        // Después de recargar se puede guardar el cambio, conservando ambas salidas.
+        $this->formulario()->fillForm(['nombre' => 'Edición actualizada'])->call('save')->assertHasNoFormErrors();
+        $this->assertSame('Edición actualizada', $this->paquete->refresh()->nombre);
+        $this->assertSame(2, $this->paquete->excursiones()->count());
+    }
+
+    public function test_no_permite_quitar_una_excursion_omitiendola_del_estado(): void
+    {
+        $otra = $this->crearExcursion($this->paquete, '2027-03-08', $this->rosa);
+
+        $this->formulario()
+            ->set('data.excursiones', [
+                'record-'.$otra->id_excursion => ['fecha_salida' => '2027-03-08', 'cupo' => 10, 'id_guia' => $this->rosa->id_usuario],
+            ])
+            ->call('save')
+            ->assertNotified('Este paquete no se puede modificar');
+
+        $this->assertSame(2, $this->paquete->excursiones()->count());
+        $this->assertNotNull($this->excursion->fresh());
+    }
+
+    public function test_con_plazas_retenidas_vuelve_al_listado(): void
+    {
+        $this->assertTrue($this->excursion->retenerCupo(2));
+
+        $this->formulario()
+            ->assertNotified('Este paquete no se puede modificar')
+            ->assertRedirect(PaqueteResource::getUrl('index'));
+
+        $this->assertFalse($this->paquete->sePuedeModificar());
+    }
+
+    public function test_si_se_retiene_cupo_mientras_se_edita_no_cambia_precios_servicios_ni_excursiones(): void
+    {
+        $formulario = $this->formulario();
+        $this->assertTrue($this->excursion->retenerCupo(2));
+
+        $formulario
+            ->fillForm([
+                'precio_base' => 900,
+                'servicios' => [$this->camping->id_servicio],
+                'excursiones.record-'.$this->excursion->id_excursion.'.cupo' => 1,
+            ])
+            ->call('save')
+            ->assertNotified('Este paquete no se puede modificar');
+
+        $this->assertEquals(750, $this->paquete->refresh()->precio_base);
+        $this->assertEquals([$this->hotel->id_servicio], $this->paquete->servicios()->pluck('servicio.id_servicio')->all());
+        $this->assertEquals(12, $this->excursion->refresh()->cupo);
+        $this->assertSame(2, $this->excursion->plazas_retenidas);
+
+        $this->excursion->liberarCupoRetenido(2);
+        $this->formulario()->fillForm(['precio_base' => 900])->call('save')->assertHasNoFormErrors();
+        $this->assertEquals(900, $this->paquete->refresh()->precio_base);
+    }
+
     private function formulario()
     {
         $this->actingAs($this->administrador);

@@ -35,11 +35,11 @@ class PaquetesTable
             ])
             ->recordActions([
                 ViewAction::make()->label('Ver'),
-                // R-02: con reservas activas el botón se ve deshabilitado y explica por qué.
+                // R-02: también se espera a que terminen los pagos con plazas retenidas.
                 EditAction::make()
                     ->label('Modificar')
                     ->disabled(fn (Paquete $record) => ! $record->sePuedeModificar())
-                    ->tooltip(fn (Paquete $record) => $record->sePuedeModificar() ? null : 'Tiene reservas activas'),
+                    ->tooltip(fn (Paquete $record) => $record->sePuedeModificar() ? null : 'Tiene reservas activas o plazas retenidas mientras se completa un pago'),
                 DarDeBajaPaquete::accionDarDeBaja(),
                 ReactivarPaquete::accionReactivar(),
             ]);

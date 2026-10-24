@@ -6,6 +6,7 @@ use App\Enums\EstadoPaquete;
 use App\Enums\EstadoReserva;
 use App\Enums\EstadoSaldo;
 use App\Enums\Rol;
+use App\Enums\TipoPago;
 use App\Filament\Resources\Paquetes\Pages\ListPaquetes;
 use App\Models\Excursion;
 use App\Models\Guia;
@@ -84,7 +85,55 @@ class EliminarPaqueteTest extends TestCase
     {
         $this->paquete->darDeBaja();
 
-        $this->get('/paquetes')->assertDontSee('Camino Inca Clásico');
+        $this->get('/paquetes')->assertOk()->assertDontSee('Camino Inca Clásico');
+    }
+
+    public function test_la_baja_espera_al_pago_y_la_reserva_se_registra_con_el_paquete_activo(): void
+    {
+        $this->assertTrue($this->excursion->retenerCupo(1));
+
+        $this->listado()
+            ->callAction(TestAction::make('darDeBaja')->table($this->paquete))
+            ->assertNotified('No se dio de baja el paquete')
+            ->assertActionDisabled(TestAction::make('edit')->table($this->paquete));
+
+        $this->assertSame(EstadoPaquete::Activo, $this->paquete->refresh()->estado);
+
+        $reserva = Reserva::generarReserva([
+            'id_retencion' => 'pago-durante-la-baja',
+            'id_excursion' => $this->excursion->id_excursion,
+            'correo_electronico' => 'cliente@correo.com',
+            'noches_extra_antes' => 0,
+            'noches_extra_despues' => 0,
+            'vence' => now()->addMinutes(config('reserva.minutos_retencion'))->toIso8601String(),
+            'integrantes' => [['nombre' => 'Ana', 'apellido' => 'Pérez', 'documento_pasaporte' => 'ABC12345', 'equipo_camping' => false]],
+        ], TipoPago::Total, 'Pago de prueba');
+
+        $this->assertNotNull($reserva);
+        $this->assertSame(EstadoReserva::Pendiente, $reserva->estado);
+        $this->assertSame(EstadoPaquete::Activo, $this->paquete->refresh()->estado);
+        $this->assertSame(0, $this->excursion->refresh()->plazas_retenidas);
+    }
+
+    public function test_permite_la_baja_despues_de_liberar_la_retencion(): void
+    {
+        $this->assertTrue($this->excursion->retenerCupo(1));
+        $this->excursion->liberarCupoRetenido(1);
+
+        $this->listado()
+            ->callAction(TestAction::make('darDeBaja')->table($this->paquete))
+            ->assertNotified('Paquete dado de baja');
+
+        $this->assertSame(EstadoPaquete::Inactivo, $this->paquete->refresh()->estado);
+    }
+
+    public function test_un_formulario_abierto_antes_de_la_baja_no_puede_retener_cupo(): void
+    {
+        $this->excursion->load('paquete');
+        $this->paquete->darDeBaja();
+
+        $this->assertFalse($this->excursion->retenerCupo(1));
+        $this->assertSame(0, $this->excursion->refresh()->plazas_retenidas);
     }
 
     public function test_cada_accion_se_ofrece_segun_el_estado(): void
@@ -123,6 +172,57 @@ class EliminarPaqueteTest extends TestCase
             ->assertNotified('No se reactivó el paquete');
 
         $this->assertSame(EstadoPaquete::Inactivo, $this->paquete->refresh()->estado);
+    }
+
+    public function test_no_reactiva_si_el_guia_esta_ocupado_en_un_recorrido_que_ya_comenzo(): void
+    {
+        $this->paquete->darDeBaja();
+        $this->crearExcursion($this->crearPaquete('Otro paquete'), '2027-03-01');
+        $this->travelTo(Carbon::parse('2027-03-03 10:00:00'));
+
+        $this->listado()
+            ->callAction(TestAction::make('reactivar')->table($this->paquete))
+            ->assertNotified('No se reactivó el paquete');
+
+        $this->assertSame(EstadoPaquete::Inactivo, $this->paquete->refresh()->estado);
+    }
+
+    public function test_el_ultimo_dia_del_recorrido_todavia_se_revisa_al_reactivar(): void
+    {
+        $this->paquete->darDeBaja();
+        $this->crearExcursion($this->crearPaquete('Otro paquete'), '2027-03-01');
+        $this->travelTo(Carbon::parse('2027-03-04 23:59:59'));
+
+        $this->listado()
+            ->callAction(TestAction::make('reactivar')->table($this->paquete))
+            ->assertNotified('No se reactivó el paquete');
+
+        $this->assertSame(EstadoPaquete::Inactivo, $this->paquete->refresh()->estado);
+    }
+
+    public function test_reactiva_una_salida_ya_comenzada_si_el_guia_sigue_libre(): void
+    {
+        $this->paquete->darDeBaja();
+        $this->travelTo(Carbon::parse('2027-03-03 10:00:00'));
+
+        $this->listado()
+            ->callAction(TestAction::make('reactivar')->table($this->paquete))
+            ->assertNotified('Paquete reactivado');
+
+        $this->assertSame(EstadoPaquete::Activo, $this->paquete->refresh()->estado);
+    }
+
+    public function test_las_salidas_finalizadas_no_bloquean_la_reactivacion(): void
+    {
+        $this->paquete->darDeBaja();
+        $this->crearExcursion($this->crearPaquete('Otro paquete'), '2027-03-01');
+        $this->travelTo(Carbon::parse('2027-03-05 00:00:00'));
+
+        $this->listado()
+            ->callAction(TestAction::make('reactivar')->table($this->paquete))
+            ->assertNotified('Paquete reactivado');
+
+        $this->assertSame(EstadoPaquete::Activo, $this->paquete->refresh()->estado);
     }
 
     // Las excursiones de un paquete dado de baja no ocupan al guía para otros paquetes.

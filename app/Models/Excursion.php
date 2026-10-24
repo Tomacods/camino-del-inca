@@ -123,7 +123,9 @@ class Excursion extends Model
         return DB::transaction(function () use ($cantidadPlazas) {
             $excursion = Excursion::lockForUpdate()->findOrFail($this->id_excursion);
 
-            if (! $excursion->tieneCupoPara($cantidadPlazas)) {
+            // Un formulario abierto antes de la baja no puede iniciar un pago después. Se consulta el paquete de la
+            // excursión recién bloqueada, sin reutilizar una relación que haya quedado cargada en el componente.
+            if (! $excursion->paquete->estaActivo() || ! $excursion->tieneCupoPara($cantidadPlazas)) {
                 return false;
             }
 

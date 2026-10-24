@@ -32,21 +32,33 @@ class EditPaquete extends EditRecord
         }
     }
 
-    // Antes de guardar nada, y dentro de la transacción: el paquete vuelve a controlar las reservas, por si entró una
-    // mientras se editaba, y bloquea y revisa a los guías, como en el alta (CU-01). Tiene que ser acá: Filament guarda
-    // los servicios y las excursiones justo después de este paso, antes de handleRecordUpdate().
+    // La transacción ya comenzó. Se rechaza un formulario que omite salidas guardadas desde otra pestaña, antes de que
+    // Filament interprete su ausencia como una baja. Las fechas existentes se reemplazan por las de la base.
+    protected function beforeValidate(): void
+    {
+        try {
+            $this->data['excursiones'] = $this->getRecord()->prepararExcursionesParaModificar($this->data['excursiones'] ?? []);
+        } catch (DomainException $excepcion) {
+            $this->avisarQueNoSePuedeModificar($excepcion->getMessage());
+
+            throw (new Halt)->rollBackDatabaseTransaction();
+        }
+    }
+
+    // Filament guarda las relaciones después de este paso. Como en CU-01, se bloquean los guías antes de actualizar
+    // las excursiones; luego se revisan reservas y retenciones con las excursiones bloqueadas, antes de escribir.
     protected function beforeSave(): void
     {
         $paquete = $this->getRecord();
 
         try {
-            $paquete->exigirSinReservasActivas();
-
             Paquete::confirmarGuiasDisponibles(
                 array_values($this->data['excursiones'] ?? []),
                 $paquete->id_recorrido,
                 $paquete->id_paquete,
             );
+
+            $paquete->exigirSinReservasActivas();
         } catch (DomainException $excepcion) {
             $this->avisarQueNoSePuedeModificar($excepcion->getMessage());
 
