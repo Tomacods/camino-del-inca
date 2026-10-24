@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Paquetes\Pages;
 
 use App\Filament\Resources\Paquetes\PaqueteResource;
+use App\Models\Paquete;
 use DomainException;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
@@ -31,12 +32,21 @@ class EditPaquete extends EditRecord
         }
     }
 
-    // Antes de guardar se vuelve a controlar, por si entró una reserva mientras se editaba. Tiene que ser acá: Filament
-    // guarda los servicios y las excursiones justo después de este paso, antes de handleRecordUpdate().
+    // Antes de guardar nada, y dentro de la transacción: el paquete vuelve a controlar las reservas, por si entró una
+    // mientras se editaba, y bloquea y revisa a los guías, como en el alta (CU-01). Tiene que ser acá: Filament guarda
+    // los servicios y las excursiones justo después de este paso, antes de handleRecordUpdate().
     protected function beforeSave(): void
     {
+        $paquete = $this->getRecord();
+
         try {
-            $this->getRecord()->exigirSinReservasActivas();
+            $paquete->exigirSinReservasActivas();
+
+            Paquete::confirmarGuiasDisponibles(
+                array_values($this->data['excursiones'] ?? []),
+                $paquete->id_recorrido,
+                $paquete->id_paquete,
+            );
         } catch (DomainException $excepcion) {
             $this->avisarQueNoSePuedeModificar($excepcion->getMessage());
 
@@ -49,18 +59,6 @@ class EditPaquete extends EditRecord
         $record->modificarPaquete($data);
 
         return $record;
-    }
-
-    // R-02: la reasignación de guía tiene la misma validación que R-01, también contra otros pedidos que se crucen.
-    protected function afterSave(): void
-    {
-        try {
-            $this->getRecord()->confirmarGuiasDisponibles();
-        } catch (DomainException $excepcion) {
-            $this->avisarQueNoSePuedeModificar($excepcion->getMessage());
-
-            throw (new Halt)->rollBackDatabaseTransaction();
-        }
     }
 
     protected function getRedirectUrl(): string

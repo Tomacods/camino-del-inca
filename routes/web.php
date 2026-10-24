@@ -7,6 +7,7 @@ Route::get('/', function () {
     return view('inicio');
 });
 Route::livewire('/paquetes', 'listar-paquetes');
+Route::livewire('/paquetes/{idPaquete}', 'consultar-paquete')->where('idPaquete', '[0-9]{1,18}');
 // La fecha de salida va como 2027-01-18. El paquete tiene que ser un número (hasta 18 cifras, lo que entra en un
 // BIGINT): si no, la ruta da 404 en vez de un error. La fecha la valida el componente, que muestra un aviso.
 Route::livewire('/reservar/{idPaquete}/{fechaSalida}', 'realizar-reserva')->where('idPaquete', '[0-9]{1,18}');
@@ -21,6 +22,7 @@ Route::livewire('/mi-reserva/{numeroReserva}/reintegro', 'solicitar-reintegro');
 Route::livewire('/mi-reserva/{numeroReserva}/modificar', 'modificar-reserva');
 Route::livewire('/mi-reserva/{numeroReserva}/pagar-saldo', 'pagar-saldo');
 Route::livewire('/mi-reserva/{numeroReserva}/reprogramar', 'reprogramar-reserva');
+Route::livewire('/mi-reserva/{numeroReserva}/valorar', 'valorar-servicios');
 // Dirección de vuelta de Mercado Pago del saldo (CU-16). block(), por lo mismo que /reservar/confirmada: si la vuelta
 // llega dos veces seguidas, la segunda espera a la primera y encuentra en la sesión el pago recién registrado.
 Route::livewire('/mi-reserva/{numeroReserva}/saldo-pagado', 'saldo-pagado')->block();

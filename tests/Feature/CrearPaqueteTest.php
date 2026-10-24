@@ -15,8 +15,10 @@ use App\Models\Servicio;
 use App\Models\Usuario;
 use Closure;
 use Filament\Forms\Components\Repeater;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use RuntimeException;
 use Tests\TestCase;
@@ -179,42 +181,69 @@ class CrearPaqueteTest extends TestCase
         $this->assertDatabaseCount('paquete_servicio', 0);
     }
 
-    // Revisión del PR: otro pedido ocupa al guía después de la validación del formulario y antes de que se guarde.
-    // Se simula guardando esa otra excursión justo cuando se guarda la del paquete nuevo.
+    // Una escritura entre la validación inicial y el guardado debe detectarse sin crear el paquete.
+    // Es una simulación en la misma conexión; el bloqueo real se comprueba aparte en PostgreSQL.
     public function test_rechaza_al_guardar_si_otro_pedido_ocupo_al_guia(): void
     {
-        $otro = Paquete::crearPaquete([
-            'id_recorrido' => $this->recorrido->id_recorrido,
-            'nombre' => 'Camino Inca Extendido',
-            'precio_base' => 950,
-            'costo_noche_extra_cusco' => 60,
-            'costo_equipo_camping' => 45,
-            'cantidad_porteadores' => 8,
-        ]);
-
-        $yaOcupado = false;
-
-        Excursion::created(function (Excursion $excursion) use ($otro, &$yaOcupado) {
-            if ($yaOcupado || $excursion->id_paquete === $otro->id_paquete) {
-                return;
-            }
-
-            $yaOcupado = true;
-
-            Excursion::create([
-                'id_paquete' => $otro->id_paquete,
-                'id_guia' => $this->guia->id_usuario,
-                'fecha_salida' => '2027-03-01',
-                'cupo' => 12,
-            ]);
-        });
+        $this->ocuparGuiaDespuesDeLaValidacion();
 
         $this->formulario()
             ->fillForm($this->datosValidos(excursiones: [$this->salida('2027-03-01')]))
             ->call('create')
-            ->assertNotified('No se creó el paquete');
+            ->assertNotified('No se creó el paquete')
+            ->assertSet('record', null);
 
         $this->assertFalse(Paquete::where('nombre', 'Camino Inca Clásico')->exists());
+        $this->assertDatabaseCount('paquete_servicio', 0);
+    }
+
+    public function test_el_formulario_permite_corregir_el_guia_y_reintentar_tras_un_conflicto(): void
+    {
+        $otroUsuario = Usuario::create(['correo' => 'otroguia@caminodelinca.test', 'password' => 'guia1234', 'rol' => Rol::Guia]);
+        $otroGuia = Guia::create(['id_usuario' => $otroUsuario->id_usuario, 'nombre' => 'Luis', 'apellido' => 'Quispe']);
+        $this->ocuparGuiaDespuesDeLaValidacion();
+
+        $formulario = $this->formulario()
+            ->fillForm($this->datosValidos(excursiones: [$this->salida('2027-03-01')]))
+            ->call('create')
+            ->assertNotified('No se creó el paquete')
+            ->assertSet('record', null);
+
+        $salidaCorregida = $this->salida('2027-03-01');
+        $salidaCorregida['id_guia'] = $otroGuia->id_usuario;
+
+        $formulario->fillForm($this->datosValidos(excursiones: [$salidaCorregida]))
+            ->call('create')
+            ->assertStatus(200)
+            ->assertHasNoFormErrors()
+            ->assertRedirect('/admin/paquetes');
+
+        $paquete = Paquete::where('nombre', 'Camino Inca Clásico')->firstOrFail();
+        $this->assertSame(1, $paquete->excursiones()->count());
+        $this->assertEquals($otroGuia->id_usuario, $paquete->excursiones()->firstOrFail()->id_guia);
+        $this->assertSame(2, $paquete->servicios()->count());
+    }
+
+    public function test_una_salida_cercana_se_crea_y_se_consulta_solo_en_el_panel(): void
+    {
+        $this->formulario()
+            ->fillForm($this->datosValidos(excursiones: [$this->salida('2026-10-26')]))
+            ->call('create')->assertHasNoFormErrors();
+
+        $paquete = Paquete::where('nombre', 'Camino Inca Clásico')->firstOrFail();
+        $this->get('/admin/paquetes/'.$paquete->id_paquete)->assertOk()->assertSee('26/10/2026');
+        $this->get('/paquetes')->assertDontSee('26/10/2026');
+        $this->get('/paquetes/'.$paquete->id_paquete)->assertOk()->assertDontSee('26/10/2026');
+        Livewire::test('realizar-reserva', ['idPaquete' => $paquete->id_paquete, 'fechaSalida' => '2026-10-26'])
+            ->assertSet('impedimento', 'anticipacion');
+    }
+
+    public function test_el_guia_y_el_visitante_no_acceden_al_alta_ni_al_listado(): void
+    {
+        $this->get('/admin/paquetes')->assertRedirect('/admin/login');
+        $this->get('/admin/paquetes/crear')->assertRedirect('/admin/login');
+        $this->actingAs($this->usuarioGuia)->get('/admin/paquetes')->assertForbidden();
+        Livewire::test(CreatePaquete::class)->assertForbidden();
     }
 
     // R-01: el guía ya conduce otra excursión (de otro paquete) en esas fechas.
@@ -261,6 +290,34 @@ class CrearPaqueteTest extends TestCase
         $this->actingAs($this->administrador);
 
         Livewire::test(ListPaquetes::class)->assertCanSeeTableRecords([$paquete]);
+    }
+
+    private function ocuparGuiaDespuesDeLaValidacion(): void
+    {
+        $otro = Paquete::crearPaquete([
+            'id_recorrido' => $this->recorrido->id_recorrido,
+            'nombre' => 'Camino Inca Extendido',
+            'precio_base' => 950,
+            'costo_noche_extra_cusco' => 60,
+            'costo_equipo_camping' => 45,
+            'cantidad_porteadores' => 8,
+        ]);
+        $yaOcupado = false;
+
+        // Se inserta después de que la primera consulta leyó al guía libre. La segunda comprobación debe verlo ocupado.
+        DB::listen(function (QueryExecuted $consulta) use ($otro, &$yaOcupado) {
+            if ($yaOcupado || ! str_contains($consulta->sql, 'from "excursion"')) {
+                return;
+            }
+
+            $yaOcupado = true;
+            Excursion::create([
+                'id_paquete' => $otro->id_paquete,
+                'id_guia' => $this->guia->id_usuario,
+                'fecha_salida' => '2027-03-01',
+                'cupo' => 12,
+            ]);
+        });
     }
 
     private function formulario()
