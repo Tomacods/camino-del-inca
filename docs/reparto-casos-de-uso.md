@@ -1,8 +1,8 @@
 # Reparto de casos de uso
 
 Reparto en cuatro áreas, una por integrante (decidido por el grupo el 05/10). Las áreas agrupan casos de uso que tocan
-las mismas pantallas y las mismas clases, para que cada uno pueda avanzar sin pisar a los demás. **Falta definir** los
-responsables de las tareas que cruzan todas las áreas, salvo la de base de datos.
+las mismas pantallas y las mismas clases, para que cada uno pueda avanzar sin pisar a los demás. De las tareas que
+cruzan todas las áreas, **falta definir** el responsable de la integración.
 
 Dónde se programa cada caso de uso:
 
@@ -50,6 +50,13 @@ CU-05 y CU-06 son compartidos: el flujo principal corresponde al cliente y el us
 como alternativa. En el panel, el administrador lista y consulta paquetes activos e inactivos, y filtra el listado
 por estado.
 
+Los ajustes de reglas y diagramas de CU-05/CU-06, incluida la consulta administrativa, están en
+[cambios de diseño de CU-06](cambios-diseno-cu06.md). Sus comprobaciones están en
+[pruebas de CU-06](pruebas-consultar-paquete.md).
+
+Los ajustes de CU-01 posteriores a la integración de CU-06 están en
+[cambios de diseño de CU-01](cambios-diseno-cu01.md), con las firmas, el diagrama de clases y el orden de los bloqueos.
+La cobertura y las comprobaciones pendientes están en [pruebas de CU-01](pruebas-crear-paquete.md).
 La parte administrativa de CU-01, CU-02, CU-03, CU-05 y CU-06 se implementa en un único recurso de Paquetes en
 Filament: listado con filtro Activo/Inactivo, vista del paquete con sus excursiones y cupo disponible, creación,
 edición y baja lógica. El cupo se calcula con la misma regla del modelo que usa el portal. Los cinco casos siguen
@@ -104,8 +111,8 @@ principio sólo envíe la confirmación de la reserva.
 |---|---|---|
 | Integración | Cuida que `main` funcione; arma la etiqueta estable de los viernes | |
 | Base de datos | Integra los cambios de esquema; mantiene el Documento de Normalización al día | Tomás |
-| Documento de prueba (TP7) | Junta los casos de prueba de cada área | |
-| Manual de usuario (TP7) | No técnico: capturas y pasos, para cualquier lector | |
+| Documento de prueba (TP7) | Junta los casos de prueba de cada área | Tomás |
+| Manual de usuario (TP7) | No técnico: capturas y pasos, para cualquier lector | Tomás |
 
 Todos programan su área; estas tareas se suman, no reemplazan.
 

@@ -1,0 +1,14 @@
+
+   PASS  Tests\Feature\SesionTest
+  ✓ el administrador inicia sesion con su correo y su contrasena                                                 1.47s
+  ✓ el guia inicia sesion con su correo y su contrasena                                                          0.20s
+  ✓ rechaza una contrasena incorrecta                                                                            0.33s
+  ✓ rechaza un correo que no esta registrado                                                                     0.32s
+  ✓ pide el correo y la contrasena                                                                               0.12s
+  ✓ sin sesion el panel pide iniciarla                                                                           0.08s
+  ✓ el administrador ve las reservas y no las excursiones del guia                                               0.28s
+  ✓ el guia ve sus excursiones y no las reservas                                                                 0.14s
+  ✓ cierra la sesion y el panel vuelve a pedirla                                                                 0.06s
+
+  Tests:    9 passed (48 assertions)
+  Duration: 3.52s

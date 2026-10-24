@@ -152,6 +152,60 @@ class Excursion extends Model
         });
     }
 
+    /* --------------------------- CU-01 Crear paquete --------------------------- */
+
+    // R-01: las salidas son siempre los lunes.
+    public static function esDiaDeSalida(Carbon $fecha): bool
+    {
+        return $fecha->isMonday();
+    }
+
+    // R-01: un guía no puede conducir dos excursiones cuyos períodos de recorrido se superpongan, sean del mismo paquete
+    // o de otro. Recibe las salidas del paquete (fecha y guía), la duración de su recorrido y, si el paquete ya está
+    // guardado, su identificación; devuelve la fecha de la primera salida cuyo guía no está libre, o null si no hay
+    // superposiciones.
+    public static function buscarConflictoDeGuia(array $salidas, int $duracionDias, ?int $idPaquete = null): ?Carbon
+    {
+        $revisadas = [];
+
+        foreach ($salidas as $salida) {
+            // Si falta la fecha o el guía, el error lo informa la validación de ese campo.
+            if (blank($salida['fecha_salida'] ?? null) || blank($salida['id_guia'] ?? null)) {
+                continue;
+            }
+
+            $inicio = Carbon::parse($salida['fecha_salida'])->startOfDay();
+            $fin = $inicio->copy()->addDays($duracionDias - 1);
+            $idGuia = (int) $salida['id_guia'];
+
+            // Las salidas del mismo paquete ya vienen en $salidas.
+            $ocupadoEnOtraExcursion = self::where('id_guia', $idGuia)
+                ->when($idPaquete !== null, fn ($consulta) => $consulta->where('id_paquete', '!=', $idPaquete))
+                ->get()
+                ->contains(fn (Excursion $otra) => $otra->seSuperponeCon($inicio, $fin));
+
+            $ocupadoEnElFormulario = collect($revisadas)
+                ->contains(fn (array $otra) => $otra['id_guia'] === $idGuia
+                    && $inicio->lessThanOrEqualTo($otra['fin'])
+                    && $otra['inicio']->lessThanOrEqualTo($fin));
+
+            if ($ocupadoEnOtraExcursion || $ocupadoEnElFormulario) {
+                return $inicio;
+            }
+
+            $revisadas[] = ['id_guia' => $idGuia, 'inicio' => $inicio, 'fin' => $fin];
+        }
+
+        return null;
+    }
+
+    // Dos períodos se superponen si cada uno empieza antes de que termine el otro (el último día cuenta).
+    public function seSuperponeCon(Carbon $inicio, Carbon $fin): bool
+    {
+        return $inicio->lessThanOrEqualTo($this->getUltimoDiaRecorrido())
+            && $this->getFechaSalida()->lessThanOrEqualTo($fin);
+    }
+
     /* ------------------------------ CU-15 Pagar ------------------------------- */
 
     // Asocia la reserva a esta excursión y la guarda.
@@ -425,10 +479,13 @@ class Excursion extends Model
 
     /* ------------------------- CU-05 Listar paquetes ------------------------- */
 
-    // También para CU-06: una salida está disponible si todavía no salió y le queda al menos un lugar.
+    // También para CU-06: una salida está disponible si se puede reservar, es decir, si está a 3 meses o más (la misma
+    // regla con la que Realizar Reserva la acepta) y le queda al menos un lugar. La anticipación se mira primero, así
+    // no se calcula el cupo de las salidas que no se van a mostrar.
     public static function getExcursionesDisponibles(int $idPaquete): Collection
     {
         return self::buscarFuturas($idPaquete)
+            ->filter(fn (Excursion $excursion) => $excursion->cumpleAnticipacionMinima(today()))
             ->filter(fn (Excursion $excursion) => $excursion->obtenerCupoDisponible() > 0)
             ->values();
     }
@@ -441,14 +498,26 @@ class Excursion extends Model
             ->get();
     }
 
-    // Búsqueda por fecha: si el paquete tiene una salida disponible ese día, es decir, futura y con cupo. Busca sólo esa
-    // salida, sin recalcular el cupo de las demás.
+    // Búsqueda por fecha: si el paquete tiene una salida disponible ese día, con la misma regla que el listado. Busca
+    // sólo esa salida, sin recalcular el cupo de las demás.
     public static function tieneFechaSalida(int $idPaquete, Carbon $fecha): bool
     {
         $excursion = self::buscarPorFechaSalida($idPaquete, $fecha->format('Y-m-d'));
 
         return $excursion !== null
-            && $excursion->getFechaSalida()->isAfter(today())
+            && $excursion->cumpleAnticipacionMinima(today())
             && $excursion->obtenerCupoDisponible() > 0;
+    }
+
+    /* ------------------------ CU-06 Consultar paquete ------------------------ */
+
+    // Lo que muestra el detalle del paquete de cada salida disponible.
+    public function getDetalle(): array
+    {
+        return [
+            'fecha_salida' => $this->getFechaSalida(),
+            'cupo_disponible' => $this->obtenerCupoDisponible(),
+            'guia' => $this->guia->getNombreCompleto(),
+        ];
     }
 }

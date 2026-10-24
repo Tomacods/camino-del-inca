@@ -1,5 +1,5 @@
 {{--
-    Un puntaje de 1 a 5 estrellas (Valorar Servicios, CU-23): un grupo de botones de opción con la etiqueta como leyenda.
+    Un puntaje de 1 a 5 estrellas (Valorar Servicios, CU-23): un grupo de botones de opción con su etiqueta accesible.
     <x-estrellas modelo="experienciaGeneral" etiqueta="El recorrido completo" :valor="$experienciaGeneral" />
     El error sale de la validación con el mismo nombre que el modelo.
 --}}
@@ -7,9 +7,9 @@
 
 @php($idGrupo = str_replace('.', '-', $modelo))
 
-<fieldset class="py-4 first:pt-0 last:pb-0" @error($modelo) aria-describedby="{{ $idGrupo }}-error" @enderror>
+<fieldset class="py-4 first:pt-0 last:pb-0" aria-labelledby="{{ $idGrupo }}-etiqueta" @error($modelo) aria-describedby="{{ $idGrupo }}-error" @enderror>
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <legend class="text-[17px] text-texto">{{ $etiqueta }}</legend>
+        <span id="{{ $idGrupo }}-etiqueta" class="text-[17px] text-texto">{{ $etiqueta }}</span>
 
         <div class="flex gap-1">
             @foreach (range(1, 5) as $estrellas)

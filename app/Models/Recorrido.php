@@ -48,4 +48,11 @@ class Recorrido extends Model
             'duracion_dias' => $this->duracion_dias,
         ];
     }
+
+    /* ------------------------ CU-06 Consultar paquete ------------------------ */
+
+    public function contarEtapas(): int
+    {
+        return $this->etapas()->count();
+    }
 }

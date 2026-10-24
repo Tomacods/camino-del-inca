@@ -7,6 +7,7 @@ Route::get('/', function () {
     return view('inicio');
 });
 Route::livewire('/paquetes', 'listar-paquetes');
+Route::livewire('/paquetes/{idPaquete}', 'consultar-paquete')->where('idPaquete', '[0-9]{1,18}');
 // La fecha de salida va como 2027-01-18. El paquete tiene que ser un número (hasta 18 cifras, lo que entra en un
 // BIGINT): si no, la ruta da 404 en vez de un error. La fecha la valida el componente, que muestra un aviso.
 Route::livewire('/reservar/{idPaquete}/{fechaSalida}', 'realizar-reserva')->where('idPaquete', '[0-9]{1,18}');
