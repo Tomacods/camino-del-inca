@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Paquetes;
 
 use App\Enums\Rol;
 use App\Filament\Resources\Paquetes\Pages\CreatePaquete;
+use App\Filament\Resources\Paquetes\Pages\EditPaquete;
 use App\Filament\Resources\Paquetes\Pages\ListPaquetes;
 use App\Filament\Resources\Paquetes\Pages\ViewPaquete;
 use App\Filament\Resources\Paquetes\Schemas\PaqueteForm;
@@ -41,6 +42,12 @@ class PaqueteResource extends Resource
         return static::canViewAny();
     }
 
+    // Si tiene reservas activas, la página de edición avisa y vuelve al listado (R-02): acá sólo se controla el rol.
+    public static function canEdit(Model $record): bool
+    {
+        return static::canViewAny();
+    }
+
     public static function canCreate(): bool
     {
         return static::canViewAny();
@@ -67,6 +74,7 @@ class PaqueteResource extends Resource
             'index' => ListPaquetes::route('/'),
             'create' => CreatePaquete::route('/crear'),
             'view' => ViewPaquete::route('/{record}'),
+            'edit' => EditPaquete::route('/{record}/modificar'),
         ];
     }
 }

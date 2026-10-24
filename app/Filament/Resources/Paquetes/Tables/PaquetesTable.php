@@ -3,6 +3,10 @@
 namespace App\Filament\Resources\Paquetes\Tables;
 
 use App\Enums\EstadoPaquete;
+use App\Filament\Resources\Paquetes\Actions\DarDeBajaPaquete;
+use App\Filament\Resources\Paquetes\Actions\ReactivarPaquete;
+use App\Models\Paquete;
+use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -31,6 +35,13 @@ class PaquetesTable
             ])
             ->recordActions([
                 ViewAction::make()->label('Ver'),
+                // R-02: también se espera a que terminen los pagos con plazas retenidas.
+                EditAction::make()
+                    ->label('Modificar')
+                    ->disabled(fn (Paquete $record) => ! $record->sePuedeModificar())
+                    ->tooltip(fn (Paquete $record) => $record->sePuedeModificar() ? null : 'Tiene reservas activas o plazas retenidas mientras se completa un pago'),
+                DarDeBajaPaquete::accionDarDeBaja(),
+                ReactivarPaquete::accionReactivar(),
             ]);
     }
 }

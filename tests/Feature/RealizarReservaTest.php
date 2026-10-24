@@ -549,6 +549,19 @@ class RealizarReservaTest extends TestCase
         $this->abrir('2027-01-18')->set('paso', 2);
     }
 
+    public function test_si_el_paquete_se_da_de_baja_con_el_formulario_abierto_no_inicia_el_pago(): void
+    {
+        $excursion = $this->crearExcursion('2027-01-18');
+        $componente = $this->llegarAlResumen();
+
+        $this->paquete->darDeBaja();
+        $componente->call('confirmarReserva');
+
+        $this->assertNull(session('reserva_en_curso'));
+        $this->assertSame(0, $excursion->refresh()->plazas_retenidas);
+        $this->assertDatabaseCount('reserva', 0);
+    }
+
     private function abrir(string $fechaSalida)
     {
         return Livewire::test('realizar-reserva', ['idPaquete' => $this->paquete->id_paquete, 'fechaSalida' => $fechaSalida]);
