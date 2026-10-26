@@ -98,6 +98,35 @@ class SesionTest extends TestCase
         $this->get('/admin/reservas')->assertForbidden();
     }
 
+    // Si antes de iniciar sesión se quiso abrir una página, al entrar se va a esa página (comportamiento de Laravel).
+    public function test_al_entrar_va_a_la_pagina_que_se_quiso_abrir_si_es_de_su_rol(): void
+    {
+        $this->get('/admin/excursiones')->assertRedirect('/admin/login');
+
+        $this->iniciarSesion('guia@caminodelinca.test', 'guia1234')
+            ->assertRedirect(url('/admin/excursiones'));
+    }
+
+    // Prueba manual 6 del 22/10: el guía que quiso abrir Reservas antes de entrar veía un 403 al iniciar sesión.
+    public function test_al_entrar_descarta_la_pagina_que_se_quiso_abrir_si_es_de_otro_rol(): void
+    {
+        $this->get('/admin/reservas')->assertRedirect('/admin/login');
+
+        $this->iniciarSesion('guia@caminodelinca.test', 'guia1234')
+            ->assertRedirect(Filament::getUrl());
+
+        $this->assertAuthenticatedAs($this->guia);
+        $this->assertNull(session('url.intended'));
+    }
+
+    public function test_al_entrar_el_administrador_descarta_las_excursiones_del_guia(): void
+    {
+        $this->get('/admin/excursiones')->assertRedirect('/admin/login');
+
+        $this->iniciarSesion('admin@caminodelinca.test', 'admin1234')
+            ->assertRedirect(Filament::getUrl());
+    }
+
     /* ---------------------------------- CU-25 ---------------------------------- */
 
     public function test_cierra_la_sesion_y_el_panel_vuelve_a_pedirla(): void
