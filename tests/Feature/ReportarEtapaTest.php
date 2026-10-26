@@ -111,6 +111,17 @@ class ReportarEtapaTest extends TestCase
             ->assertMountedActionModalDontSee('Es la etapa final');
     }
 
+    // A3. El navegador muestra el aviso sólo sin conexión y, al volver la señal, habilita otra vez «Reportar» (prueba
+    // manual 8 del 23/10). Acá se comprueba que la confirmación los lleva; el corte de red se prueba en el navegador.
+    public function test_la_confirmacion_avisa_sin_conexion_y_permite_reintentar_al_volver(): void
+    {
+        $this->listado()
+            ->mountAction($this->accion($this->excursionEnCurso))
+            ->assertMountedActionModalSeeHtml('wire:offline')
+            ->assertMountedActionModalSee('Sin conexión: la etapa todavía no se registró. Cuando vuelva la señal, tocá Reportar de nuevo.')
+            ->assertMountedActionModalSeeHtml('x-on:online.window');
+    }
+
     public function test_la_primera_confirmacion_dice_que_no_hay_etapa_reportada(): void
     {
         $this->listado()

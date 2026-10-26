@@ -14,11 +14,18 @@
 </ol>
 
 {{-- A3 (4.6–4.7): si falla la conexión al enviar el reporte, el sistema informa que la etapa no pudo registrarse y permite
-     reintentar. Livewire muestra el aviso cuando el navegador se queda sin red y lo oculta cuando vuelve. Si el guía toca
-     Reportar sin conexión, el pedido falla y el botón queda deshabilitado aunque vuelva la señal: para reintentar hay que
-     recargar la página. Reintentar no tiene riesgo: si el primer pedido sí había llegado, el segundo avisa «ya se
-     reportó» y no avanza otra etapa (ver Excursion::actualizarEtapaActual()). Va sin modificador (.block): Livewire oculta
-     de entrada sólo [wire:offline], y con otro nombre de atributo el aviso se vería también con conexión. --}}
+     reintentar. Livewire muestra el aviso cuando el navegador se queda sin red y lo oculta cuando vuelve. Va sin
+     modificador (.block): Livewire oculta de entrada sólo [wire:offline], y con otro nombre de atributo el aviso se vería
+     también con conexión.
+     Si el guía toca Reportar sin conexión, el pedido falla y Livewire deja el botón deshabilitado, como si el pedido
+     siguiera en curso (prueba manual 8 del 23/10). Por eso, cuando vuelve la señal, se vuelve a habilitar el botón del
+     cuadro: el guía reintenta sin recargar la página. Reintentar no tiene riesgo: si el primer pedido sí había llegado,
+     el segundo avisa «ya se reportó» y no avanza otra etapa (ver Excursion::actualizarEtapaActual()). --}}
+<div
+    hidden
+    x-data
+    x-on:online.window="$el.closest('.fi-modal-window')?.querySelectorAll('button[type=submit][disabled]').forEach((boton) => boton.removeAttribute('disabled'))"
+></div>
 <p wire:offline role="alert" style="margin:0.75rem 0 0;padding:0.5rem 0.75rem;border-left:3px solid var(--warning-500);font-size:0.875rem;font-weight:600;text-align:left">
-    Sin conexión: la etapa todavía no se registró. Cuando vuelva la señal, recargá la página y reportá de nuevo.
+    Sin conexión: la etapa todavía no se registró. Cuando vuelva la señal, tocá Reportar de nuevo.
 </p>
