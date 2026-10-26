@@ -80,6 +80,31 @@ class ConsultarPaquetePanelTest extends TestCase
         $this->get('/paquetes/'.$inactivo->id_paquete)->assertRedirect('/paquetes');
     }
 
+    public function test_el_administrador_filtra_por_fecha_de_salida(): void
+    {
+        $this->crearExcursion('2026-11-02');
+        $otro = $this->paquete->replicate();
+        $otro->fill(['nombre' => 'Paquete inactivo con salida pasada', 'estado' => EstadoPaquete::Inactivo])->save();
+        Excursion::create([
+            'id_paquete' => $otro->id_paquete, 'id_guia' => $this->guia->id_usuario,
+            'fecha_salida' => '2026-09-07', 'cupo' => 12, 'plazas_retenidas' => 0,
+        ]);
+        $this->actingAs($this->administrador);
+
+        // A diferencia del portal, cuentan las salidas a menos de tres meses, las que ya pasaron y las de paquetes inactivos.
+        Livewire::test(ListPaquetes::class)
+            ->filterTable('fecha_salida', ['fecha_salida' => '2026-11-02'])
+            ->assertCanSeeTableRecords([$this->paquete])
+            ->assertCanNotSeeTableRecords([$otro])
+            ->filterTable('fecha_salida', ['fecha_salida' => '2026-09-07'])
+            ->assertCanSeeTableRecords([$otro])
+            ->assertCanNotSeeTableRecords([$this->paquete])
+            ->filterTable('fecha_salida', ['fecha_salida' => '2026-11-09'])
+            ->assertCountTableRecords(0)
+            ->removeTableFilters()
+            ->assertCanSeeTableRecords([$this->paquete, $otro]);
+    }
+
     public function test_el_detalle_administrativo_incluye_datos_precios_servicios_y_promedio(): void
     {
         $hotel = Servicio::create(['tipo' => TipoServicio::Hotel, 'nombre' => 'Hotel en Cusco']);
