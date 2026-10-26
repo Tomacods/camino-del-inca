@@ -255,6 +255,13 @@ class Paquete extends Model
         return self::where('estado', EstadoPaquete::Activo);
     }
 
+    // CU-05 del administrador (R-05): los paquetes que tienen una salida ese día. A diferencia del portal, cuenta
+    // cualquier salida, ya haya pasado o no le quede cupo, porque el panel muestra todas.
+    public function scopeConSalidaEl(Builder $consulta, Carbon|string $fecha): Builder
+    {
+        return $consulta->whereHas('excursiones', fn (Builder $excursion) => $excursion->whereDate('fecha_salida', $fecha));
+    }
+
     // Pasos 3 y 4: entre los paquetes del listado, los que coinciden con el criterio. El componente ya validó el formato
     // y pasa una fecha de salida o un texto para buscar en el nombre.
     public static function buscarPaquetes(Carbon|string $criterio): Collection

@@ -8,9 +8,13 @@ use App\Filament\Resources\Paquetes\Actions\ReactivarPaquete;
 use App\Models\Paquete;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 class PaquetesTable
 {
@@ -32,6 +36,17 @@ class PaquetesTable
                     EstadoPaquete::Activo->value => EstadoPaquete::Activo->value,
                     EstadoPaquete::Inactivo->value => EstadoPaquete::Inactivo->value,
                 ]),
+                // R-05: el administrador filtra también por fecha de salida, como el cliente en el portal.
+                Filter::make('fecha_salida')
+                    ->schema([
+                        DatePicker::make('fecha_salida')->label('Fecha de salida')->displayFormat('d/m/Y'),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => filled($data['fecha_salida'] ?? null)
+                        ? $query->conSalidaEl($data['fecha_salida'])
+                        : $query)
+                    ->indicateUsing(fn (array $data): ?string => filled($data['fecha_salida'] ?? null)
+                        ? 'Salida: '.Carbon::parse($data['fecha_salida'])->format('d/m/Y')
+                        : null),
             ])
             ->recordActions([
                 ViewAction::make()->label('Ver'),
