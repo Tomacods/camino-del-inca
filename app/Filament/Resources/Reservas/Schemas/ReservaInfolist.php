@@ -96,6 +96,6 @@ class ReservaInfolist
 
     private static function dolares(mixed $monto): string
     {
-        return 'USD '.number_format((float) $monto, 0, ',', '.');
+        return 'USD '.number_format((float) $monto, 2, ',', '.');
     }
 }
