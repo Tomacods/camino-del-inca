@@ -153,6 +153,18 @@ class SaldoPendienteTest extends TestCase
         $this->assertFalse($this->reserva->verificarFechaLimiteSaldo());
     }
 
+    public function test_iniciar_pago_saldo_sin_fecha_limite_informa_el_vencimiento_sin_inventar_una_fecha(): void
+    {
+        // CB-06 es defensivo: una reserva adeudada siempre tiene fecha límite. Se fuerza el dato para recorrerlo.
+        $this->reserva->fecha_limite_saldo = null;
+
+        $this->expectExceptionObject(new DomainException(
+            'El plazo para pagar el saldo venció y la reserva se cancela por falta de pago.'
+        ));
+
+        $this->reserva->iniciarPagoSaldo();
+    }
+
     public function test_actualizar_reserva_deja_el_saldo_abonado_y_lo_guarda(): void
     {
         $pago = $this->reserva->pagos()->sole();

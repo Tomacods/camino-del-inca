@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 // Cancelar Reserva (CU-21). Hoy es el 13/10/2026 y la salida es el 01/02/2027: faltan más de 30 días, así que se
@@ -91,6 +92,25 @@ class CancelarReservaTest extends TestCase
         $reserva = $this->reserva->fresh();
         $this->assertSame(EstadoReserva::Cancelada, $reserva->estado);
         $this->assertNull($reserva->devolucion);
+    }
+
+    #[DataProvider('fechasParaCalcularReembolso')]
+    public function test_calcular_reembolso_en_los_limites_de_anticipacion(string $fechaActual, float $montoEsperado): void
+    {
+        $this->travelTo(Carbon::parse($fechaActual));
+
+        $this->assertSame($montoEsperado, $this->reserva->calcularReembolso(now()));
+    }
+
+    public static function fechasParaCalcularReembolso(): array
+    {
+        return [
+            'CN-01: 31 días' => ['2027-01-01 23:59:00', 375.0],
+            'CN-02: 30 días' => ['2027-01-02 00:00:00', 0.0],
+            'CN-03: 29 días' => ['2027-01-03 10:00:00', 0.0],
+            'CN-04: día de salida' => ['2027-02-01 10:00:00', 0.0],
+            'CN-05: salida pasada' => ['2027-02-02 10:00:00', 0.0],
+        ];
     }
 
     public function test_con_una_reserva_que_no_admite_cancelacion_muestra_el_aviso(): void

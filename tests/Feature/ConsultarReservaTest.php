@@ -165,6 +165,16 @@ class ConsultarReservaTest extends TestCase
             ->assertSee('Reserva 000125-9');
     }
 
+    public function test_con_un_numero_existente_y_un_correo_ajeno_no_permite_consultar_la_reserva(): void
+    {
+        $this->consultarReserva('000125-9', 'otra.persona@example.com')
+            ->assertHasErrors(['numeroReserva'])
+            ->assertSee('No encontramos una reserva con esos datos.')
+            ->assertDontSee('Reserva 000125-9');
+
+        $this->assertNull(session('acceso_reserva'));
+    }
+
     // Con formato inválido no se controla el dígito: un solo aviso. Se mira la lista de errores y no la pantalla,
     // porque la pantalla muestra sólo el primero.
     public function test_un_numero_con_formato_invalido_tiene_un_solo_aviso(): void

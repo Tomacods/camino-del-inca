@@ -134,6 +134,8 @@ class ReservaConfirmadaTest extends TestCase
         $this->volverDeMercadoPago(['status' => 'rejected'])->assertRedirect('/reservar/pago');
 
         $this->assertSame(0, Reserva::count());
+        $this->assertDatabaseEmpty('pago');
+        $this->assertDatabaseEmpty('comprobante');
         $this->assertSame(5, $this->excursion->fresh()->plazas_retenidas);
         $this->assertSame($enCurso, session('reserva_en_curso'));
 

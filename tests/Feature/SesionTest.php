@@ -5,10 +5,12 @@ namespace Tests\Feature;
 use App\Enums\Rol;
 use App\Filament\Pages\Auth\IniciarSesion;
 use App\Models\Guia;
+use App\Models\Reserva;
 use App\Models\Usuario;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 // CU-24 Iniciar Sesión y CU-25 Cerrar Sesión (R-24 y R-25): el administrador y el guía entran al panel con su correo y
@@ -67,6 +69,45 @@ class SesionTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_el_error_de_credenciales_no_revela_si_el_correo_existe(): void
+    {
+        $errorConCorreoRegistrado = $this->iniciarSesion('admin@caminodelinca.test', 'otra-clave')
+            ->assertHasFormErrors(['correo'])
+            ->errors()->get('data.correo');
+        $this->assertGuest();
+
+        $errorConCorreoInexistente = $this->iniciarSesion('nadie@caminodelinca.test', 'otra-clave')
+            ->assertHasFormErrors(['correo'])
+            ->errors()->get('data.correo');
+        $this->assertGuest();
+
+        $this->assertSame(['Estas credenciales no coinciden con nuestros registros.'], $errorConCorreoRegistrado);
+        $this->assertSame($errorConCorreoRegistrado, $errorConCorreoInexistente);
+    }
+
+    public function test_el_sexto_intento_se_bloquea_y_permite_entrar_al_vencer_el_plazo(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+
+        for ($intento = 1; $intento <= 5; $intento++) {
+            $this->iniciarSesion('admin@caminodelinca.test', 'otra-clave')
+                ->assertHasFormErrors(['correo']);
+            $this->assertGuest();
+        }
+
+        // Aun con las credenciales correctas, el sexto intento debe quedar bloqueado durante 60 segundos.
+        $this->iniciarSesion('admin@caminodelinca.test', 'admin1234')
+            ->assertNotified('Demasiados intentos. Intente de nuevo en 60 segundos.');
+        $this->assertGuest();
+
+        $this->travel(61)->seconds();
+
+        $this->iniciarSesion('admin@caminodelinca.test', 'admin1234')
+            ->assertHasNoFormErrors()
+            ->assertRedirect(Filament::getUrl());
+        $this->assertAuthenticatedAs($this->administrador);
+    }
+
     public function test_pide_el_correo_y_la_contrasena(): void
     {
         $this->iniciarSesion('', '')
@@ -96,6 +137,17 @@ class SesionTest extends TestCase
 
         $this->get('/admin/excursiones')->assertOk();
         $this->get('/admin/reservas')->assertForbidden();
+    }
+
+    public function test_el_guia_no_puede_consultar_el_detalle_de_una_reserva_por_url(): void
+    {
+        $this->seed();
+        $reserva = Reserva::where('numero_reserva', '000125-9')->firstOrFail();
+
+        $this->actingAs($this->guia)
+            ->get('/admin/reservas/'.$reserva->id_reserva)
+            ->assertForbidden()
+            ->assertDontSee('federico.rios@mail.com');
     }
 
     // Si antes de iniciar sesión se quiso abrir una página, al entrar se va a esa página (comportamiento de Laravel).
@@ -129,15 +181,27 @@ class SesionTest extends TestCase
 
     /* ---------------------------------- CU-25 ---------------------------------- */
 
-    public function test_cierra_la_sesion_y_el_panel_vuelve_a_pedirla(): void
+    #[DataProvider('rolesQueCierranSesion')]
+    public function test_cierra_la_sesion_y_el_panel_vuelve_a_pedirla(Rol $rol, string $rutaProtegida): void
     {
-        $this->actingAs($this->administrador)
-            ->post(route('filament.admin.auth.logout'))
+        $usuario = $rol === Rol::Administrador ? $this->administrador : $this->guia;
+        $this->actingAs($usuario)->get($rutaProtegida)->assertOk();
+
+        $this->post(route('filament.admin.auth.logout'))
             ->assertRedirect();
 
         $this->assertGuest();
 
         $this->get('/admin')->assertRedirect('/admin/login');
+        $this->get($rutaProtegida)->assertRedirect('/admin/login');
+    }
+
+    public static function rolesQueCierranSesion(): array
+    {
+        return [
+            'administrador' => [Rol::Administrador, '/admin/reservas'],
+            'guía' => [Rol::Guia, '/admin/excursiones'],
+        ];
     }
 
     private function iniciarSesion(string $correo, string $contrasena)
