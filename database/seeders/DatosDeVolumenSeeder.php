@@ -244,11 +244,11 @@ class DatosDeVolumenSeeder extends Seeder
         ],
     ];
 
-    // Los tres de PaqueteSeeder también reciben salidas nuevas: nombre => cada cuántas semanas sale.
+    // Dos de PaqueteSeeder también reciben salidas nuevas: nombre => cada cuántas semanas sale. «Camino Inca Extendido»
+    // queda como estaba, sin reservas activas, para poder mostrar Modificar Paquete y Dar de Baja (R-02 y R-03).
     private const FRECUENCIA_PAQUETES_ACTUALES = [
         'Camino Inca Clásico' => 1,
         'Camino Inca Corto' => 2,
-        'Camino Inca Extendido' => 4,
     ];
 
     // Precios en USD por persona. Los más vendidos salen todas las semanas; el resto, cada dos o cuatro. La antigüedad
@@ -681,7 +681,34 @@ class DatosDeVolumenSeeder extends Seeder
             }
         }
 
+        // Las filas y $this->excursiones se arman juntas: tienen los mismos índices.
+        $indiceSinIniciar = $this->buscarEnCursoQueTerminaMasTarde();
+
+        if ($indiceSinIniciar !== null) {
+            $filas[$indiceSinIniciar]['fecha_hora_inicio_recorrido'] = null;
+            $filas[$indiceSinIniciar]['id_etapa_actual'] = null;
+            $this->excursiones[$indiceSinIniciar]['iniciada'] = false;
+        }
+
         $this->insertarEnBloques('excursion', $filas);
+    }
+
+    // Iniciar Recorrido (CU-11) se puede hacer cualquier día del recorrido, no sólo el de la salida. Para mostrarlo
+    // aunque hoy no salga ninguna, entre las que salieron antes de hoy y siguen en curso, la que termina más tarde queda
+    // sin iniciar. Un lunes no hay ninguna así: quedan sin iniciar las que salen ese día.
+    private function buscarEnCursoQueTerminaMasTarde(): ?int
+    {
+        $indiceElegido = null;
+
+        foreach ($this->excursiones as $indice => $excursion) {
+            $enCurso = $excursion['iniciada'] && $excursion['ultimo_dia']->greaterThanOrEqualTo($this->hoy);
+
+            if ($enCurso && ($indiceElegido === null || $excursion['ultimo_dia']->greaterThan($this->excursiones[$indiceElegido]['ultimo_dia']))) {
+                $indiceElegido = $indice;
+            }
+        }
+
+        return $indiceElegido;
     }
 
     // Devuelve el inicio del recorrido y la etapa actual. Terminada: el guía la inició el día de la salida, entre las
@@ -1338,8 +1365,9 @@ class DatosDeVolumenSeeder extends Seeder
         $this->command->table(['Caso', 'Número', 'Correo', 'Paquete', 'Salida'], $this->armarMuestras());
     }
 
-    // Una reserva de cada caso para probar a mano, la más reciente de cada uno. Y una excursión en curso con el correo de
-    // su guía; si hoy es lunes no hay ninguna, y se muestra una que sale hoy: el guía la inicia y después reporta.
+    // Una reserva de cada caso para probar a mano, la más reciente de cada uno. Una excursión iniciada para Reportar
+    // Etapa (si hay) y una sin iniciar para Iniciar Recorrido, con el correo de su guía. Y un paquete activo sin reservas
+    // activas, el único que se puede modificar o dar de baja.
     private function armarMuestras(): array
     {
         $casos = [
@@ -1367,18 +1395,31 @@ class DatosDeVolumenSeeder extends Seeder
             }
         }
 
-        $enCurso = Arr::first($this->excursiones, fn (array $excursion) => $excursion['iniciada'] && $excursion['ultimo_dia']->greaterThanOrEqualTo($this->hoy));
-        $saleHoy = Arr::first($this->excursiones, fn (array $excursion) => $excursion['fecha_salida']->equalTo($this->hoy));
-        $excursion = $enCurso ?? $saleHoy;
+        $excursionPorCaso = [
+            'Excursión en curso (Reportar Etapa)' => Arr::first($this->excursiones, fn (array $excursion) => $excursion['iniciada']
+                && $excursion['ultimo_dia']->greaterThanOrEqualTo($this->hoy)),
+            'Excursión sin iniciar (Iniciar Recorrido)' => Arr::first($this->excursiones, fn (array $excursion) => ! $excursion['iniciada']
+                && $excursion['fecha_salida']->lessThanOrEqualTo($this->hoy)
+                && $excursion['ultimo_dia']->greaterThanOrEqualTo($this->hoy)),
+        ];
 
-        if ($excursion !== null) {
-            $muestras[] = [
-                $enCurso !== null ? 'Excursión en curso (Reportar Etapa)' : 'Excursión que sale hoy (Iniciar Recorrido y Reportar Etapa)',
-                '—',
-                $this->guias[$excursion['id_guia']]['correo'],
-                $this->paquetes[$excursion['paquete']]['nombre'],
-                $excursion['fecha_salida']->format('d/m/Y'),
-            ];
+        foreach ($excursionPorCaso as $caso => $excursion) {
+            if ($excursion !== null) {
+                $muestras[] = [
+                    $caso,
+                    '—',
+                    $this->guias[$excursion['id_guia']]['correo'],
+                    $this->paquetes[$excursion['paquete']]['nombre'],
+                    $excursion['fecha_salida']->format('d/m/Y'),
+                ];
+            }
+        }
+
+        $paqueteSinReservasActivas = Paquete::buscarActivos()->orderBy('id_paquete')->get()
+            ->first(fn (Paquete $paquete) => ! $paquete->tieneReservasActivas());
+
+        if ($paqueteSinReservasActivas !== null) {
+            $muestras[] = ['Paquete sin reservas activas (Modificar y Dar de Baja)', '—', '—', $paqueteSinReservasActivas->nombre, '—'];
         }
 
         return $muestras;
