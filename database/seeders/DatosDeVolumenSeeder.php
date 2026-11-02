@@ -508,7 +508,7 @@ class DatosDeVolumenSeeder extends Seeder
 
     private function crearPaquetes(): void
     {
-        // Los de PaqueteSeeder tienen fecha_creacion = today(), así que no acotan cuándo se pudo reservar.
+        // Los de PaqueteSeeder, con la misma regla que los nuevos: salidas y reservas después del alta.
         foreach (self::FRECUENCIA_PAQUETES_ACTUALES as $nombre => $cadaSemanas) {
             $paquete = Paquete::with(['recorrido', 'excursiones'])->where('nombre', $nombre)->firstOrFail();
 
@@ -519,9 +519,9 @@ class DatosDeVolumenSeeder extends Seeder
                 'id_recorrido' => $paquete->id_recorrido,
                 'dias' => $paquete->recorrido->duracion_dias,
                 'cada_semanas' => $cadaSemanas,
-                'salidas_desde' => $this->primeraSalida,
+                'salidas_desde' => $paquete->fecha_creacion->copy()->addMonthsNoOverflow(config('reserva.meses_anticipacion_minima'))->max($this->primeraSalida),
                 'salidas_hasta' => $this->ultimaSalida,
-                'reservas_desde' => null,
+                'reservas_desde' => $paquete->fecha_creacion->copy()->addDay(),
                 // id_paquete + fecha_salida es único: se saltean las fechas que ya tiene.
                 'fechas_tomadas' => $paquete->excursiones->map(fn ($excursion) => $excursion->fecha_salida->toDateString())->all(),
                 'quejas_hotel' => false,
