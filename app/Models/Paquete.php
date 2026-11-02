@@ -331,9 +331,10 @@ class Paquete extends Model
     // La consulta administrativa incluye todas las salidas; la disponibilidad del portal se mantiene en getDetalles().
     public function getExcursionesParaConsulta(): array
     {
-        return $this->excursiones()->with('guia')->orderBy('fecha_salida')->get()
+        // El infolist del panel evalúa la lista unas 17 veces por carga: once() la arma una sola vez por instancia.
+        return once(fn () => $this->excursiones()->with('guia')->orderBy('fecha_salida')->get()
             ->map(fn (Excursion $excursion) => $excursion->getDetalle())
-            ->all();
+            ->all());
     }
 
     // El promedio no se guarda (es derivado, como dice el Documento de Normalización): sale del puntaje de experiencia
