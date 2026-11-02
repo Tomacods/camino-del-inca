@@ -17,10 +17,10 @@ Con las cantidades de fábrica salen, aproximadamente:
 | Paquetes nuevos | 20 sobre los 3 recorridos: 16 activos y 4 dados de baja |
 | Excursiones | unas 980, siempre en lunes, desde 14 meses atrás hasta 10 meses adelante (ninguna en febrero) |
 | Reservas | unas 3.600, en todos los estados; alrededor del 10 % canceladas, por las cuatro causas |
-| Excursionistas | unos 8.900 |
-| Pagos y comprobantes | unos 5.000 de cada uno |
+| Excursionistas | unos 9.000 |
+| Pagos y comprobantes | unos 5.100 de cada uno |
 | Devoluciones | unas 300 (reintegros y reembolsos) |
-| Valoraciones | unas 1.300, con unos 8.200 puntajes por categoría |
+| Valoraciones | unas 1.300, con unos 8.500 puntajes por categoría |
 
 Respeta las reglas de los modelos y de `config/reserva.php`: cupo, anticipación mínima, fechas límite, montos, números
 de reserva y de comprobante, y un guía por semana (R-01). Ninguna reserva queda con un plazo vencido: el Temporizador no
@@ -31,7 +31,8 @@ cancela nada ni manda correos. Los correos de los clientes son de `example.com`,
 
 Iniciar Recorrido se puede hacer cualquier día del recorrido. Por eso, de las excursiones en curso que salieron antes
 de hoy, la que termina más tarde queda sin iniciar; las demás quedan iniciadas, con la etapa que corresponde. Un lunes
-quedan sin iniciar las que salen ese día.
+quedan sin iniciar las que salen ese día. La semana en curso salen todos los paquetes de 5 días: así, hasta el viernes
+hay una excursión para Iniciar Recorrido y otra para Reportar Etapa.
 
 Las fechas son relativas al día en que se corre; lo demás sale igual para todos por la semilla fija. Al terminar
 muestra las cantidades por tabla y las reservas por estado. También muestra una reserva de muestra de cada caso, con

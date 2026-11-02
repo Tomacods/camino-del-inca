@@ -623,6 +623,12 @@ class DatosDeVolumenSeeder extends Seeder
         $idExcursion = $this->siguienteId('excursion', 'id_excursion');
         $filas = [];
 
+        // La semana en curso salen todos los paquetes del recorrido más largo, sin importar su frecuencia. Así, hasta el
+        // viernes quedan al menos dos en curso: la que termina más tarde, sin iniciar (Iniciar Recorrido), y otra
+        // iniciada (Reportar Etapa).
+        $lunesDeEstaSemana = $this->hoy->copy()->startOfWeek(CarbonInterface::MONDAY);
+        $diasDelRecorridoMasLargo = max(array_column($this->paquetes, 'dias'));
+
         for ($lunes = $this->primeraSalida->copy(), $semana = 0; $lunes->lessThanOrEqualTo($this->ultimaSalida); $lunes->addWeek(), $semana++) {
             // El Camino Inca cierra en febrero por mantenimiento.
             if ($lunes->month === 2) {
@@ -634,7 +640,9 @@ class DatosDeVolumenSeeder extends Seeder
             $guiasDeLaSemana = [];
 
             foreach ($this->paquetes as $indicePaquete => $paquete) {
-                if (($semana + $indicePaquete) % $paquete['cada_semanas'] !== 0
+                $saleSiempreEstaSemana = $lunes->equalTo($lunesDeEstaSemana) && $paquete['dias'] === $diasDelRecorridoMasLargo;
+
+                if ((($semana + $indicePaquete) % $paquete['cada_semanas'] !== 0 && ! $saleSiempreEstaSemana)
                     || $lunes->lessThan($paquete['salidas_desde'])
                     || $lunes->greaterThan($paquete['salidas_hasta'])
                     || in_array($lunes->toDateString(), $paquete['fechas_tomadas'], true)) {
