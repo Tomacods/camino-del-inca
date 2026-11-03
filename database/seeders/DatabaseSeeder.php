@@ -26,5 +26,11 @@ class DatabaseSeeder extends Seeder
             DevolucionSeeder::class,
             ValoracionSeeder::class,
         ]);
+
+        // Miles de reservas para la presentación: no corren en las pruebas, que llaman a $this->seed() y usan las
+        // reservas de los seeders de arriba.
+        if (! app()->runningUnitTests()) {
+            $this->call(DatosDeVolumenSeeder::class);
+        }
     }
 }
