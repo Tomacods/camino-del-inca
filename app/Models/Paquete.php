@@ -280,6 +280,7 @@ class Paquete extends Model
         return $nombre === ''
             || Str::contains(Str::lower(Str::ascii($this->nombre)), Str::lower(Str::ascii($nombre)));
     }
+
     // Lo que muestra cada paquete en el listado del portal.
     public function getDatosResumen(): array
     {
