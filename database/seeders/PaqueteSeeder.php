@@ -14,6 +14,9 @@ class PaqueteSeeder extends Seeder
 
     private const COSTO_EQUIPO_CAMPING = 45;
 
+    // Fija y vieja: los datos de volumen les cargan reservas desde 2025, y el alta tiene que ser anterior.
+    private const FECHA_CREACION = '2024-06-03';
+
     public function run(): void
     {
         $this->crearPaquete(
@@ -82,7 +85,7 @@ class PaqueteSeeder extends Seeder
                 'costo_equipo_camping' => self::COSTO_EQUIPO_CAMPING,
                 'cantidad_porteadores' => $cantidadPorteadores,
                 'estado' => EstadoPaquete::Activo,
-                'fecha_creacion' => today(),
+                'fecha_creacion' => self::FECHA_CREACION,
             ],
         );
 
