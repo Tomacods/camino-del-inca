@@ -142,7 +142,7 @@ class ListarPaquetesTest extends TestCase
         $this->crearExcursion($clasico, '2027-02-15');
         $this->crearExcursion($corto, '2027-02-22');
 
-        $this->buscar('', '15/02/2027', '15/02/2027')
+        $this->buscar('', '2027-02-15', '2027-02-15')
             ->assertHasNoErrors()
             ->assertSee('Camino Inca Clásico')
             ->assertDontSee('Camino Inca Corto');
@@ -154,7 +154,7 @@ class ListarPaquetesTest extends TestCase
         $this->crearExcursion($this->crearPaquete('Camino Inca Corto'), '2027-03-22');
         $this->crearExcursion($this->crearPaquete('Camino Inca Extendido'), '2027-05-03');
 
-        $this->buscar('', '01/02/2027', '28/02/2027')
+        $this->buscar('', '2027-02-01', '2027-02-28')
             ->assertHasNoErrors()
             ->assertSee('Camino Inca Clásico')
             ->assertDontSee('Camino Inca Corto')
@@ -168,7 +168,7 @@ class ListarPaquetesTest extends TestCase
         $this->crearExcursion($this->crearPaquete('Camino Inca Corto'), '2027-02-28');
         $this->crearExcursion($this->crearPaquete('Camino Inca Extendido'), '2027-03-01');
 
-        $this->buscar('', '01/02/2027', '28/02/2027')
+        $this->buscar('', '2027-02-01', '2027-02-28')
             ->assertSee('Camino Inca Clásico')
             ->assertSee('Camino Inca Corto')
             ->assertDontSee('Camino Inca Extendido');
@@ -179,7 +179,7 @@ class ListarPaquetesTest extends TestCase
         $this->crearExcursion($this->crearPaquete('Camino Inca Clásico'), '2027-02-15');
         $this->crearExcursion($this->crearPaquete('Camino Inca Corto'), '2027-03-22');
 
-        $this->buscar('', '01/03/2027', '')
+        $this->buscar('', '2027-03-01', '')
             ->assertSee('Camino Inca Corto')
             ->assertDontSee('Camino Inca Clásico');
     }
@@ -189,7 +189,7 @@ class ListarPaquetesTest extends TestCase
         $this->crearExcursion($this->crearPaquete('Camino Inca Clásico'), '2027-02-15');
         $this->crearExcursion($this->crearPaquete('Camino Inca Corto'), '2027-03-22');
 
-        $this->buscar('', '', '28/02/2027')
+        $this->buscar('', '', '2027-02-28')
             ->assertSee('Camino Inca Clásico')
             ->assertDontSee('Camino Inca Corto');
     }
@@ -199,7 +199,7 @@ class ListarPaquetesTest extends TestCase
         $this->crearExcursion($this->crearPaquete('Camino Inca Clásico'), '2027-02-15');
         $this->crearExcursion($this->crearPaquete('Camino Inca Corto'), '2027-02-22');
 
-        $this->buscar('corto', '01/02/2027', '28/02/2027')
+        $this->buscar('corto', '2027-02-01', '2027-02-28')
             ->assertSee('Camino Inca Corto')
             ->assertDontSee('Camino Inca Clásico');
     }
@@ -209,7 +209,7 @@ class ListarPaquetesTest extends TestCase
         $paquete = $this->crearPaquete('Camino Inca Clásico');
         $this->crearExcursion($paquete, '2027-02-01', plazasRetenidas: 12);
 
-        $this->buscar('', '01/02/2027', '01/02/2027')
+        $this->buscar('', '2027-02-01', '2027-02-01')
             ->assertSee('No encontramos paquetes para la salida del 01/02/2027');
     }
 
@@ -218,7 +218,7 @@ class ListarPaquetesTest extends TestCase
         $paquete = $this->crearPaquete('Camino Inca Clásico');
         $this->crearExcursion($paquete, '2026-12-14');
 
-        $this->buscar('', '14/12/2026', '14/12/2026')
+        $this->buscar('', '2026-12-14', '2026-12-14')
             ->assertSee('No encontramos paquetes para la salida del 14/12/2026');
     }
 
@@ -227,7 +227,7 @@ class ListarPaquetesTest extends TestCase
         $paquete = $this->crearPaquete('Camino Inca Clásico');
         $this->crearExcursion($paquete, '2026-09-07');
 
-        $this->buscar('', '01/09/2026', '30/09/2026')
+        $this->buscar('', '2026-09-01', '2026-09-30')
             ->assertSee('No encontramos paquetes para las salidas entre el 01/09/2026 y el 30/09/2026');
     }
 
@@ -257,11 +257,11 @@ class ListarPaquetesTest extends TestCase
     {
         $this->crearPaquete('Camino Inca Clásico');
 
-        $this->buscar('', '31/02/2027')
+        $this->buscar('', '2027-02-31')
             ->assertHasErrors(['desde' => 'date_format'])
             ->assertSee('Camino Inca Clásico');
 
-        $this->buscar('', '2027-02-15')->assertHasErrors(['desde' => 'date_format']);
+        $this->buscar('', '15/02/2027')->assertHasErrors(['desde' => 'date_format']);
         $this->buscar('', '', '15/2/2027')->assertHasErrors(['hasta' => 'date_format']);
     }
 
@@ -269,7 +269,7 @@ class ListarPaquetesTest extends TestCase
     {
         $this->crearPaquete('Camino Inca Clásico');
 
-        $this->buscar('', '28/02/2027', '01/02/2027')
+        $this->buscar('', '2027-02-28', '2027-02-01')
             ->assertHasErrors(['hasta'])
             ->assertSee('Camino Inca Clásico');
     }

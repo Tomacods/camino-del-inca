@@ -32,8 +32,8 @@ new #[Title('Paquetes')] class extends Component
     {
         return [
             'criterio' => ['max:100'],
-            'desde' => ['nullable', 'date_format:d/m/Y'],
-            'hasta' => ['nullable', 'date_format:d/m/Y'],
+            'desde' => ['nullable', 'date_format:Y-m-d'],
+            'hasta' => ['nullable', 'date_format:Y-m-d'],
         ];
     }
 
@@ -41,8 +41,8 @@ new #[Title('Paquetes')] class extends Component
     {
         return [
             'criterio.max' => 'La búsqueda puede tener hasta 100 caracteres.',
-            'desde.date_format' => 'La fecha tiene que tener el formato dd/mm/aaaa, por ejemplo 15/03/2027.',
-            'hasta.date_format' => 'La fecha tiene que tener el formato dd/mm/aaaa, por ejemplo 15/03/2027.',
+            'desde.date_format' => 'Elegí una fecha válida en el calendario.',
+            'hasta.date_format' => 'Elegí una fecha válida en el calendario.',
         ];
     }
 
@@ -84,10 +84,10 @@ new #[Title('Paquetes')] class extends Component
     public function descripcionBusqueda(): string
     {
         $fechas = match (true) {
-            $this->busquedaDesde !== '' && $this->busquedaDesde === $this->busquedaHasta => 'la salida del '.$this->busquedaDesde,
-            $this->busquedaDesde !== '' && $this->busquedaHasta !== '' => 'las salidas entre el '.$this->busquedaDesde.' y el '.$this->busquedaHasta,
-            $this->busquedaDesde !== '' => 'las salidas desde el '.$this->busquedaDesde,
-            $this->busquedaHasta !== '' => 'las salidas hasta el '.$this->busquedaHasta,
+            $this->busquedaDesde !== '' && $this->busquedaDesde === $this->busquedaHasta => 'la salida del '.$this->mostrar($this->busquedaDesde),
+            $this->busquedaDesde !== '' && $this->busquedaHasta !== '' => 'las salidas entre el '.$this->mostrar($this->busquedaDesde).' y el '.$this->mostrar($this->busquedaHasta),
+            $this->busquedaDesde !== '' => 'las salidas desde el '.$this->mostrar($this->busquedaDesde),
+            $this->busquedaHasta !== '' => 'las salidas hasta el '.$this->mostrar($this->busquedaHasta),
             default => '',
         };
 
@@ -118,7 +118,13 @@ new #[Title('Paquetes')] class extends Component
     // Una fecha ya validada en formato dd/mm/aaaa, o null si el campo está vacío.
     private function fecha(string $texto): ?Carbon
     {
-        return $texto === '' ? null : Carbon::createFromFormat('d/m/Y', $texto)->startOfDay();
+        return $texto === '' ? null : Carbon::createFromFormat('Y-m-d', $texto)->startOfDay();
+    }
+
+    // Para mostrar en los avisos: la fecha en el formato que usa el cliente, dd/mm/aaaa.
+    private function mostrar(string $fecha): string
+    {
+        return Carbon::createFromFormat('Y-m-d', $fecha)->format('d/m/Y');
     }
 };
 
@@ -140,8 +146,9 @@ new #[Title('Paquetes')] class extends Component
     <x-tarjeta class="mt-10">
         <form wire:submit="buscarPaquetes" class="grid gap-5 md:grid-cols-[2fr_1fr_1fr_auto]">
             <x-campo nombre="criterio" etiqueta="Nombre del paquete" wire:model="criterio" placeholder="Ej.: Clásico" />
-            <x-campo nombre="desde" etiqueta="Salidas desde" wire:model="desde" placeholder="dd/mm/aaaa" />
-            <x-campo nombre="hasta" etiqueta="Hasta" wire:model="hasta" placeholder="dd/mm/aaaa" />
+            {{-- El navegador muestra el calendario para elegir la fecha; no hace falta escribirla. --}}
+            <x-campo nombre="desde" type="date" etiqueta="Salidas desde" wire:model="desde" />
+            <x-campo nombre="hasta" type="date" etiqueta="Hasta" wire:model="hasta" />
 
             <div>
                 {{-- Ocupa el lugar de la etiqueta, para que el botón quede a la altura de los campos. --}}
