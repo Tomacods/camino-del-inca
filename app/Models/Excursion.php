@@ -502,15 +502,16 @@ class Excursion extends Model
             ->get();
     }
 
-    // Búsqueda por fecha: si el paquete tiene una salida disponible ese día, con la misma regla que el listado. Busca
-    // sólo esa salida, sin recalcular el cupo de las demás.
-    public static function tieneFechaSalida(int $idPaquete, Carbon $fecha): bool
+    // Búsqueda por fechas (CU-05, pasos 3 y 4): si el paquete tiene una salida disponible dentro del rango, con la misma
+    // regla que el listado (a 3 meses o más y con cupo). Un extremo nulo no limita el rango; las fechas se incluyen.
+    public static function tieneSalidaEntre(int $idPaquete, ?Carbon $desde, ?Carbon $hasta): bool
     {
-        $excursion = self::buscarPorFechaSalida($idPaquete, $fecha->format('Y-m-d'));
-
-        return $excursion !== null
-            && $excursion->cumpleAnticipacionMinima(today())
-            && $excursion->obtenerCupoDisponible() > 0;
+        return self::where('id_paquete', $idPaquete)
+            ->when($desde !== null, fn ($consulta) => $consulta->whereDate('fecha_salida', '>=', $desde->format('Y-m-d')))
+            ->when($hasta !== null, fn ($consulta) => $consulta->whereDate('fecha_salida', '<=', $hasta->format('Y-m-d')))
+            ->get()
+            ->contains(fn (Excursion $excursion) => $excursion->cumpleAnticipacionMinima(today())
+                && $excursion->obtenerCupoDisponible() > 0);
     }
 
     /* ------------------------ CU-06 Consultar paquete ------------------------ */

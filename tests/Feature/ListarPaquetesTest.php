@@ -135,17 +135,73 @@ class ListarPaquetesTest extends TestCase
             ->assertDontSee('Camino Inca Corto');
     }
 
-    public function test_busca_por_fecha_de_salida(): void
+    public function test_busca_por_una_sola_fecha_de_salida(): void
     {
         $clasico = $this->crearPaquete('Camino Inca Clásico');
         $corto = $this->crearPaquete('Camino Inca Corto');
         $this->crearExcursion($clasico, '2027-02-15');
         $this->crearExcursion($corto, '2027-02-22');
 
-        $this->buscar('15/02/2027')
+        $this->buscar('', '15/02/2027', '15/02/2027')
             ->assertHasNoErrors()
             ->assertSee('Camino Inca Clásico')
             ->assertDontSee('Camino Inca Corto');
+    }
+
+    public function test_busca_por_un_intervalo_de_fechas(): void
+    {
+        $this->crearExcursion($this->crearPaquete('Camino Inca Clásico'), '2027-02-15');
+        $this->crearExcursion($this->crearPaquete('Camino Inca Corto'), '2027-03-22');
+        $this->crearExcursion($this->crearPaquete('Camino Inca Extendido'), '2027-05-03');
+
+        $this->buscar('', '01/02/2027', '28/02/2027')
+            ->assertHasNoErrors()
+            ->assertSee('Camino Inca Clásico')
+            ->assertDontSee('Camino Inca Corto')
+            ->assertDontSee('Camino Inca Extendido');
+    }
+
+    // Las fechas de los extremos cuentan: 01/02 y 28/02 se incluyen; 01/03 queda afuera.
+    public function test_el_intervalo_incluye_los_dos_extremos(): void
+    {
+        $this->crearExcursion($this->crearPaquete('Camino Inca Clásico'), '2027-02-01');
+        $this->crearExcursion($this->crearPaquete('Camino Inca Corto'), '2027-02-28');
+        $this->crearExcursion($this->crearPaquete('Camino Inca Extendido'), '2027-03-01');
+
+        $this->buscar('', '01/02/2027', '28/02/2027')
+            ->assertSee('Camino Inca Clásico')
+            ->assertSee('Camino Inca Corto')
+            ->assertDontSee('Camino Inca Extendido');
+    }
+
+    public function test_solo_desde_busca_las_salidas_de_esa_fecha_en_adelante(): void
+    {
+        $this->crearExcursion($this->crearPaquete('Camino Inca Clásico'), '2027-02-15');
+        $this->crearExcursion($this->crearPaquete('Camino Inca Corto'), '2027-03-22');
+
+        $this->buscar('', '01/03/2027', '')
+            ->assertSee('Camino Inca Corto')
+            ->assertDontSee('Camino Inca Clásico');
+    }
+
+    public function test_solo_hasta_busca_las_salidas_hasta_esa_fecha(): void
+    {
+        $this->crearExcursion($this->crearPaquete('Camino Inca Clásico'), '2027-02-15');
+        $this->crearExcursion($this->crearPaquete('Camino Inca Corto'), '2027-03-22');
+
+        $this->buscar('', '', '28/02/2027')
+            ->assertSee('Camino Inca Clásico')
+            ->assertDontSee('Camino Inca Corto');
+    }
+
+    public function test_combina_el_nombre_con_el_intervalo(): void
+    {
+        $this->crearExcursion($this->crearPaquete('Camino Inca Clásico'), '2027-02-15');
+        $this->crearExcursion($this->crearPaquete('Camino Inca Corto'), '2027-02-22');
+
+        $this->buscar('corto', '01/02/2027', '28/02/2027')
+            ->assertSee('Camino Inca Corto')
+            ->assertDontSee('Camino Inca Clásico');
     }
 
     public function test_una_fecha_sin_cupo_no_coincide(): void
@@ -153,7 +209,8 @@ class ListarPaquetesTest extends TestCase
         $paquete = $this->crearPaquete('Camino Inca Clásico');
         $this->crearExcursion($paquete, '2027-02-01', plazasRetenidas: 12);
 
-        $this->buscar('01/02/2027')->assertSee('No encontramos paquetes para «01/02/2027»');
+        $this->buscar('', '01/02/2027', '01/02/2027')
+            ->assertSee('No encontramos paquetes para la salida del 01/02/2027');
     }
 
     public function test_una_fecha_a_menos_de_tres_meses_no_coincide(): void
@@ -161,7 +218,8 @@ class ListarPaquetesTest extends TestCase
         $paquete = $this->crearPaquete('Camino Inca Clásico');
         $this->crearExcursion($paquete, '2026-12-14');
 
-        $this->buscar('14/12/2026')->assertSee('No encontramos paquetes para «14/12/2026»');
+        $this->buscar('', '14/12/2026', '14/12/2026')
+            ->assertSee('No encontramos paquetes para la salida del 14/12/2026');
     }
 
     public function test_una_fecha_que_ya_paso_no_coincide(): void
@@ -169,7 +227,8 @@ class ListarPaquetesTest extends TestCase
         $paquete = $this->crearPaquete('Camino Inca Clásico');
         $this->crearExcursion($paquete, '2026-09-07');
 
-        $this->buscar('07/09/2026')->assertSee('No encontramos paquetes para «07/09/2026»');
+        $this->buscar('', '01/09/2026', '30/09/2026')
+            ->assertSee('No encontramos paquetes para las salidas entre el 01/09/2026 y el 30/09/2026');
     }
 
     public function test_sin_criterio_muestra_todos_los_paquetes(): void
@@ -198,11 +257,21 @@ class ListarPaquetesTest extends TestCase
     {
         $this->crearPaquete('Camino Inca Clásico');
 
-        $this->buscar('31/02/2027')
-            ->assertHasErrors(['criterio' => 'date_format'])
+        $this->buscar('', '31/02/2027')
+            ->assertHasErrors(['desde' => 'date_format'])
             ->assertSee('Camino Inca Clásico');
 
-        $this->buscar('2027-02-15')->assertHasErrors(['criterio' => 'date_format']);
+        $this->buscar('', '2027-02-15')->assertHasErrors(['desde' => 'date_format']);
+        $this->buscar('', '', '15/2/2027')->assertHasErrors(['hasta' => 'date_format']);
+    }
+
+    public function test_rechaza_un_hasta_anterior_al_desde(): void
+    {
+        $this->crearPaquete('Camino Inca Clásico');
+
+        $this->buscar('', '28/02/2027', '01/02/2027')
+            ->assertHasErrors(['hasta'])
+            ->assertSee('Camino Inca Clásico');
     }
 
     // La búsqueda aplicada sólo la cambia buscarPaquetes(), después de validar el criterio.
@@ -210,7 +279,7 @@ class ListarPaquetesTest extends TestCase
     {
         $this->expectException(CannotUpdateLockedPropertyException::class);
 
-        Livewire::test('listar-paquetes')->set('busqueda', '123');
+        Livewire::test('listar-paquetes')->set('busquedaDesde', '123');
     }
 
     public function test_ver_todos_vuelve_al_listado_completo(): void
@@ -221,14 +290,17 @@ class ListarPaquetesTest extends TestCase
         $this->buscar('Clásico')
             ->call('verTodos')
             ->assertSet('criterio', '')
+            ->assertSet('busqueda', '')
             ->assertSee('Camino Inca Corto');
     }
 
-    // Escribe el criterio y toca «Buscar», como lo haría el cliente.
-    private function buscar(string $criterio)
+    // Escribe los criterios y toca «Buscar», como lo haría el cliente.
+    private function buscar(string $nombre = '', string $desde = '', string $hasta = '')
     {
         return Livewire::test('listar-paquetes')
-            ->set('criterio', $criterio)
+            ->set('criterio', $nombre)
+            ->set('desde', $desde)
+            ->set('hasta', $hasta)
             ->call('buscarPaquetes');
     }
 
