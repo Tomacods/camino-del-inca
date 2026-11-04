@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Excursion;
 use App\Models\Paquete;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -10,6 +11,10 @@ use Livewire\Component;
 
 new #[Title('Paquetes')] class extends Component
 {
+    // Cuántas casillas de fecha muestra como máximo cada tarjeta. Si el paquete tiene más salidas, la última casilla
+    // lleva a su ficha (CU-06), donde están todas: así un paquete que sale cada semana no alarga la tarjeta.
+    private const CASILLAS_POR_TARJETA = 6;
+
     // Lo que escribe el cliente en el buscador.
     public string $criterio = '';
 
@@ -61,8 +66,39 @@ new #[Title('Paquetes')] class extends Component
             : Paquete::buscarPaquetes($this->criterioDeBusqueda());
 
         return $paquetes
-            ->map(fn (Paquete $paquete) => $paquete->getDatosResumen())
+            ->map(fn (Paquete $paquete) => $this->conSalidasVisibles($paquete->getDatosResumen()))
             ->all();
+    }
+
+    // Agrega al resumen las salidas que entran en la tarjeta y cuántas quedan para la ficha del paquete. Si se buscó
+    // por fecha, la salida buscada siempre se ve, aunque no sea de las próximas.
+    private function conSalidasVisibles(array $resumen): array
+    {
+        $excursiones = $resumen['excursiones'];
+        $visibles = $excursiones;
+
+        if ($excursiones->count() > self::CASILLAS_POR_TARJETA) {
+            // Una casilla queda para «N fechas más».
+            $visibles = $excursiones->take(self::CASILLAS_POR_TARJETA - 1);
+            $buscada = $excursiones->first(fn (Excursion $excursion) => $this->esLaBuscada($excursion));
+
+            if ($buscada !== null && ! $visibles->contains($buscada)) {
+                $visibles = $visibles->take(self::CASILLAS_POR_TARJETA - 2)->push($buscada);
+            }
+        }
+
+        return [
+            ...$resumen,
+            'salidas_visibles' => $visibles,
+            'salidas_ocultas' => $excursiones->count() - $visibles->count(),
+        ];
+    }
+
+    // El criterio ya pasó la validación con el formato dd/mm/aaaa, así que alcanza con comparar el texto. La vista
+    // hace la misma comparación para resaltar la casilla.
+    private function esLaBuscada(Excursion $excursion): bool
+    {
+        return $excursion->getFechaSalida()->format('d/m/Y') === $this->busqueda;
     }
 
     // El modelo recibe el criterio ya interpretado: una fecha de salida o un texto para buscar en el nombre.
@@ -144,18 +180,35 @@ new #[Title('Paquetes')] class extends Component
                         <p class="mt-1 text-sm text-texto-secundario">Elegí una fecha para reservar.</p>
 
                         {{-- CU-05, flujo alternativo A3: reservar directamente una salida lleva a Realizar Reserva (CU-14). --}}
-                        <ul class="mt-3 flex flex-wrap gap-2">
-                            @foreach ($paquete['excursiones'] as $excursion)
+                        {{-- Dos columnas parejas; como mucho tres filas (ver CASILLAS_POR_TARJETA). --}}
+                        <ul class="mt-3 grid grid-cols-2 gap-2">
+                            @foreach ($paquete['salidas_visibles'] as $excursion)
                                 @php($fecha = $excursion->getFechaSalida())
+                                @php($buscada = $fecha->format('d/m/Y') === $busqueda)
                                 <li>
                                     <a href="/reservar/{{ $paquete['id_paquete'] }}/{{ $fecha->format('Y-m-d') }}"
                                        aria-label="Reservar la salida del {{ $fecha->format('d/m/Y') }}"
-                                       class="inline-flex min-h-12 items-center rounded-full border border-divisor px-4 text-sm tabular-nums
-                                              text-enlace transition-colors duration-150 ease-out hover:border-accion hover:bg-aviso">
+                                       @class([
+                                           'flex min-h-12 items-center justify-center rounded-full border px-3 text-sm tabular-nums',
+                                           'text-enlace transition-colors duration-150 ease-out hover:border-accion hover:bg-aviso',
+                                           'border-accion bg-aviso font-semibold' => $buscada,
+                                           'border-divisor' => ! $buscada,
+                                       ])>
                                         {{ $fecha->format('d/m/Y') }}
                                     </a>
                                 </li>
                             @endforeach
+
+                            @if ($paquete['salidas_ocultas'] > 0)
+                                <li>
+                                    <a href="/paquetes/{{ $paquete['id_paquete'] }}#salidas"
+                                       aria-label="Ver las otras {{ $paquete['salidas_ocultas'] }} fechas de salida de {{ $paquete['nombre'] }}"
+                                       class="flex min-h-12 items-center justify-center rounded-full px-3 text-sm font-medium text-enlace
+                                              transition-colors duration-150 ease-out hover:bg-aviso">
+                                        {{ $paquete['salidas_ocultas'] }} fechas más
+                                    </a>
+                                </li>
+                            @endif
                         </ul>
                     @endif
 
