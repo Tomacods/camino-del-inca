@@ -262,24 +262,23 @@ class Paquete extends Model
         return $consulta->whereHas('excursiones', fn (Builder $excursion) => $excursion->whereDate('fecha_salida', $fecha));
     }
 
-    // Pasos 3 y 4: entre los paquetes del listado, los que coinciden con el criterio. El componente ya validó el formato
-    // y pasa una fecha de salida o un texto para buscar en el nombre.
-    public static function buscarPaquetes(Carbon|string $criterio): Collection
+    // CU-05, pasos 3 y 4: entre los paquetes del listado, los que coinciden con el nombre y, si se indicó alguna fecha, con
+    // una salida disponible dentro del rango. Sin nombre no se filtra por nombre; sin fechas no se filtra por salidas.
+    public static function buscarPorNombreYFechas(string $nombre, ?Carbon $desde, ?Carbon $hasta): Collection
     {
+        $buscaFechas = $desde !== null || $hasta !== null;
+
         return self::listarPaquetes()
-            ->filter(fn (Paquete $paquete) => $paquete->coincideConCriterio($criterio))
+            ->filter(fn (Paquete $paquete) => $paquete->coincideConNombre($nombre)
+                && (! $buscaFechas || Excursion::tieneSalidaEntre($paquete->id_paquete, $desde, $hasta)))
             ->values();
     }
 
-    // El nombre se compara sin mayúsculas ni tildes: «clasico» encuentra «Camino Inca Clásico». Una fecha coincide si el
-    // paquete tiene una salida disponible ese día, es decir, una de las que muestra el listado.
-    public function coincideConCriterio(Carbon|string $criterio): bool
+    // El nombre se compara sin mayúsculas ni tildes: «clasico» encuentra «Camino Inca Clásico».
+    public function coincideConNombre(string $nombre): bool
     {
-        if ($criterio instanceof Carbon) {
-            return Excursion::tieneFechaSalida($this->id_paquete, $criterio);
-        }
-
-        return Str::contains(Str::lower(Str::ascii($this->nombre)), Str::lower(Str::ascii($criterio)));
+        return $nombre === ''
+            || Str::contains(Str::lower(Str::ascii($this->nombre)), Str::lower(Str::ascii($nombre)));
     }
 
     // Lo que muestra cada paquete en el listado del portal.
