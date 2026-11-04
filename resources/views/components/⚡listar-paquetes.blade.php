@@ -118,19 +118,25 @@ new #[Title('Paquetes')] class extends Component
 ?>
 
 <div>
-    <h1 class="text-5xl font-semibold">
-        Paquetes. <span class="text-texto-secundario">Elegí el que más te guste.</span>
-    </h1>
+    {{-- Portada: la llegada a Machu Picchu. Es una foto propia del grupo (la de la tía de Tomás), así que no lleva
+         créditos; la misma se usa al final de los hitos de la portada (ver docs/guia-visual-portal.md). --}}
+    <div class="relative h-80 overflow-hidden rounded-[28px] bg-texto sm:h-[26rem]">
+        <img src="{{ asset('img/recorrido/llegada-horizontal.webp') }}" alt="" width="1280" height="720" fetchpriority="high"
+             class="absolute inset-0 size-full object-cover object-[50%_35%]">
 
-    @if (session('paquete_no_disponible'))
-        {{-- CU-06, flujo alternativo A1: el paquete que se quiso ver no existe o ya no está «Activo». --}}
-        <x-aviso tipo="error" class="mt-10" titulo="Ese paquete no está disponible actualmente">
-            Puede que se haya dado de baja. Elegí otro de la lista.
-        </x-aviso>
-    @endif
+        {{-- Degradé oscuro desde abajo, para que el título blanco se lea sobre cualquier parte de la foto. --}}
+        <div class="absolute inset-0 bg-linear-to-t from-black/85 via-black/50 to-black/5" aria-hidden="true"></div>
+
+        <p class="absolute top-4 right-4 rounded-xl bg-texto/70 px-3 py-1 text-sm text-white sm:right-6">Machu Picchu</p>
+
+        {{-- bottom-20 deja lugar para el buscador, que se monta sobre el borde de la foto. --}}
+        <h1 class="absolute inset-x-6 bottom-20 text-4xl font-semibold text-balance text-white sm:inset-x-10 sm:bottom-24 sm:text-5xl">
+            Paquetes. <span class="text-white/80">Elegí el que más te guste.</span>
+        </h1>
+    </div>
 
     {{-- CU-05, paso 3: el criterio es opcional; sin criterio se ve el listado completo. --}}
-    <x-tarjeta class="mt-10">
+    <x-tarjeta class="relative mx-3 -mt-14 sm:mx-8">
         <form wire:submit="buscarPaquetes" class="grid gap-5 md:grid-cols-[1fr_auto]">
             <x-campo nombre="criterio" etiqueta="Buscar por nombre o fecha de salida" wire:model="criterio"
                      placeholder="Ej.: Clásico o 15/03/2027" />
@@ -142,6 +148,13 @@ new #[Title('Paquetes')] class extends Component
             </div>
         </form>
     </x-tarjeta>
+
+    @if (session('paquete_no_disponible'))
+        {{-- CU-06, flujo alternativo A1: el paquete que se quiso ver no existe o ya no está «Activo». --}}
+        <x-aviso tipo="error" class="mt-10" titulo="Ese paquete no está disponible actualmente">
+            Puede que se haya dado de baja. Elegí otro de la lista.
+        </x-aviso>
+    @endif
 
     @if ($busqueda !== '' && count($this->paquetes) > 0)
         <p class="mt-8 text-[17px] text-texto-secundario">
@@ -167,12 +180,14 @@ new #[Title('Paquetes')] class extends Component
                     {{-- El nombre del recorrido ya dice la duración («Camino Inca de 4 días»). --}}
                     <p class="text-[17px] text-texto-secundario">{{ $paquete['nombre_recorrido'] }}</p>
 
-                    <p class="mt-4 text-[17px]">
-                        Desde <span class="font-semibold tabular-nums">USD {{ number_format((float) $paquete['precio_base'], 2, ',', '.') }}</span>
+                    {{-- El precio es lo que más se compara entre paquetes: va grande, con «desde» y «por persona» chicos. --}}
+                    <p class="mt-5 text-sm text-texto-secundario">
+                        Desde
+                        <span class="block text-3xl font-semibold tracking-tight text-texto tabular-nums">USD {{ number_format((float) $paquete['precio_base'], 2, ',', '.') }}</span>
                         por persona
                     </p>
 
-                    <h3 class="mt-6 text-sm font-semibold text-texto-secundario">Salidas disponibles</h3>
+                    <h3 class="mt-6 border-t border-divisor pt-5 text-sm font-semibold text-texto-secundario">Salidas disponibles</h3>
 
                     @if ($paquete['excursiones']->isEmpty())
                         <p class="mt-2 text-sm text-texto-secundario">Sin salidas disponibles por ahora.</p>
