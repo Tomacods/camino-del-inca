@@ -48,14 +48,23 @@ new #[Title('Paquete')] class extends Component
             {{ $paquete['nombre_recorrido'] }} · {{ $paquete['cantidad_etapas'] }} etapas
         </p>
 
-        <p class="mt-2 text-[17px]">
-            @if ($paquete['promedio_valoraciones'] === null)
-                <span class="text-texto-secundario">Todavía no tiene valoraciones.</span>
-            @else
-                Valoración promedio:
-                <span class="font-semibold tabular-nums">{{ number_format($paquete['promedio_valoraciones'], 1, ',', '.') }}</span> de 5
-            @endif
-        </p>
+        {{-- Reseñas públicas: mismas estrellas que en el listado, y acceso a los comentarios. --}}
+        @if ($paquete['promedio_valoraciones'] === null)
+            <p class="mt-4 text-[17px] text-texto-secundario">Todavía no tiene valoraciones.</p>
+        @else
+            @php($llenas = (int) round((float) $paquete['promedio_valoraciones']))
+            <div class="mt-4 inline-flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-tarjeta px-4 py-3 shadow-tarjeta">
+                <span role="img" aria-label="Valoración promedio: {{ number_format((float) $paquete['promedio_valoraciones'], 1, ',', '.') }} de 5 estrellas"
+                      class="text-xl leading-none tracking-wider">
+                    <span class="text-ambar">{{ str_repeat('★', $llenas) }}</span><span class="text-divisor">{{ str_repeat('★', 5 - $llenas) }}</span>
+                </span>
+                <span class="text-[17px]">
+                    <span class="font-semibold tabular-nums">{{ number_format((float) $paquete['promedio_valoraciones'], 1, ',', '.') }}</span> de 5
+                </span>
+                <a href="/paquetes/{{ $paquete['id_paquete'] }}/comentarios"
+                   class="ml-auto text-[15px] font-medium text-enlace hover:underline">Ver comentarios →</a>
+            </div>
+        @endif
 
         <div class="mt-10 grid gap-6 md:grid-cols-2">
             <x-tarjeta titulo="Qué incluye">

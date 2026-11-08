@@ -110,8 +110,14 @@ new #[Title('Paquetes')] class extends Component
             )
             : Paquete::listarPaquetes();
 
+        // Las valoraciones de todos los paquetes en una sola consulta; un paquete sin valoraciones queda en null.
+        $valoraciones = Paquete::resumenDeValoraciones();
+
         return $paquetes
-            ->map(fn (Paquete $paquete) => $paquete->getDatosResumen())
+            ->map(fn (Paquete $paquete) => [
+                ...$paquete->getDatosResumen(),
+                'valoraciones' => $valoraciones->get($paquete->id_paquete),
+            ])
             ->all();
     }
 
@@ -186,6 +192,26 @@ new #[Title('Paquetes')] class extends Component
                         Desde <span class="font-semibold tabular-nums">USD {{ number_format((float) $paquete['precio_base'], 2, ',', '.') }}</span>
                         por persona
                     </p>
+
+                    {{-- Reseñas públicas: estrellas del promedio de la experiencia general y acceso a los comentarios. --}}
+                    @php($valoracion = $paquete['valoraciones'])
+                    @if ($valoracion)
+                        @php($llenas = (int) round((float) $valoracion->promedio))
+                        <div class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-fondo px-4 py-3">
+                            <span role="img" aria-label="Promedio: {{ number_format((float) $valoracion->promedio, 1, ',', '.') }} de 5 estrellas"
+                                  class="text-xl leading-none tracking-wider">
+                                <span class="text-ambar">{{ str_repeat('★', $llenas) }}</span><span class="text-divisor">{{ str_repeat('★', 5 - $llenas) }}</span>
+                            </span>
+                            <span class="text-[15px]">
+                                <span class="font-semibold tabular-nums">{{ number_format((float) $valoracion->promedio, 1, ',', '.') }}</span>
+                                de 5 · {{ $valoracion->cantidad }} {{ $valoracion->cantidad === 1 ? 'valoración' : 'valoraciones' }}
+                            </span>
+                            <a href="/paquetes/{{ $paquete['id_paquete'] }}/comentarios"
+                               class="ml-auto text-[15px] font-medium text-enlace hover:underline">Ver comentarios →</a>
+                        </div>
+                    @else
+                        <p class="mt-4 text-[15px] text-texto-secundario">Todavía sin valoraciones</p>
+                    @endif
 
                     <h3 class="mt-6 text-sm font-semibold text-texto-secundario">Salidas disponibles</h3>
 

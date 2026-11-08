@@ -347,4 +347,31 @@ class Paquete extends Model
 
         return $promedio === null ? null : round((float) $promedio, 1);
     }
+
+    /* ------------------------- Reseñas públicas (CU-05 y CU-06) ------------------------- */
+
+    // Promedio de la experiencia general y cantidad de valoraciones de cada paquete, en una sola consulta. Las valoraciones
+    // sin comentario cuentan para el promedio. Los paquetes sin valoraciones no aparecen en la lista.
+    public static function resumenDeValoraciones(): \Illuminate\Support\Collection
+    {
+        return DB::table('valoracion')
+            ->join('reserva', 'reserva.id_reserva', '=', 'valoracion.id_reserva')
+            ->join('excursion', 'excursion.id_excursion', '=', 'reserva.id_excursion')
+            ->groupBy('excursion.id_paquete')
+            ->selectRaw('excursion.id_paquete, AVG(valoracion.puntaje_experiencia_general) AS promedio, COUNT(*) AS cantidad')
+            ->get()
+            ->keyBy('id_paquete');
+    }
+
+    // Los comentarios públicos del paquete, del más nuevo al más viejo. Las valoraciones sin comentario no se listan.
+    // Con un puntaje, sólo las de ese puntaje de experiencia general.
+    public function comentarios(?int $puntaje = null): Collection
+    {
+        return Valoracion::query()
+            ->whereNotNull('comentario')
+            ->whereHas('reserva.excursion', fn (Builder $excursion) => $excursion->where('id_paquete', $this->id_paquete))
+            ->when($puntaje !== null, fn (Builder $consulta) => $consulta->where('puntaje_experiencia_general', $puntaje))
+            ->orderByDesc('fecha')
+            ->get();
+    }
 }
