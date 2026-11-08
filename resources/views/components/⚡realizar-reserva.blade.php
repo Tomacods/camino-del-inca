@@ -553,7 +553,7 @@ new #[Title('Reservar')] class extends Component
                     <label class="mt-5 flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-borde-campo px-4 py-3
                                   text-[17px] transition-colors has-checked:border-accion has-checked:bg-aviso">
                         <input type="checkbox" wire:model="equipoCamping" class="size-5 shrink-0 accent-accion">
-                        Lleva equipo de camping (USD {{ number_format($excursion->paquete->costo_equipo_camping, 0, ',', '.') }})
+                        Contrata equipo de camping (USD {{ number_format($excursion->paquete->costo_equipo_camping, 0, ',', '.') }})
                     </label>
                 </x-tarjeta>
 
