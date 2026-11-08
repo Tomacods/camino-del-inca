@@ -50,10 +50,10 @@ class AccesoPersonalTest extends TestCase
     // Si se pidió una página antes de entrar y el rol la ve, se respeta esa página.
     public function test_respeta_la_pagina_pedida_antes_de_entrar(): void
     {
-        $this->get('/admin/paquetes')->assertRedirect('/admin/login');
+        $this->get('/admin/reservas')->assertRedirect('/admin/login');
 
         $this->iniciarSesion('admin@caminodelinca.test', 'admin1234')
-            ->assertRedirect('/admin/paquetes');
+            ->assertRedirect('/admin/reservas');
     }
 
     public function test_el_panel_tiene_un_enlace_para_volver_al_portal(): void

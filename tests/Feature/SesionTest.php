@@ -7,7 +7,6 @@ use App\Filament\Pages\Auth\IniciarSesion;
 use App\Models\Guia;
 use App\Models\Reserva;
 use App\Models\Usuario;
-use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -168,7 +167,7 @@ class SesionTest extends TestCase
             ->assertRedirect(url('/admin/excursiones'));
 
         $this->assertAuthenticatedAs($this->guia);
-        $this->assertNotSame('/admin/reservas', session('url.intended'));
+        $this->assertNull(session('url.intended'));
     }
 
     public function test_al_entrar_el_administrador_descarta_las_excursiones_del_guia(): void
