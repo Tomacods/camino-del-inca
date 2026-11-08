@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages\Auth;
 
+use App\Enums\Rol;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Pages\Login;
 use Filament\Forms\Components\TextInput;
@@ -22,11 +23,25 @@ class IniciarSesion extends Login
     {
         $respuesta = parent::authenticate();
 
-        if ($respuesta !== null && ! self::puedeAbrir(session('url.intended'))) {
+        if ($respuesta === null) {
+            return $respuesta;
+        }
+
+        if (! self::puedeAbrir(session('url.intended'))) {
             session()->forget('url.intended');
         }
 
+        // Sin una página pedida antes, cada rol entra a su sección (el administrador a Paquetes, el guía a sus excursiones).
+        if (! session()->has('url.intended')) {
+            session()->put('url.intended', self::inicioDelRol());
+        }
+
         return $respuesta;
+    }
+
+    private static function inicioDelRol(): string
+    {
+        return auth()->user()?->rol === Rol::Administrador ? '/admin/paquetes' : '/admin/excursiones';
     }
 
     // Una página de un recurso se puede abrir si el rol ve ese recurso. Las demás páginas no dependen del rol.

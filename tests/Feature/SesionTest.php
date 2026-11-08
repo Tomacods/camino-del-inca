@@ -7,7 +7,6 @@ use App\Filament\Pages\Auth\IniciarSesion;
 use App\Models\Guia;
 use App\Models\Reserva;
 use App\Models\Usuario;
-use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -38,7 +37,7 @@ class SesionTest extends TestCase
     {
         $this->iniciarSesion('admin@caminodelinca.test', 'admin1234')
             ->assertHasNoFormErrors()
-            ->assertRedirect(Filament::getUrl());
+            ->assertRedirect(url('/admin/paquetes'));
 
         $this->assertAuthenticatedAs($this->administrador);
     }
@@ -47,7 +46,7 @@ class SesionTest extends TestCase
     {
         $this->iniciarSesion('guia@caminodelinca.test', 'guia1234')
             ->assertHasNoFormErrors()
-            ->assertRedirect(Filament::getUrl());
+            ->assertRedirect(url('/admin/excursiones'));
 
         $this->assertAuthenticatedAs($this->guia);
     }
@@ -104,7 +103,7 @@ class SesionTest extends TestCase
 
         $this->iniciarSesion('admin@caminodelinca.test', 'admin1234')
             ->assertHasNoFormErrors()
-            ->assertRedirect(Filament::getUrl());
+            ->assertRedirect(url('/admin/paquetes'));
         $this->assertAuthenticatedAs($this->administrador);
     }
 
@@ -165,7 +164,7 @@ class SesionTest extends TestCase
         $this->get('/admin/reservas')->assertRedirect('/admin/login');
 
         $this->iniciarSesion('guia@caminodelinca.test', 'guia1234')
-            ->assertRedirect(Filament::getUrl());
+            ->assertRedirect(url('/admin/excursiones'));
 
         $this->assertAuthenticatedAs($this->guia);
         $this->assertNull(session('url.intended'));
@@ -176,7 +175,7 @@ class SesionTest extends TestCase
         $this->get('/admin/excursiones')->assertRedirect('/admin/login');
 
         $this->iniciarSesion('admin@caminodelinca.test', 'admin1234')
-            ->assertRedirect(Filament::getUrl());
+            ->assertRedirect(url('/admin/paquetes'));
     }
 
     /* ---------------------------------- CU-25 ---------------------------------- */

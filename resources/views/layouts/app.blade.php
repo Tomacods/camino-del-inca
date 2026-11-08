@@ -40,7 +40,10 @@
 
     <footer class="border-t border-divisor">
         <div class="mx-auto max-w-5xl px-4 py-6 text-sm text-texto-secundario sm:px-6">
-            Camino del Inca · Desarrollo de Software, UNPSJB 2026 · Grupo 11
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <span>Camino del Inca · Desarrollo de Software, UNPSJB 2026 · Grupo 11</span>
+                <a href="/admin/login" class="hover:text-texto hover:underline">Acceso del personal</a>
+            </div>
         </div>
     </footer>
 </body>
