@@ -60,7 +60,7 @@ class RealizarReservaTest extends TestCase
             ->assertSee('Camino Inca Clásico')
             ->assertSee('18/01/2027')
             ->assertSee('Quedan 12 lugares')
-            ->assertSee('Lleva equipo de camping (USD 45)')
+            ->assertSee('Contrata equipo de camping (USD 45)')
             ->set('correoElectronico', 'ana.perez@mail.com')
             ->set('cantidadIntegrantes', 2);
 
