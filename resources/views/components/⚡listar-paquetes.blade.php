@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Excursion;
 use App\Models\Paquete;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Computed;
@@ -9,8 +10,12 @@ use Livewire\Component;
 
 new #[Title('Paquetes')] class extends Component
 {
-    // Lo que escribe el cliente en el buscador: un nombre, y/o un rango de fechas de salida (dd/mm/aaaa). Desde y Hasta
-    // pueden ir solos, o los dos. Si son iguales, es una sola fecha.
+    // Cuántas casillas de fecha muestra como máximo cada tarjeta. Si el paquete tiene más salidas, la última casilla
+    // lleva a su ficha (CU-06), donde están todas: así un paquete que sale cada semana no alarga la tarjeta.
+    private const CASILLAS_POR_TARJETA = 6;
+
+    // Lo que escribe el cliente en el buscador: un nombre, y/o un rango de fechas de salida. Desde y Hasta pueden ir
+    // solos, o los dos. Si son iguales, es una sola fecha.
     public string $criterio = '';
 
     public string $desde = '';
@@ -115,13 +120,52 @@ new #[Title('Paquetes')] class extends Component
 
         return $paquetes
             ->map(fn (Paquete $paquete) => [
-                ...$paquete->getDatosResumen(),
+                ...$this->conSalidasVisibles($paquete->getDatosResumen()),
                 'valoraciones' => $valoraciones->get($paquete->id_paquete),
             ])
             ->all();
     }
 
-    // Una fecha ya validada en formato dd/mm/aaaa, o null si el campo está vacío.
+    // Agrega al resumen las salidas que entran en la tarjeta y cuántas quedan para la ficha del paquete. Si se buscó
+    // por fecha, la salida buscada siempre se ve, aunque no sea de las próximas.
+    private function conSalidasVisibles(array $resumen): array
+    {
+        $excursiones = $resumen['excursiones'];
+        $visibles = $excursiones;
+
+        if ($excursiones->count() > self::CASILLAS_POR_TARJETA) {
+            // Una casilla queda para «N fechas más».
+            $visibles = $excursiones->take(self::CASILLAS_POR_TARJETA - 1);
+            $buscada = $excursiones->first(fn (Excursion $excursion) => $this->esLaBuscada($excursion));
+
+            if ($buscada !== null && ! $visibles->contains($buscada)) {
+                $visibles = $visibles->take(self::CASILLAS_POR_TARJETA - 2)->push($buscada);
+            }
+        }
+
+        return [
+            ...$resumen,
+            'salidas_visibles' => $visibles,
+            'salidas_ocultas' => $excursiones->count() - $visibles->count(),
+        ];
+    }
+
+    // Una salida es «la buscada» si cae dentro del rango Desde–Hasta aplicado (los extremos se incluyen; un extremo
+    // vacío no limita). Sin fechas en la búsqueda, ninguna se resalta. Las fechas ya pasaron la validación (Y-m-d), así
+    // que alcanza con comparar el texto. La vista usa este mismo método para resaltar la casilla.
+    public function esLaBuscada(Excursion $excursion): bool
+    {
+        if ($this->busquedaDesde === '' && $this->busquedaHasta === '') {
+            return false;
+        }
+
+        $fecha = $excursion->getFechaSalida()->format('Y-m-d');
+
+        return ($this->busquedaDesde === '' || $fecha >= $this->busquedaDesde)
+            && ($this->busquedaHasta === '' || $fecha <= $this->busquedaHasta);
+    }
+
+    // Una fecha ya validada en formato aaaa-mm-dd, o null si el campo está vacío.
     private function fecha(string $texto): ?Carbon
     {
         return $texto === '' ? null : Carbon::createFromFormat('Y-m-d', $texto)->startOfDay();
@@ -137,19 +181,25 @@ new #[Title('Paquetes')] class extends Component
 ?>
 
 <div>
-    <h1 class="text-5xl font-semibold">
-        Paquetes. <span class="text-texto-secundario">Elegí el que más te guste.</span>
-    </h1>
+    {{-- Portada: la llegada a Machu Picchu. Es una foto propia del grupo (la de la tía de Tomás), así que no lleva
+         créditos; la misma se usa al final de los hitos de la portada (ver docs/guia-visual-portal.md). --}}
+    <div class="relative h-80 overflow-hidden rounded-[28px] bg-texto sm:h-[26rem]">
+        <img src="{{ asset('img/recorrido/llegada-horizontal.webp') }}" alt="" width="1280" height="720" fetchpriority="high"
+             class="absolute inset-0 size-full object-cover object-[50%_35%]">
 
-    @if (session('paquete_no_disponible'))
-        {{-- CU-06, flujo alternativo A1: el paquete que se quiso ver no existe o ya no está «Activo». --}}
-        <x-aviso tipo="error" class="mt-10" titulo="Ese paquete no está disponible actualmente">
-            Puede que se haya dado de baja. Elegí otro de la lista.
-        </x-aviso>
-    @endif
+        {{-- Degradé oscuro desde abajo, para que el título blanco se lea sobre cualquier parte de la foto. --}}
+        <div class="absolute inset-0 bg-linear-to-t from-black/85 via-black/50 to-black/5" aria-hidden="true"></div>
+
+        <p class="absolute top-4 right-4 rounded-xl bg-texto/70 px-3 py-1 text-sm text-white sm:right-6">Machu Picchu</p>
+
+        {{-- bottom-20 deja lugar para el buscador, que se monta sobre el borde de la foto. --}}
+        <h1 class="absolute inset-x-6 bottom-20 text-4xl font-semibold text-balance text-white sm:inset-x-10 sm:bottom-24 sm:text-5xl">
+            Paquetes. <span class="text-white/80">Elegí el que más te guste.</span>
+        </h1>
+    </div>
 
     {{-- CU-05, paso 3: el criterio es opcional; sin criterio ni fechas se ve el listado completo. --}}
-    <x-tarjeta class="mt-10">
+    <x-tarjeta class="relative mx-3 -mt-14 sm:mx-8">
         <form wire:submit="buscarPaquetes" class="grid gap-5 md:grid-cols-[2fr_1fr_1fr_auto]">
             <x-campo nombre="criterio" etiqueta="Nombre del paquete" wire:model="criterio" placeholder="Ej.: Clásico" />
             {{-- El navegador muestra el calendario para elegir la fecha; no hace falta escribirla. --}}
@@ -163,6 +213,13 @@ new #[Title('Paquetes')] class extends Component
             </div>
         </form>
     </x-tarjeta>
+
+    @if (session('paquete_no_disponible'))
+        {{-- CU-06, flujo alternativo A1: el paquete que se quiso ver no existe o ya no está «Activo». --}}
+        <x-aviso tipo="error" class="mt-10" titulo="Ese paquete no está disponible actualmente">
+            Puede que se haya dado de baja. Elegí otro de la lista.
+        </x-aviso>
+    @endif
 
     @if ($this->hayBusqueda() && count($this->paquetes) > 0)
         <p class="mt-8 text-[17px] text-texto-secundario">
@@ -188,8 +245,10 @@ new #[Title('Paquetes')] class extends Component
                     {{-- El nombre del recorrido ya dice la duración («Camino Inca de 4 días»). --}}
                     <p class="text-[17px] text-texto-secundario">{{ $paquete['nombre_recorrido'] }}</p>
 
-                    <p class="mt-4 text-[17px]">
-                        Desde <span class="font-semibold tabular-nums">USD {{ number_format((float) $paquete['precio_base'], 2, ',', '.') }}</span>
+                    {{-- El precio es lo que más se compara entre paquetes: va grande, con «desde» y «por persona» chicos. --}}
+                    <p class="mt-5 text-sm text-texto-secundario">
+                        Desde
+                        <span class="block text-3xl font-semibold tracking-tight text-texto tabular-nums">USD {{ number_format((float) $paquete['precio_base'], 2, ',', '.') }}</span>
                         por persona
                     </p>
 
@@ -213,7 +272,7 @@ new #[Title('Paquetes')] class extends Component
                         <p class="mt-4 text-[15px] text-texto-secundario">Todavía sin valoraciones</p>
                     @endif
 
-                    <h3 class="mt-6 text-sm font-semibold text-texto-secundario">Salidas disponibles</h3>
+                    <h3 class="mt-6 border-t border-divisor pt-5 text-sm font-semibold text-texto-secundario">Salidas disponibles</h3>
 
                     @if ($paquete['excursiones']->isEmpty())
                         <p class="mt-2 text-sm text-texto-secundario">Sin salidas disponibles por ahora.</p>
@@ -221,18 +280,35 @@ new #[Title('Paquetes')] class extends Component
                         <p class="mt-1 text-sm text-texto-secundario">Elegí una fecha para reservar.</p>
 
                         {{-- CU-05, flujo alternativo A3: reservar directamente una salida lleva a Realizar Reserva (CU-14). --}}
-                        <ul class="mt-3 flex flex-wrap gap-2">
-                            @foreach ($paquete['excursiones'] as $excursion)
+                        {{-- Dos columnas parejas; como mucho tres filas (ver CASILLAS_POR_TARJETA). --}}
+                        <ul class="mt-3 grid grid-cols-2 gap-2">
+                            @foreach ($paquete['salidas_visibles'] as $excursion)
                                 @php($fecha = $excursion->getFechaSalida())
+                                @php($buscada = $this->esLaBuscada($excursion))
                                 <li>
                                     <a href="/reservar/{{ $paquete['id_paquete'] }}/{{ $fecha->format('Y-m-d') }}"
                                        aria-label="Reservar la salida del {{ $fecha->format('d/m/Y') }}"
-                                       class="inline-flex min-h-12 items-center rounded-full border border-divisor px-4 text-sm tabular-nums
-                                              text-enlace transition-colors duration-150 ease-out hover:border-accion hover:bg-aviso">
+                                       @class([
+                                           'flex min-h-12 items-center justify-center rounded-full border px-3 text-sm tabular-nums',
+                                           'text-enlace transition-colors duration-150 ease-out hover:border-accion hover:bg-aviso',
+                                           'border-accion bg-aviso font-semibold' => $buscada,
+                                           'border-divisor' => ! $buscada,
+                                       ])>
                                         {{ $fecha->format('d/m/Y') }}
                                     </a>
                                 </li>
                             @endforeach
+
+                            @if ($paquete['salidas_ocultas'] > 0)
+                                <li>
+                                    <a href="/paquetes/{{ $paquete['id_paquete'] }}#salidas"
+                                       aria-label="Ver las otras {{ $paquete['salidas_ocultas'] }} fechas de salida de {{ $paquete['nombre'] }}"
+                                       class="flex min-h-12 items-center justify-center rounded-full px-3 text-sm font-medium text-enlace
+                                              transition-colors duration-150 ease-out hover:bg-aviso">
+                                        {{ $paquete['salidas_ocultas'] }} fechas más
+                                    </a>
+                                </li>
+                            @endif
                         </ul>
                     @endif
 

@@ -115,8 +115,9 @@ sequenceDiagram
     end
 ```
 
-En DS-05 también debe aparecer `cumpleAnticipacionMinima(today())` antes del filtro de cupo. La búsqueda por fecha
-llama a `tieneFechaSalida()`, que aplica la misma anticipación y comprueba el cupo de esa fecha.
+En DS-05 también debe aparecer `cumpleAnticipacionMinima(today())` antes del filtro de cupo. La búsqueda por fechas
+llama a `tieneSalidaEntre()`, que aplica la misma anticipación y comprueba el cupo de las salidas del rango Desde–Hasta
+(los extremos se incluyen y uno de ellos puede faltar).
 
 ### Promedio y diagrama de clases
 
@@ -137,7 +138,7 @@ Verificar estos métodos en el diagrama de clases, con los nombres y las firmas 
 | Recorrido | `getDatosRecorrido()` | `array` |
 | Recorrido | `contarEtapas()` | `int` |
 | Excursion | `getExcursionesDisponibles(int $idPaquete)` (estático) | `Collection` |
-| Excursion | `tieneFechaSalida(int $idPaquete, Carbon $fecha)` (estático) | `bool` |
+| Excursion | `tieneSalidaEntre(int $idPaquete, ?Carbon $desde, ?Carbon $hasta)` (estático) | `bool` |
 | Excursion | `cumpleAnticipacionMinima($fecha)` | `bool` |
 | Excursion | `obtenerCupoDisponible()` | `int` |
 | Excursion | `getDetalle()` | `array` |
