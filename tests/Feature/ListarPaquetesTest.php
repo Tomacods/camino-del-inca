@@ -100,6 +100,40 @@ class ListarPaquetesTest extends TestCase
         $respuesta->assertDontSee('01/02/2027');
     }
 
+    public function test_con_seis_salidas_o_menos_las_muestra_todas(): void
+    {
+        $paquete = $this->crearPaquete('Camino Inca Clásico');
+        $this->crearSalidasMensuales($paquete, 6);
+
+        $this->get('/paquetes')
+            ->assertSee('15/02/2027')
+            ->assertSee('15/07/2027')
+            ->assertDontSee('fechas más');
+    }
+
+    public function test_con_mas_de_seis_salidas_muestra_las_proximas_cinco_y_cuantas_quedan(): void
+    {
+        $paquete = $this->crearPaquete('Camino Inca Clásico');
+        $this->crearSalidasMensuales($paquete, 8);
+
+        $this->get('/paquetes')
+            ->assertSee('15/06/2027')
+            ->assertDontSee('15/07/2027')
+            ->assertSee('3 fechas más')
+            ->assertSee('href="/paquetes/'.$paquete->id_paquete.'#salidas"', false);
+    }
+
+    public function test_la_fecha_buscada_se_ve_aunque_no_sea_de_las_proximas(): void
+    {
+        $paquete = $this->crearPaquete('Camino Inca Clásico');
+        $this->crearSalidasMensuales($paquete, 8);
+
+        $this->buscar('15/09/2027')
+            ->assertSee('href="/reservar/'.$paquete->id_paquete.'/2027-09-15"', false)
+            ->assertDontSee('href="/reservar/'.$paquete->id_paquete.'/2027-06-15"', false)
+            ->assertSee('3 fechas más');
+    }
+
     public function test_cada_salida_lleva_al_formulario_de_reserva(): void
     {
         $paquete = $this->crearPaquete('Camino Inca Clásico');
@@ -247,6 +281,14 @@ class ListarPaquetesTest extends TestCase
             'estado' => $estado,
             'fecha_creacion' => $fechaCreacion,
         ]);
+    }
+
+    // Una salida el día 15 de cada mes, desde febrero de 2027.
+    private function crearSalidasMensuales(Paquete $paquete, int $cantidad): void
+    {
+        for ($mes = 0; $mes < $cantidad; $mes++) {
+            $this->crearExcursion($paquete, Carbon::parse('2027-02-15')->addMonths($mes)->toDateString());
+        }
     }
 
     private function crearExcursion(Paquete $paquete, string $fechaSalida, int $plazasRetenidas = 0): Excursion

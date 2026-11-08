@@ -88,7 +88,8 @@ new #[Title('Paquete')] class extends Component
             </x-tarjeta>
         </div>
 
-        <h2 class="mt-12 text-3xl font-semibold">Salidas disponibles</h2>
+        {{-- Destino de la casilla «N fechas más» del listado (CU-05). scroll-mt deja el título por debajo del encabezado fijo. --}}
+        <h2 id="salidas" class="mt-12 scroll-mt-24 text-3xl font-semibold">Salidas disponibles</h2>
 
         @if (count($paquete['excursiones']) === 0)
             <x-aviso class="mt-6" titulo="Por ahora no hay salidas disponibles">
