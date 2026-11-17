@@ -93,7 +93,8 @@ class IniciarRecorridoTest extends TestCase
             ->assertTableColumnFormattedStateSet('fecha_hora_inicio_recorrido', '19/10/2026 08:30', $this->excursionDeHoy);
     }
 
-    // La acción mira la duración del recorrido en cada fila: el recorrido se trae una sola vez con la tabla.
+    // La acción mira la duración del recorrido en cada fila: el recorrido se trae una sola vez con la tabla. La otra
+    // consulta es la del orden, que busca las salidas sin iniciar (Excursion::scopeSinIniciarPrimero()).
     public function test_el_listado_no_consulta_el_recorrido_por_cada_excursion(): void
     {
         $this->actingAs($this->usuarioGuia);
@@ -103,7 +104,25 @@ class IniciarRecorridoTest extends TestCase
         $consultas = array_column(DB::getQueryLog(), 'query');
         DB::disableQueryLog();
 
-        $this->assertCount(1, array_filter($consultas, fn (string $consulta) => str_contains($consulta, 'from "recorrido"')));
+        $this->assertCount(2, array_filter($consultas, fn (string $consulta) => str_contains($consulta, 'from "recorrido"')));
+    }
+
+    // El guía no la inició el lunes: el miércoles todavía puede, así que va arriba, antes que la del lunes que viene. La
+    // del lunes anterior, que tampoco se inició, ya terminó y queda al final.
+    public function test_la_salida_sin_iniciar_aparece_antes_que_las_futuras_hasta_su_ultimo_dia(): void
+    {
+        $this->travelTo('2026-10-21 09:00:00');
+
+        $this->listado()->assertCanSeeTableRecords([$this->excursionDeHoy, $this->excursionProxima, $this->excursionPasada], inOrder: true);
+    }
+
+    // El recorrido de 4 días que salió el lunes terminó el jueves: el viernes ya no se puede iniciar y vuelve entre las
+    // pasadas.
+    public function test_despues_del_ultimo_dia_la_salida_sin_iniciar_vuelve_entre_las_pasadas(): void
+    {
+        $this->travelTo('2026-10-23 09:00:00');
+
+        $this->listado()->assertCanSeeTableRecords([$this->excursionProxima, $this->excursionDeHoy, $this->excursionPasada], inOrder: true);
     }
 
     // Nada en el diseño lo prohíbe: la de hoy no tiene reservas.

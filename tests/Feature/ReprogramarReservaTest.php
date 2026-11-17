@@ -395,6 +395,17 @@ class ReprogramarReservaTest extends TestCase
         $this->assertSame($this->destino->id_excursion, $reserva->id_excursion);
     }
 
+    public function test_con_un_solo_integrante_el_resumen_habla_de_su_permiso(): void
+    {
+        $this->reserva->excursionistas()->first()->delete();
+        $this->darAcceso();
+
+        $this->abrirPantalla()
+            ->call('elegir', '2027-03-01')
+            ->assertSeeHtml('el permiso del integrante se valida de nuevo')
+            ->assertDontSeeHtml('los 1 integrantes');
+    }
+
     public function test_una_fecha_mal_escrita_avisa_que_la_excursion_no_esta_disponible(): void
     {
         $this->darAcceso();

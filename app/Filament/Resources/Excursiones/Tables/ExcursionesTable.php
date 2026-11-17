@@ -26,10 +26,12 @@ class ExcursionesTable
                 'reservasConfirmadas.excursionistas',
             ]))
             // Arriba de todo, la salida en curso: la que admite reportar etapa (CU-12, ver Excursion::scopeEnCursoPrimero()).
-            // Después, las salidas de hoy en adelante, de la más cercana a la más lejana, y al final las pasadas, de la más
-            // reciente a la más vieja. El primer CASE de abajo separa esos dos grupos; los otros dos ordenan cada uno.
+            // Después, la que ya salió y todavía se puede iniciar (CU-11, ver Excursion::scopeSinIniciarPrimero()). Después,
+            // las salidas de hoy en adelante, de la más cercana a la más lejana, y al final las pasadas, de la más reciente a
+            // la más vieja. El primer CASE de abajo separa esos dos grupos; los otros dos ordenan cada uno.
             ->defaultSort(fn (Builder $query) => $query
                 ->enCursoPrimero()
+                ->sinIniciarPrimero()
                 ->orderByRaw('CASE WHEN fecha_salida >= ? THEN 0 ELSE 1 END', [today()->toDateString()])
                 ->orderByRaw('CASE WHEN fecha_salida >= ? THEN fecha_salida END ASC', [today()->toDateString()])
                 ->orderByRaw('CASE WHEN fecha_salida < ? THEN fecha_salida END DESC', [today()->toDateString()]))

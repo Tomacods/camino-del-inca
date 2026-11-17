@@ -229,7 +229,8 @@ new #[Title('Reprogramar reserva')] class extends Component
                     </dl>
 
                     <x-aviso class="mt-5">
-                        La reserva vuelve a «Pendiente» y los permisos de los {{ $this->reserva->excursionistas->count() }} integrantes se validan de nuevo.
+                        @php($integrantes = $this->reserva->excursionistas->count())
+                        La reserva vuelve a «Pendiente» y {{ $integrantes === 1 ? 'el permiso del integrante se valida' : 'los permisos de los '.$integrantes.' integrantes se validan' }} de nuevo.
                     </x-aviso>
 
                     <div class="mt-5 flex flex-wrap gap-3">

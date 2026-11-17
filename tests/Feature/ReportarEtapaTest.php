@@ -150,7 +150,9 @@ class ReportarEtapaTest extends TestCase
 
         $this->travelTo('2026-10-21 09:00:00');
 
-        $this->listado()->assertCanSeeTableRecords([$this->excursionEnCurso, $futura, $this->excursionSinIniciar, $terminada], inOrder: true);
+        // La sin iniciar salió el lunes y todavía se puede iniciar: va después de la que está en curso (ver
+        // IniciarRecorridoTest).
+        $this->listado()->assertCanSeeTableRecords([$this->excursionEnCurso, $this->excursionSinIniciar, $futura, $terminada], inOrder: true);
     }
 
     // Recién iniciada, sin ninguna etapa reportada, también está en curso.
@@ -160,7 +162,7 @@ class ReportarEtapaTest extends TestCase
 
         $this->travelTo('2026-10-21 09:00:00');
 
-        $this->listado()->assertCanSeeTableRecords([$this->excursionEnCurso, $futura, $this->excursionSinIniciar], inOrder: true);
+        $this->listado()->assertCanSeeTableRecords([$this->excursionEnCurso, $this->excursionSinIniciar, $futura], inOrder: true);
     }
 
     public function test_el_guia_reporta_desde_la_pagina_de_integrantes(): void
