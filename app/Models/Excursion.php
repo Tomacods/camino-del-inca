@@ -393,6 +393,28 @@ class Excursion extends Model
             .')) THEN 0 ELSE 1 END');
     }
 
+    // Paso 1 de Iniciar Recorrido (CU-11): la salida que el guía todavía tiene que iniciar va arriba, después de la que
+    // está en curso. Si salió el lunes y el guía la inicia el miércoles, por fecha quedaría al final, entre las pasadas.
+    // Se buscan con la misma regla que muestra la acción, admiteInicioRecorrido(): sólo puede ser una que salió hasta hoy
+    // y que no se inició. El último día depende de la duración del recorrido, por eso el filtro se hace acá y no en SQL.
+    public function scopeSinIniciarPrimero(Builder $consulta): Builder
+    {
+        $idsSinIniciar = self::with('paquete.recorrido')
+            ->whereNull('fecha_hora_inicio_recorrido')
+            ->whereDate('fecha_salida', '<=', today())
+            ->get()
+            ->filter(fn (Excursion $excursion) => $excursion->admiteInicioRecorrido(today()))
+            ->pluck('id_excursion');
+
+        if ($idsSinIniciar->isEmpty()) {
+            return $consulta;
+        }
+
+        $marcadores = $idsSinIniciar->map(fn () => '?')->implode(', ');
+
+        return $consulta->orderByRaw('CASE WHEN excursion.id_excursion IN ('.$marcadores.') THEN 0 ELSE 1 END', $idsSinIniciar->all());
+    }
+
     // Pasos 3 y 4, A1 y A2. Recibe la etapa que el guía vio en la confirmación y la registra sólo si sigue siendo la
     // siguiente. La fila se bloquea hasta el final de la transacción: si el guía toca dos veces, tiene la excursión abierta
     // en dos pestañas o reintenta después de un corte de conexión (A3) cuando el primer pedido sí había llegado, el
@@ -467,6 +489,7 @@ class Excursion extends Model
         $otras = self::with(['paquete', 'guia'])
             ->where('id_paquete', $idPaquete)
             ->whereDate('fecha_salida', '!=', $fechaOrigen)
+            ->orderBy('fecha_salida')
             ->get();
 
         return self::filtrarHabilitadas($otras, $cantidad);

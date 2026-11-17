@@ -180,6 +180,17 @@ class ModificarReservaTest extends TestCase
         $this->assertSame(['01/03/2027'], $this->fechasHabilitadas());
     }
 
+    // Las excursiones de un paquete no se cargan en orden de fecha (al modificarlo se agregan al final): la lista sí.
+    // Ojo: en SQLite el índice único de paquete y fecha ya las devuelve en orden, así que esta prueba pasaría aunque la
+    // consulta no ordenara. En PostgreSQL no: sin el orderBy() de buscarOtrasDelPaquete() salían mezcladas.
+    public function test_la_lista_va_de_la_salida_mas_cercana_a_la_mas_lejana(): void
+    {
+        $this->crearExcursion('2027-04-05', 12);
+        $this->crearExcursion('2027-03-15', 12);
+
+        $this->assertSame(['01/03/2027', '15/03/2027', '05/04/2027'], $this->fechasHabilitadas());
+    }
+
     public function test_la_lista_descuenta_las_plazas_retenidas(): void
     {
         // Otro cliente está pagando 11 lugares del destino: queda 1, y el grupo es de dos.
@@ -295,6 +306,7 @@ class ModificarReservaTest extends TestCase
             ->assertSeeHtmlInOrder(['Resumen del cambio', '01/02/2027', '01/03/2027'])
             ->assertSeeHtmlInOrder(['Nueva fecha límite de confirmación', '01/02/2027'])
             ->assertSeeHtmlInOrder(['Nueva fecha límite de pago del saldo', '01/02/2027'])
+            ->assertSeeHtml('los permisos de los 2 integrantes se validan de nuevo')
             ->call('confirmar')
             ->assertSee('¡Excursión cambiada!')
             ->assertSeeHtmlInOrder(['Reserva 000125-9', EstadoReserva::Pendiente->value])
