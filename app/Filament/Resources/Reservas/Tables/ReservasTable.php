@@ -37,7 +37,8 @@ class ReservasTable
                 TextColumn::make('estado')
                     ->label('Estado')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => $state->value),
+                    ->formatStateUsing(fn ($state) => $state->value)
+                    ->color(fn (EstadoReserva $state) => self::colorDeEstado($state)),
                 TextColumn::make('estado_saldo')
                     ->label('Saldo')
                     ->formatStateUsing(fn ($state) => $state->value),
@@ -80,6 +81,19 @@ class ReservasTable
                 ViewAction::make()->label('Ver'),
                 ValidarPermisosReserva::accionValidarPermisos(),
             ]);
+    }
+
+    // Color de la etiqueta del estado, uno distinto por estado para distinguirlas de un vistazo. Son los mismos tonos que
+    // el chip del portal del cliente (chip-estado.blade.php), salvo «Finalizada», que allí no tiene color.
+    public static function colorDeEstado(EstadoReserva $estado): string
+    {
+        return match ($estado) {
+            EstadoReserva::Pendiente => 'warning',
+            EstadoReserva::Confirmada => 'info',
+            EstadoReserva::SinPermiso => 'danger',
+            EstadoReserva::Cancelada => 'gray',
+            EstadoReserva::Finalizada => 'success',
+        };
     }
 
     // Un filtro por tipo de servicio, en el orden del R-07, que elige un servicio concreto de ese tipo. El nombre sale

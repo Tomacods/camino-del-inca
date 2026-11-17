@@ -18,6 +18,15 @@ use Illuminate\Support\Carbon;
 
 class PaquetesTable
 {
+    // Color de la etiqueta del estado, para distinguir de un vistazo los paquetes dados de baja.
+    public static function colorDeEstado(EstadoPaquete $estado): string
+    {
+        return match ($estado) {
+            EstadoPaquete::Activo => 'success',
+            EstadoPaquete::Inactivo => 'gray',
+        };
+    }
+
     public static function configure(Table $table): Table
     {
         return $table
@@ -27,7 +36,8 @@ class PaquetesTable
                 TextColumn::make('precio_base')->label('Precio base')->money('USD'),
                 TextColumn::make('excursiones_count')->label('Excursiones')->counts('excursiones'),
                 TextColumn::make('estado')->label('Estado')->badge()
-                    ->formatStateUsing(fn (EstadoPaquete $state) => $state->value),
+                    ->formatStateUsing(fn (EstadoPaquete $state) => $state->value)
+                    ->color(fn (EstadoPaquete $state) => self::colorDeEstado($state)),
                 TextColumn::make('fecha_creacion')->label('Creación')->date('d/m/Y'),
             ])
             ->defaultSort('fecha_creacion', 'desc')

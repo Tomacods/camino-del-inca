@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Paquetes\Schemas;
 
 use App\Enums\EstadoPaquete;
 use App\Enums\TipoServicio;
+use App\Filament\Resources\Paquetes\Tables\PaquetesTable;
 use App\Models\Paquete;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -18,7 +19,8 @@ class PaqueteInfolist
             Section::make('Paquete')->columns(2)->schema([
                 TextEntry::make('nombre')->label('Nombre'),
                 TextEntry::make('estado')->label('Estado')->badge()
-                    ->formatStateUsing(fn (EstadoPaquete $state) => $state->value),
+                    ->formatStateUsing(fn (EstadoPaquete $state) => $state->value)
+                    ->color(fn (EstadoPaquete $state) => PaquetesTable::colorDeEstado($state)),
                 TextEntry::make('recorrido.nombre')->label('Recorrido'),
                 TextEntry::make('recorrido.duracion_dias')->label('Duración (días)'),
                 TextEntry::make('cantidad_etapas')->label('Etapas')

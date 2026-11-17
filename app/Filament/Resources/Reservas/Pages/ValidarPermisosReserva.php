@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Reservas\Pages;
 use App\Enums\EstadoPermiso;
 use App\Enums\EstadoReserva;
 use App\Filament\Resources\Reservas\ReservaResource;
+use App\Filament\Resources\Reservas\Tables\ReservasTable;
 use App\Models\Reserva;
 use DomainException;
 use Filament\Actions\Action;
@@ -215,7 +216,8 @@ class ValidarPermisosReserva extends Page
                 ->columns(4)
                 ->schema([
                     TextEntry::make('estado')->label('Estado')->badge()
-                        ->state($reserva->estado->value),
+                        ->state($reserva->estado->value)
+                        ->color(ReservasTable::colorDeEstado($reserva->estado)),
                     TextEntry::make('paquete')->label('Paquete')
                         ->state($this->nombrePaquete),
                     TextEntry::make('fecha_salida')->label('Salida')
