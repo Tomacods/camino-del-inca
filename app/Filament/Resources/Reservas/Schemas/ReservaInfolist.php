@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Reservas\Schemas;
 
+use App\Enums\EstadoReserva;
+use App\Filament\Resources\Reservas\Tables\ReservasTable;
 use App\Models\Reserva;
 use BackedEnum;
 use Filament\Infolists\Components\RepeatableEntry;
@@ -19,7 +21,8 @@ class ReservaInfolist
                 ->schema([
                     TextEntry::make('numero_reserva')->label('Número'),
                     TextEntry::make('estado')->label('Estado')->badge()
-                        ->formatStateUsing(fn ($state) => self::texto($state)),
+                        ->formatStateUsing(fn ($state) => self::texto($state))
+                        ->color(fn (EstadoReserva $state) => ReservasTable::colorDeEstado($state)),
                     TextEntry::make('estado_saldo')->label('Estado del saldo')
                         ->formatStateUsing(fn ($state) => self::texto($state)),
                     TextEntry::make('correo_electronico')->label('Correo del titular'),
