@@ -2,7 +2,7 @@
 
 namespace App\Enums;
 
-// Los ocho tipos de Notificar Cliente (CU-13), como en la regla de negocio del Doc 3. No es una columna de la base: lo
+// Los nueve tipos de Notificar Cliente (CU-13), como en la regla de negocio del Doc 3. No es una columna de la base: lo
 // pasa el caso de uso que invoca la notificación.
 enum TipoNotificacion: string
 {
@@ -14,4 +14,5 @@ enum TipoNotificacion: string
     case CancelacionFaltaPago = 'Cancelación por Falta de Pago';
     case EtapaFinal = 'Etapa Final';
     case CancelacionFaltaPermisos = 'Cancelación por Falta de Permisos';
+    case Reprogramacion = 'Reprogramación de Reserva';
 }

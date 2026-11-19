@@ -37,7 +37,7 @@ class NotificarClienteTest extends TestCase
         $this->travelTo('2026-10-14 12:00:00');
     }
 
-    /* --------------------------- Los ocho tipos ------------------------------- */
+    /* --------------------------- Los nueve tipos ------------------------------ */
 
     public function test_primera_compra_lleva_el_numero_de_reserva_y_el_comprobante(): void
     {
@@ -133,7 +133,7 @@ class NotificarClienteTest extends TestCase
     }
 
     #[DataProvider('tiposSinComprobante')]
-    public function test_los_otros_seis_tipos_no_adjuntan_un_pdf(TipoNotificacion $tipoNotificacion): void
+    public function test_los_otros_siete_tipos_no_adjuntan_un_pdf(TipoNotificacion $tipoNotificacion): void
     {
         Mail::fake();
 
@@ -154,6 +154,7 @@ class NotificarClienteTest extends TestCase
             'Cancelación por Falta de Pago' => [TipoNotificacion::CancelacionFaltaPago],
             'Etapa Final' => [TipoNotificacion::EtapaFinal],
             'Cancelación por Falta de Permisos' => [TipoNotificacion::CancelacionFaltaPermisos],
+            'Reprogramación de Reserva' => [TipoNotificacion::Reprogramacion],
         ];
     }
 
@@ -405,6 +406,23 @@ class NotificarClienteTest extends TestCase
         $correo->assertSeeInHtml('Te reintegramos todo lo abonado: un reintegro de <strong>USD 1.350,00</strong>', false);
     }
 
+    // CU-19 invoca la notificación después de reprogramar, con la reserva ya en «Pendiente» en la nueva salida y con
+    // la nueva fecha límite de confirmación. 000124-7 está así: «Pendiente», con tres integrantes y salida el 18/01/2027.
+    public function test_reprogramacion_informa_la_nueva_salida_el_estado_y_la_nueva_fecha_limite(): void
+    {
+        Mail::fake();
+
+        $this->assertTrue(Reserva::notificarCliente(TipoNotificacion::Reprogramacion, '000124-7'));
+
+        $correo = $this->correoEnviado(TipoNotificacion::Reprogramacion, 'lucia.fernandez@mail.com');
+        $correo->assertHasSubject('Tu reserva 000124-7 fue reprogramada');
+        $correo->assertSeeInOrderInHtml([
+            'Reprogramaste tu reserva', '000124-7', 'la nueva fecha de salida es el', '18/01/2027',
+            'La reserva volvió a', '«Pendiente»', 'los permisos de ingreso al Camino Inca de todos los integrantes',
+            'La nueva fecha límite de confirmación es el', '18/12/2026 a las 23:59',
+        ]);
+    }
+
     /* ----------------------------- Destinatario ------------------------------- */
 
     // El correo va sólo al titular. Los excursionistas no tienen correo en el esquema, y el de la reserva es el único.
@@ -412,7 +430,7 @@ class NotificarClienteTest extends TestCase
     {
         Mail::fake();
 
-        // 000123-5 está en «Sin Permiso», el único estado en que vale «Permisos Rechazados»: así salen los ocho tipos.
+        // 000123-5 está en «Sin Permiso», el único estado en que vale «Permisos Rechazados»: así salen los nueve tipos.
         foreach (TipoNotificacion::cases() as $tipoNotificacion) {
             $this->assertTrue(Reserva::notificarCliente($tipoNotificacion, '000123-5'));
         }
