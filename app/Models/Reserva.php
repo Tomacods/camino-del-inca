@@ -321,8 +321,15 @@ class Reserva extends Model
             ->first();
     }
 
+    // Una reserva «Finalizada» ya viajó y está paga entera: el saldo vence antes de la salida y, si no se paga, CU-22 la
+    // cancela. Su monto total es lo que pagó, y no se recalcula con los precios actuales del paquete, que se puede
+    // modificar porque R-02 sólo lo bloquea con reservas activas. Las demás calculan con los precios del paquete.
     public function calcularMontoTotal(): float
     {
+        if ($this->validarEstado([EstadoReserva::Finalizada])) {
+            return $this->sumarPagos();
+        }
+
         return $this->excursion->paquete->calcularMonto(
             $this->excursionistas->count(),
             $this->noches_extra_antes + $this->noches_extra_despues,
@@ -339,6 +346,7 @@ class Reserva extends Model
         ]);
     }
 
+    // Con una reserva «Finalizada» da 0: su monto total es la suma de sus pagos.
     public function calcularSaldoPendiente(): float
     {
         return $this->calcularMontoTotal() - $this->sumarPagos();
