@@ -46,7 +46,7 @@ class ValoracionesTable
                     ->label('Guía')
                     ->state(fn (Valoracion $record) => $record->reserva->excursion->guia->getNombreCompleto()),
                 TextColumn::make('puntaje_experiencia_general')
-                    ->label('Experiencia general')
+                    ->label('Experiencia general (promedio)')
                     ->formatStateUsing(fn ($state) => $state.' de 5')
                     ->sortable(),
                 TextColumn::make('comentario')
@@ -84,7 +84,7 @@ class ValoracionesTable
                         Select::make('categoria')
                             ->label('Puntaje de')
                             ->options([
-                                self::EXPERIENCIA_GENERAL => 'Experiencia general',
+                                self::EXPERIENCIA_GENERAL => 'Experiencia general (promedio)',
                                 ...collect(CategoriaValoracion::cases())
                                     ->mapWithKeys(fn (CategoriaValoracion $categoria) => [$categoria->name => $categoria->value])
                                     ->all(),

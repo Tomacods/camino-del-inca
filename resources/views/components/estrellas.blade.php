@@ -1,6 +1,6 @@
 {{--
     Un puntaje de 1 a 5 estrellas (Valorar Servicios, CU-23): un grupo de botones de opción con su etiqueta accesible.
-    <x-estrellas modelo="experienciaGeneral" etiqueta="El recorrido completo" :valor="$experienciaGeneral" />
+    <x-estrellas modelo="puntajes.Hotel" etiqueta="Hotel" :valor="$puntajes['Hotel'] ?? null" />
     El error sale de la validación con el mismo nombre que el modelo.
 --}}
 @props(['modelo', 'etiqueta', 'valor' => null])

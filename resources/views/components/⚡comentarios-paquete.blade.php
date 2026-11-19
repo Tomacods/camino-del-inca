@@ -83,7 +83,7 @@ new #[Title('Comentarios del paquete')] class extends Component
     @endif
 
     {{-- Filtro por puntaje de la experiencia general. El botón marcado es el que está activo. --}}
-    <div role="group" aria-label="Filtrar por puntaje" class="mt-8 flex flex-wrap gap-2">
+    <div role="group" aria-label="Filtrar por experiencia general (promedio)" class="mt-8 flex flex-wrap gap-2">
         @foreach ([null, 5, 4, 3, 2, 1] as $opcion)
             @php($etiqueta = $opcion === null ? 'Todas' : $opcion.($opcion === 1 ? ' estrella' : ' estrellas'))
             <button type="button" wire:click="filtrar({{ $opcion ?? 'null' }})"
@@ -100,7 +100,7 @@ new #[Title('Comentarios del paquete')] class extends Component
             @php($estrellas = (int) $valoracion->puntaje_experiencia_general)
             <article class="rounded-[18px] bg-tarjeta p-6 shadow-tarjeta">
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                    <span role="img" aria-label="{{ $estrellas }} de 5 estrellas" class="text-xl leading-none tracking-wider">
+                    <span role="img" aria-label="Experiencia general (promedio): {{ $estrellas }} de 5 estrellas" class="text-xl leading-none tracking-wider">
                         <span class="text-ambar">{{ str_repeat('★', $estrellas) }}</span><span class="text-divisor">{{ str_repeat('★', 5 - $estrellas) }}</span>
                     </span>
                     <time datetime="{{ $valoracion->fecha->format('Y-m-d') }}" class="text-[14px] text-texto-secundario">
