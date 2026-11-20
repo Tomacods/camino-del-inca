@@ -21,7 +21,7 @@ Mora Anabella Molina y Mariano Reyes.
 
 ## Requisitos
 
-- **PHP 8.2 o superior** (probado con 8.5), con las extensiones `pdo_pgsql`, `pgsql`, `intl`, `zip`, `mbstring`,
+- **PHP 8.4 o superior** (probado con 8.5), con las extensiones `pdo_pgsql`, `pgsql`, `intl`, `zip`, `mbstring`,
   `fileinfo`, `curl` y `openssl`
 - **Composer 2**
 - **Node.js 22 o superior** (probado con 24), con npm
