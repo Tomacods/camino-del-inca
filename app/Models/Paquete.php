@@ -115,7 +115,8 @@ class Paquete extends Model
     }
 
     // Dentro de la transacción de edición. El paquete bloqueado serializa las altas de excursiones de CU-02 y la
-    // reactivación. Las fechas existentes se toman de la base, aunque el cliente haya cambiado el campo deshabilitado.
+    // reactivación. Las fechas existentes se toman de la base, aunque el cliente haya cambiado el campo deshabilitado; en
+    // las excursiones que ya salieron, también el cupo y el guía.
     public function prepararExcursionesParaModificar(array $salidas): array
     {
         self::whereKey($this->id_paquete)->lockForUpdate()->firstOrFail();
@@ -128,6 +129,11 @@ class Paquete extends Model
             }
 
             $salidas[$clave]['fecha_salida'] = $excursion->fecha_salida->format('Y-m-d');
+
+            if ($excursion->yaSalio()) {
+                $salidas[$clave]['cupo'] = $excursion->cupo;
+                $salidas[$clave]['id_guia'] = $excursion->id_guia;
+            }
         }
 
         foreach (array_keys($salidas) as $clave) {
@@ -203,6 +209,48 @@ class Paquete extends Model
             self::confirmarGuiasDisponibles($salidas, $this->id_recorrido, $this->id_paquete);
 
             $this->update(['estado' => EstadoPaquete::Activo]);
+        });
+    }
+
+    /* ----------------------- CU-27 Agregar excursión ----------------------- */
+
+    // R-02 (excepción): a un paquete «Activo» se le puede agregar una salida aunque tenga reservas activas, porque no
+    // cambian sus precios, sus servicios ni sus excursiones. Por eso no se llama a exigirSinReservasActivas(). El paquete
+    // se bloquea como en prepararExcursionesParaModificar(): dos altas de la misma fecha, o un alta y una baja, se turnan.
+    // Los guías se bloquean después, como al modificar. Sin la identificación del paquete, confirmarGuiasDisponibles()
+    // compara también con las excursiones que el paquete ya tiene.
+    public function agregarExcursion(array $datos): Excursion
+    {
+        return DB::transaction(function () use ($datos) {
+            $paquete = self::whereKey($this->id_paquete)->lockForUpdate()->firstOrFail();
+            $fechaSalida = Carbon::parse($datos['fecha_salida'])->startOfDay();
+
+            if (! $paquete->estaActivo()) {
+                throw new DomainException('El paquete está «Inactivo»: sólo se agregan excursiones a un paquete «Activo».');
+            }
+
+            if ($fechaSalida->lessThanOrEqualTo(today())) {
+                throw new DomainException('La fecha de salida tiene que ser posterior a hoy.');
+            }
+
+            if (! Excursion::esDiaDeSalida($fechaSalida)) {
+                throw new DomainException('La salida tiene que ser un lunes.');
+            }
+
+            if (Excursion::buscarPorFechaSalida($paquete->id_paquete, $fechaSalida->format('Y-m-d')) !== null) {
+                throw new DomainException('El paquete ya tiene una salida el '.$fechaSalida->format('d/m/Y').'.');
+            }
+
+            self::confirmarGuiasDisponibles(
+                [['fecha_salida' => $fechaSalida->format('Y-m-d'), 'id_guia' => $datos['id_guia']]],
+                $paquete->id_recorrido,
+            );
+
+            return $paquete->excursiones()->create([
+                'fecha_salida' => $fechaSalida->format('Y-m-d'),
+                'cupo' => $datos['cupo'],
+                'id_guia' => $datos['id_guia'],
+            ]);
         });
     }
 

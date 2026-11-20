@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Paquetes\Tables;
 
 use App\Enums\EstadoPaquete;
+use App\Filament\Resources\Paquetes\Actions\AgregarExcursion;
 use App\Filament\Resources\Paquetes\Actions\DarDeBajaPaquete;
 use App\Filament\Resources\Paquetes\Actions\ReactivarPaquete;
 use App\Models\Paquete;
@@ -64,7 +65,9 @@ class PaquetesTable
                 EditAction::make()
                     ->label('Modificar')
                     ->disabled(fn (Paquete $record) => ! $record->sePuedeModificar())
-                    ->tooltip(fn (Paquete $record) => $record->sePuedeModificar() ? null : 'Tiene reservas activas o plazas retenidas mientras se completa un pago'),
+                    ->tooltip(fn (Paquete $record) => $record->sePuedeModificar() ? null : 'Tiene reservas activas o plazas retenidas mientras se completa un pago. Para sumar una salida, usá «Agregar excursión».'),
+                // CU-27: una salida nueva se puede agregar aunque el paquete tenga reservas.
+                AgregarExcursion::accionAgregarExcursion(),
                 DarDeBajaPaquete::accionDarDeBaja(),
                 ReactivarPaquete::accionReactivar(),
             ]);

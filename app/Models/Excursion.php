@@ -210,6 +210,15 @@ class Excursion extends Model
             && $this->getFechaSalida()->lessThanOrEqualTo($fin);
     }
 
+    /* -------------------------- CU-02 Modificar paquete -------------------------- */
+
+    // R-02: una excursión que ya salió (la fecha de salida es hoy o anterior, o el guía inició el recorrido) no cambia
+    // su cupo ni su guía. Su guía es el que la condujo: las valoraciones de sus reservas se filtran por él.
+    public function yaSalio(): bool
+    {
+        return $this->recorridoIniciado() || $this->fecha_salida->lessThanOrEqualTo(today());
+    }
+
     /* ------------------------------ CU-15 Pagar ------------------------------- */
 
     // Asocia la reserva a esta excursión y la guarda.

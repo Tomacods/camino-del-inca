@@ -38,6 +38,7 @@ necesita RESERVA.
 | CU-01 | Crear Paquete | Administrador | Panel |
 | CU-02 | Modificar Paquete | Administrador | Panel |
 | CU-03 | Eliminar Paquete | Administrador | Panel |
+| CU-27 | Agregar Excursión (mejora del 18/11) | Administrador | Panel |
 | CU-05 | Listar Paquetes | Cliente, Administrador | Portal y Panel |
 | CU-06 | Consultar Paquete | Cliente, Administrador | Portal y Panel |
 | CU-08 | Listar Valoraciones | Administrador | Panel |
@@ -59,7 +60,8 @@ Los ajustes de CU-01 posteriores a la integración de CU-06 están en
 La cobertura y las comprobaciones pendientes están en [pruebas de CU-01](pruebas-crear-paquete.md).
 Las correcciones de CU-02 y CU-03 y el acuerdo sobre retenciones están en
 [cambios de diseño de CU-02 y CU-03](cambios-diseno-cu02-cu03.md), con sus
-[pruebas y comprobaciones manuales](pruebas-modificar-eliminar-paquete.md).
+[pruebas y comprobaciones manuales](pruebas-modificar-eliminar-paquete.md). CU-27 Agregar Excursión, que suma una salida a
+un paquete «Activo» aunque tenga reservas, se agregó después de la devolución del 18/11 y está en el mismo documento.
 La parte administrativa de CU-01, CU-02, CU-03, CU-05 y CU-06 se implementa en un único recurso de Paquetes en
 Filament: listado con filtro Activo/Inactivo, vista del paquete con sus excursiones y cupo disponible, creación,
 edición y baja lógica. El cupo se calcula con la misma regla del modelo que usa el portal. Los cinco casos siguen
