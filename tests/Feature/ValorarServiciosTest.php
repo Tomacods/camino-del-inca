@@ -208,6 +208,20 @@ class ValorarServiciosTest extends TestCase
         $this->assertSame(5, (int) $valoracion->puntaje_experiencia_general);
     }
 
+    // Justo por encima del límite, con las siete categorías: 32 / 7 = 4,57 → 5.
+    public function test_un_promedio_apenas_mayor_a_4_5_se_guarda_como_5(): void
+    {
+        $this->crearIntegrante('Lucía', 'BEN789', equipoCamping: true);
+
+        $valoracion = Valoracion::valorarServicios($this->reserva, [
+            'Hotel' => 5, 'CampingDeEtapa' => 5, 'TransporteEnBus' => 5, 'TransporteFerroviario' => 5,
+            'Porteadores' => 4, 'Guia' => 4, 'EquipoDeCamping' => 4,
+        ], null);
+
+        $this->assertSame(5, (int) $valoracion->puntaje_experiencia_general);
+        $this->assertCount(7, $valoracion->detalles);
+    }
+
     // Si alguien llevó equipo de camping, su puntaje entra en el promedio: (6 × 5 + 1) / 7 = 4,43 → 4.
     public function test_con_equipo_de_camping_su_puntaje_cuenta_en_el_promedio(): void
     {
