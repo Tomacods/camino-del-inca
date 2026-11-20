@@ -54,6 +54,28 @@ Se conserva el criterio del PR: las excursiones de paquetes Inactivos no ocupan 
 al reactivar se vuelve a verificar su disponibilidad. Esta excepción por estado debe quedar expresa en R-01,
 que actualmente habla de excursiones del mismo paquete o de cualquier otro sin explicitarla.
 
+## Agregar excursión a un paquete con reservas (CU-27)
+
+Pedido de la devolución del 18/11/2026: R-02 bloquea toda la modificación de un paquete con reservas activas, así que
+un paquete con reservas no podía sumar salidas nuevas. Se agrega un caso de uso aparte, **CU-27 Agregar Excursión**
+(R-27), sin cambiar CU-02, que sigue bloqueado con reservas activas o plazas retenidas.
+
+- La acción «Agregar excursión» está en la consulta del paquete y en su fila del listado. Se ofrece sólo con el paquete
+  «Activo», tenga o no reservas.
+- Pide fecha de salida, cupo y guía. La fecha tiene que ser un lunes posterior a hoy y no repetir otra salida del
+  paquete; el cupo, mayor que cero. El guía se elige entre los libres para el período de la salida, como en CU-01 y
+  CU-02 (`Guia::disponiblesPara`), y se habilita al elegir la fecha.
+- `Paquete::agregarExcursion()` vuelve a controlar todo en una transacción: bloquea el paquete (como
+  `prepararExcursionesParaModificar`), revisa que siga «Activo», la fecha y que no esté repetida, y llama a
+  `confirmarGuiasDisponibles` sin la identificación del paquete, para comparar también con sus propias salidas. Los
+  guías se bloquean después del paquete, en el mismo orden que al modificar y al reactivar.
+- No llama a `exigirSinReservasActivas()`: no cambia precios, servicios ni excursiones existentes, así que las reservas
+  activas y las plazas retenidas no se ven afectadas. La salida nueva es futura, así que nunca es una que ya salió
+  (`Excursion::yaSalio`).
+- Si alguien abrió Modificar Paquete antes del alta, al guardar el formulario le falta la salida nueva y
+  `prepararExcursionesParaModificar` lo rechaza pidiendo recargarlo, como con cualquier salida agregada desde otra
+  pestaña.
+
 ## Firmas para el diagrama de clases
 
 | Clase | Método | Retorno |
@@ -68,6 +90,7 @@ que actualmente habla de excursiones del mismo paquete o de cualquier otro sin e
 | Paquete | darDeBaja() | void |
 | Paquete | reactivar() | void |
 | Paquete | confirmarGuiasDisponibles(array $salidas, int $idRecorrido, ?int $idPaquete = null), estático | void |
+| Paquete | agregarExcursion(array $datos), CU-27, con el paquete bloqueado durante la transacción | Excursion |
 
 `exigirSinReservasActivas()` también controla las plazas retenidas según la aclaración acordada.
 La guía de pruebas está en [pruebas de CU-02 y CU-03](pruebas-modificar-eliminar-paquete.md).

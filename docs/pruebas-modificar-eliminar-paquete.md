@@ -23,6 +23,13 @@ Las regresiones verifican:
 - Al reactivar se detectan superposiciones en recorridos ya comenzados, incluido todo su último día.
   Un guía libre permite reactivar; los recorridos que terminaron el día anterior no bloquean la operación.
 
+`AgregarExcursionTest` cubre CU-27 Agregar Excursión: una salida nueva en un paquete con una reserva «Confirmada»,
+desde la consulta y desde el listado, sin cambiar la salida existente ni su reserva. Se rechazan el paquete «Inactivo»
+(la acción no se ofrece y el modelo lo vuelve a controlar), una fecha que no es lunes, una de hoy o anterior, una
+fecha repetida, un cupo menor que 1, un guía ocupado por otro paquete y un guía ocupado por otra salida del mismo
+paquete. El guía se elige sólo entre los libres para la fecha, y si otro administrador lo ocupa después de validar,
+el modelo lo rechaza, avisa el motivo y el formulario queda abierto.
+
 `RealizarReservaTest` verifica también el formulario del cliente abierto antes de la baja: confirmar después
 no retiene plazas, no guarda una reserva en curso y no inicia el pago.
 
@@ -41,6 +48,11 @@ pérdida de excursiones sin necesitar simultaneidad real y no sustituyen una pru
 5. Abrir el formulario del cliente sin confirmar; dar de baja el paquete desde el panel y después confirmar:
    no debe crearse la reserva en curso ni llegarse al pago.
 6. Verificar una reactivación con un recorrido que comenzó y sigue en curso, y probar el último día del recorrido.
+7. CU-27: en un paquete con una reserva Confirmada, «Modificar» está deshabilitado y «Agregar excursión» no. Agregar
+   una salida desde la consulta del paquete y otra desde el listado. Las dos aparecen en «Excursiones» y la salida de
+   la reserva no cambia. Probar una fecha que no es lunes, una repetida y un guía ocupado (no aparece en la lista).
+8. CU-27 con Modificar Paquete abierto en otra pestaña (en un paquete sin reservas): agregar una salida desde la
+   consulta y después guardar el formulario viejo. Debe pedir recargar sin borrar la salida nueva.
 
 ## Bloqueos en PostgreSQL
 
