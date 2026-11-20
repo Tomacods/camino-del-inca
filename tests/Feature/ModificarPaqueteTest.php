@@ -17,6 +17,7 @@ use App\Models\Servicio;
 use App\Models\Usuario;
 use Closure;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -28,6 +29,10 @@ use Tests\TestCase;
 class ModificarPaqueteTest extends TestCase
 {
     use RefreshDatabase;
+
+    // La consulta con la que Paquete::confirmarGuiasDisponibles() bloquea a los guías al guardar, después de validar el
+    // formulario. La lista de guías y la validación también leen las excursiones, así que se espera a este bloqueo.
+    private const BLOQUEO_DE_GUIAS = 'from "guia" where "id_usuario" in';
 
     private Usuario $administrador;
 
@@ -173,7 +178,7 @@ class ModificarPaqueteTest extends TestCase
         $yaOcupado = false;
 
         DB::listen(function (QueryExecuted $consulta) use ($otro, &$yaOcupado) {
-            if ($yaOcupado || ! str_contains($consulta->sql, 'from "excursion"')) {
+            if ($yaOcupado || ! str_contains($consulta->sql, self::BLOQUEO_DE_GUIAS)) {
                 return;
             }
 
@@ -186,7 +191,8 @@ class ModificarPaqueteTest extends TestCase
                 'nombre' => 'Camino Inca Clásico 2027',
                 'excursiones.record-'.$this->excursion->id_excursion.'.id_guia' => $this->luis->id_usuario,
             ])
-            ->call('save');
+            ->call('save')
+            ->assertNotified('Este paquete no se puede modificar');
 
         $this->assertSame('Camino Inca Clásico', $this->paquete->refresh()->nombre);
         $this->assertEquals($this->rosa->id_usuario, $this->excursion->refresh()->id_guia);
@@ -343,6 +349,111 @@ class ModificarPaqueteTest extends TestCase
         $this->excursion->liberarCupoRetenido(2);
         $this->formulario()->fillForm(['precio_base' => 900])->call('save')->assertHasNoFormErrors();
         $this->assertEquals(900, $this->paquete->refresh()->precio_base);
+    }
+
+    // R-02 con R-01: el guía asignado a una excursión existente sigue en la lista, aunque la excursión sea suya.
+    public function test_el_guia_asignado_sigue_en_la_lista_de_su_excursion(): void
+    {
+        $this->formulario()
+            ->assertFormFieldExists(
+                'excursiones.record-'.$this->excursion->id_excursion.'.id_guia',
+                fn (Select $campo): bool => array_keys($campo->getOptions()) === [$this->luis->id_usuario, $this->rosa->id_usuario],
+            );
+    }
+
+    // Luis conduce otra excursión del 01/03 al 04/03: no se ofrece para la salida del 01/03, sí para la del 08/03.
+    public function test_un_guia_ocupado_no_se_ofrece_para_esa_fecha_y_si_para_otra(): void
+    {
+        $this->crearExcursion($this->crearPaquete('Camino Inca Extendido'), '2027-03-01', $this->luis);
+
+        $this->formulario()
+            ->fillForm([
+                'excursiones.nueva.fecha_salida' => '2027-03-08',
+                'excursiones.nueva.cupo' => 10,
+            ])
+            ->assertFormFieldExists(
+                'excursiones.record-'.$this->excursion->id_excursion.'.id_guia',
+                fn (Select $campo): bool => array_keys($campo->getOptions()) === [$this->rosa->id_usuario],
+            )
+            ->assertFormFieldExists(
+                'excursiones.nueva.id_guia',
+                fn (Select $campo): bool => array_keys($campo->getOptions()) === [$this->luis->id_usuario, $this->rosa->id_usuario],
+            );
+    }
+
+    public function test_una_excursion_nueva_sin_fecha_no_ofrece_guias(): void
+    {
+        $this->formulario()
+            ->fillForm(['excursiones.nueva.cupo' => 10])
+            ->assertFormFieldDisabled('excursiones.nueva.id_guia')
+            ->assertFormFieldExists(
+                'excursiones.nueva.id_guia',
+                fn (Select $campo): bool => $campo->getOptions() === [] && $campo->getPlaceholder() === 'Elegí primero la fecha de salida',
+            );
+    }
+
+    // R-02: una excursión que ya salió conserva su cupo y su guía, aunque el paquete se pueda modificar. Si no, las
+    // valoraciones de sus reservas pasarían al guía nuevo (se filtran por el guía de la excursión).
+    public function test_una_excursion_que_ya_salio_no_cambia_su_cupo_ni_su_guia(): void
+    {
+        $salida = $this->crearExcursion($this->paquete, '2026-10-19', $this->rosa);
+        $item = 'excursiones.record-'.$salida->id_excursion;
+
+        $this->formulario()
+            ->assertFormFieldDisabled("{$item}.cupo")
+            ->assertFormFieldDisabled("{$item}.id_guia")
+            ->fillForm([
+                'nombre' => 'Camino Inca Clásico 2027',
+                "{$item}.cupo" => 4,
+                "{$item}.id_guia" => $this->luis->id_usuario,
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $salida->refresh();
+        $this->assertSame('Camino Inca Clásico 2027', $this->paquete->refresh()->nombre);
+        $this->assertEquals(12, $salida->cupo);
+        $this->assertEquals($this->rosa->id_usuario, $salida->id_guia);
+    }
+
+    // Un cupo inválido en una salida que ya salió no se valida: no se va a guardar.
+    public function test_una_excursion_que_ya_salio_no_valida_el_cupo_ni_el_guia(): void
+    {
+        $salida = $this->crearExcursion($this->paquete, '2026-10-19', $this->rosa);
+        $item = 'excursiones.record-'.$salida->id_excursion;
+
+        $this->formulario()
+            ->fillForm(["{$item}.cupo" => 0, "{$item}.id_guia" => null])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertEquals(12, $salida->refresh()->cupo);
+    }
+
+    public function test_las_excursiones_futuras_siguen_cambiando_su_cupo_y_su_guia(): void
+    {
+        $this->crearExcursion($this->paquete, '2026-10-19', $this->rosa);
+        $item = 'excursiones.record-'.$this->excursion->id_excursion;
+
+        $this->formulario()
+            ->fillForm(["{$item}.cupo" => 8, "{$item}.id_guia" => $this->luis->id_usuario])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->excursion->refresh();
+        $this->assertEquals(8, $this->excursion->cupo);
+        $this->assertEquals($this->luis->id_usuario, $this->excursion->id_guia);
+    }
+
+    // Ya salió si la fecha de salida es hoy o anterior, o si el guía inició el recorrido.
+    public function test_ya_salio(): void
+    {
+        $this->assertFalse($this->excursion->yaSalio());
+        $this->assertTrue($this->crearExcursion($this->paquete, '2026-10-21', $this->rosa)->yaSalio());
+        $this->assertTrue($this->crearExcursion($this->paquete, '2026-10-19', $this->rosa)->yaSalio());
+
+        $this->excursion->fecha_hora_inicio_recorrido = now();
+        $this->assertTrue($this->excursion->yaSalio());
     }
 
     private function formulario()

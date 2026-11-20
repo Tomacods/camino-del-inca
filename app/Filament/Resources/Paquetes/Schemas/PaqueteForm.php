@@ -20,7 +20,7 @@ use Illuminate\Support\Carbon;
 
 // Los datos del R-01, para crear (CU-01) y modificar (CU-02). El formulario valida el formato, con los máximos de las
 // columnas (decimal(10,2) en los precios y smallint en porteadores y cupo); las reglas de negocio (salidas los lunes y
-// guías sin superposiciones) las decide el modelo Excursion.
+// guías sin superposiciones) las deciden los modelos Excursion y Guia.
 class PaqueteForm
 {
     private const PRECIO_MAXIMO = 99999999.99;
@@ -43,6 +43,7 @@ class PaqueteForm
                         ->label('Recorrido')
                         ->relationship('recorrido', 'nombre')
                         ->required()
+                        ->live()
                         ->disabledOn('edit')
                         ->helperText('Define la duración del viaje y las etapas que reporta el guía.'),
                     TextInput::make('cantidad_porteadores')
@@ -92,7 +93,8 @@ class PaqueteForm
 
             Section::make('Excursiones')
                 ->description('Cada una con su fecha de salida (siempre un lunes), su cupo y su guía. Al modificar el paquete, '
-                    .'la fecha de las excursiones que ya existen no cambia: se puede cambiar su cupo y su guía, o agregar otras.')
+                    .'la fecha de las excursiones que ya existen no cambia: se puede cambiar su cupo y su guía, o agregar otras. '
+                    .'En las que ya salieron tampoco cambian el cupo ni el guía.')
                 ->schema([
                     Repeater::make('excursiones')
                         ->hiddenLabel()
@@ -104,6 +106,7 @@ class PaqueteForm
                                 ->displayFormat('d/m/Y')
                                 ->disabled(fn (?Excursion $record): bool => $record !== null)
                                 ->validatedWhenNotDehydrated(false)
+                                ->live()
                                 ->required()
                                 ->after('today')
                                 ->distinct()
@@ -114,17 +117,24 @@ class PaqueteForm
                                         }
                                     },
                                 ]),
+                            // R-02: en las excursiones que ya salieron, el cupo y el guía quedan fijos, como la fecha.
                             TextInput::make('cupo')
                                 ->label('Cupo')
+                                ->disabled(fn (?Excursion $record): bool => $record?->yaSalio() ?? false)
+                                ->validatedWhenNotDehydrated(false)
                                 ->integer()
                                 ->minValue(1)
                                 ->maxValue(self::ENTERO_MAXIMO)
                                 ->required(),
+                            // R-01: sólo los guías libres para esta salida; la lista cambia con la fecha y el recorrido. Al
+                            // guardar se vuelve a validar (regla del repetidor), por las filas del mismo formulario con el
+                            // mismo guía y por los cambios hechos desde otra pestaña.
                             Select::make('id_guia')
                                 ->label('Guía')
-                                ->options(fn () => Guia::orderBy('apellido')->get()
-                                    ->mapWithKeys(fn (Guia $guia) => [$guia->id_usuario => $guia->getNombreCompleto()])
-                                    ->all())
+                                ->options(fn (Get $get, ?Excursion $record): array => self::guiasDisponibles($get, $record))
+                                ->disabled(fn (Get $get, ?Excursion $record): bool => ($record?->yaSalio() ?? false) || ! self::tieneFechaYRecorrido($get))
+                                ->validatedWhenNotDehydrated(false)
+                                ->placeholder(fn (Get $get): ?string => self::tieneFechaYRecorrido($get) ? null : 'Elegí primero la fecha de salida')
                                 ->required(),
                         ])
                         ->columns(3)
@@ -154,5 +164,29 @@ class PaqueteForm
                         ]),
                 ]),
         ]);
+    }
+
+    // Dentro de una fila del repetidor, la fecha es de la fila y el recorrido es del paquete (dos niveles más arriba).
+    private static function tieneFechaYRecorrido(Get $get): bool
+    {
+        return filled($get('fecha_salida')) && filled($get('../../id_recorrido'));
+    }
+
+    private static function guiasDisponibles(Get $get, ?Excursion $excursion): array
+    {
+        // Una excursión que ya salió no cambia de guía: se muestra el que la condujo.
+        if ($excursion?->yaSalio()) {
+            return [$excursion->id_guia => $excursion->guia->getNombreCompleto()];
+        }
+
+        $recorrido = Recorrido::find($get('../../id_recorrido'));
+
+        if ($recorrido === null || blank($get('fecha_salida'))) {
+            return [];
+        }
+
+        return Guia::disponiblesPara(Carbon::parse($get('fecha_salida')), $recorrido->duracion_dias, $excursion?->id_excursion)
+            ->mapWithKeys(fn (Guia $guia) => [$guia->id_usuario => $guia->getNombreCompleto()])
+            ->all();
     }
 }

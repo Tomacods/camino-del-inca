@@ -115,7 +115,8 @@ class Paquete extends Model
     }
 
     // Dentro de la transacción de edición. El paquete bloqueado serializa las altas de excursiones de CU-02 y la
-    // reactivación. Las fechas existentes se toman de la base, aunque el cliente haya cambiado el campo deshabilitado.
+    // reactivación. Las fechas existentes se toman de la base, aunque el cliente haya cambiado el campo deshabilitado; en
+    // las excursiones que ya salieron, también el cupo y el guía.
     public function prepararExcursionesParaModificar(array $salidas): array
     {
         self::whereKey($this->id_paquete)->lockForUpdate()->firstOrFail();
@@ -128,6 +129,11 @@ class Paquete extends Model
             }
 
             $salidas[$clave]['fecha_salida'] = $excursion->fecha_salida->format('Y-m-d');
+
+            if ($excursion->yaSalio()) {
+                $salidas[$clave]['cupo'] = $excursion->cupo;
+                $salidas[$clave]['id_guia'] = $excursion->id_guia;
+            }
         }
 
         foreach (array_keys($salidas) as $clave) {

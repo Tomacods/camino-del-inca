@@ -33,6 +33,12 @@ Antes de validar el formulario, el modelo bloquea el paquete y consulta sus excu
 Las salidas nuevas conservan la validación de lunes, fecha futura, cupo, guía y superposición. Las existentes
 conservan su fecha y permiten cambiar cupo y guía, sujeto a las reglas de R-02.
 
+Las excursiones que ya salieron (Excursion::yaSalio(): la fecha de salida es hoy o anterior, o el recorrido se inició)
+tampoco cambian su cupo ni su guía: los dos campos quedan deshabilitados, no se validan ni se guardan, y el modelo
+reemplaza lo recibido por lo guardado, como con la fecha. Si no, un paquete con sólo reservas «Finalizada» o
+«Cancelada» permitiría cambiar el guía de una salida que ya terminó, y sus valoraciones (que se filtran por el guía de
+la excursión) pasarían al guía nuevo.
+
 El bloqueo del paquete se mantiene hasta terminar la transacción del formulario. Dos ediciones o una edición y una
 reactivación del mismo paquete se turnan. Los guías se bloquean en orden antes de actualizar las excursiones, como
 en CU-01; luego se bloquean las excursiones en orden de `id_excursion` y se revisan reservas y retenciones.
@@ -56,6 +62,7 @@ que actualmente habla de excursiones del mismo paquete o de cualquier otro sin e
 | Paquete | tienePlazasRetenidas() | bool |
 | Paquete | sePuedeModificar() | bool |
 | Paquete | prepararExcursionesParaModificar(array $salidas), dentro de la transacción de edición | array |
+| Excursion | yaSalio() | bool |
 | Paquete | exigirSinReservasActivas(), con bloqueo durante la transacción | void |
 | Paquete | modificarPaquete(array $datos) | void |
 | Paquete | darDeBaja() | void |

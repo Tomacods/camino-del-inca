@@ -52,6 +52,7 @@ de CU-02 usen el mismo orden: bloquear guías, comprobar períodos y recién des
 | Excursion | buscarConflictoDeGuia(array $salidas, int $duracionDias, ?int $idPaquete = null), estático | ?Carbon |
 | Excursion | seSuperponeCon(Carbon $inicio, Carbon $fin) | bool |
 | Excursion | getUltimoDiaRecorrido() | Carbon |
+| Guia | disponiblesPara(Carbon $fechaSalida, int $duracionDias, ?int $idExcursionExcluida = null), estático | Collection de Guia |
 
 Los métodos de consulta de CU-06 se conservan. El siguiente fragmento muestra las responsabilidades de CU-01 y sus
 relaciones; complementa el diagrama general y no redefine el esquema de la base.
@@ -69,7 +70,9 @@ classDiagram
         +seSuperponeCon(inicio, fin) bool
         +getUltimoDiaRecorrido() Carbon
     }
-    class Guia
+    class Guia {
+        +disponiblesPara(fechaSalida, duracionDias, idExcursionExcluida) Collection
+    }
     class Recorrido
     class Servicio
     Paquete "1" --> "*" Excursion : salidas
@@ -80,6 +83,15 @@ classDiagram
 
 buscarConflictoDeGuia() devuelve null cuando no encuentra un conflicto. Los dos métodos de Paquete y los dos
 primeros de Excursion son estáticos; los demás operan sobre una excursión.
+
+## Lista de guías según la fecha (mejora del 19/11)
+
+El campo Guía de cada excursión ofrece sólo los guías libres para esa salida: los que no conducen otra excursión, de
+un paquete activo, cuyo período se superpone con el de la salida (Guia::disponiblesPara, que usa
+Excursion::seSuperponeCon). La lista se recalcula al cambiar la fecha de salida o el recorrido; sin alguno de los dos,
+el campo queda deshabilitado con el texto «Elegí primero la fecha de salida». Al modificar (CU-02) se excluye la propia
+excursión, para que su guía siga apareciendo. La validación de buscarConflictoDeGuia() al guardar se mantiene: cubre
+dos filas del mismo formulario con el mismo guía y los cambios hechos desde otra pestaña.
 
 ## Integración con CU-06
 

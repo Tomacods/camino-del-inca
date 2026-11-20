@@ -15,6 +15,7 @@ use App\Models\Servicio;
 use App\Models\Usuario;
 use Closure;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -27,6 +28,10 @@ use Tests\TestCase;
 class CrearPaqueteTest extends TestCase
 {
     use RefreshDatabase;
+
+    // La consulta con la que Paquete::confirmarGuiasDisponibles() bloquea a los guías al guardar, después de validar el
+    // formulario. La lista de guías y la validación también leen las excursiones, así que se espera a este bloqueo.
+    private const BLOQUEO_DE_GUIAS = 'from "guia" where "id_usuario" in';
 
     private Usuario $administrador;
 
@@ -269,6 +274,40 @@ class CrearPaqueteTest extends TestCase
             ->assertHasNoFormErrors();
     }
 
+    // R-01: Rosa conduce otra excursión del 01/03 al 04/03. Para la salida del 01/03 sólo se ofrece Luis; para la del
+    // 08/03, los dos.
+    public function test_la_lista_de_guias_ofrece_solo_los_libres_para_cada_fecha(): void
+    {
+        $luis = $this->crearGuia('luis@caminodelinca.test', 'Luis', 'Mamani');
+        $this->crearExcursionDeOtroPaquete('2027-03-01');
+
+        $this->formulario()
+            ->fillForm($this->datosValidos(excursiones: [$this->salidaSinGuia('2027-03-01'), $this->salidaSinGuia('2027-03-08')]))
+            ->assertFormFieldExists(
+                'excursiones.0.id_guia',
+                fn (Select $campo): bool => array_keys($campo->getOptions()) === [$luis->id_usuario],
+            )
+            ->assertFormFieldExists(
+                'excursiones.1.id_guia',
+                fn (Select $campo): bool => array_keys($campo->getOptions()) === [$luis->id_usuario, $this->guia->id_usuario],
+            );
+    }
+
+    public function test_sin_fecha_o_sin_recorrido_la_lista_de_guias_queda_deshabilitada(): void
+    {
+        $this->formulario()
+            ->fillForm($this->datosValidos(excursiones: [$this->salidaSinGuia('')]))
+            ->assertFormFieldDisabled('excursiones.0.id_guia')
+            ->assertFormFieldExists(
+                'excursiones.0.id_guia',
+                fn (Select $campo): bool => $campo->getPlaceholder() === 'Elegí primero la fecha de salida',
+            )
+            ->fillForm(['id_recorrido' => null, 'excursiones' => [$this->salidaSinGuia('2027-03-01')]])
+            ->assertFormFieldDisabled('excursiones.0.id_guia')
+            ->fillForm(['id_recorrido' => $this->recorrido->id_recorrido])
+            ->assertFormFieldEnabled('excursiones.0.id_guia');
+    }
+
     public function test_un_guia_no_puede_entrar_al_formulario(): void
     {
         $this->actingAs($this->usuarioGuia)
@@ -304,9 +343,9 @@ class CrearPaqueteTest extends TestCase
         ]);
         $yaOcupado = false;
 
-        // Se inserta después de que la primera consulta leyó al guía libre. La segunda comprobación debe verlo ocupado.
+        // Se inserta después de que la validación vio al guía libre. La comprobación al guardar debe verlo ocupado.
         DB::listen(function (QueryExecuted $consulta) use ($otro, &$yaOcupado) {
-            if ($yaOcupado || ! str_contains($consulta->sql, 'from "excursion"')) {
+            if ($yaOcupado || ! str_contains($consulta->sql, self::BLOQUEO_DE_GUIAS)) {
                 return;
             }
 
@@ -347,6 +386,18 @@ class CrearPaqueteTest extends TestCase
     private function salida(string $fecha, int $cupo = 12): array
     {
         return ['fecha_salida' => $fecha, 'cupo' => $cupo, 'id_guia' => $this->guia->id_usuario];
+    }
+
+    private function salidaSinGuia(string $fecha): array
+    {
+        return ['fecha_salida' => $fecha, 'cupo' => 12, 'id_guia' => null];
+    }
+
+    private function crearGuia(string $correo, string $nombre, string $apellido): Guia
+    {
+        $usuario = Usuario::create(['correo' => $correo, 'password' => 'guia1234', 'rol' => Rol::Guia]);
+
+        return Guia::create(['id_usuario' => $usuario->id_usuario, 'nombre' => $nombre, 'apellido' => $apellido]);
     }
 
     // Una excursión del mismo guía en otro paquete, de 4 días: ocupa del lunes al jueves.
