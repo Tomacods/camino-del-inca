@@ -15,6 +15,7 @@ use App\Models\Comprobante;
 use App\Models\Pago;
 use App\Models\Paquete;
 use App\Models\Reserva;
+use App\Models\Valoracion;
 use Carbon\CarbonInterface;
 use Faker\Factory as Faker;
 use Faker\Generator;
@@ -1240,7 +1241,7 @@ class DatosDeVolumenSeeder extends Seeder
 
     // Las categorías de Valoracion::getCategoriasAValorar(): todas, y el equipo de camping sólo si alguien lo llevó. Los
     // guías con quejas tienen puntajes bajos en «Guía»; el paquete con quejas del hotel, en «Hotel»; y en los meses de
-    // lluvia bajan el camping, los transportes y la experiencia general.
+    // lluvia bajan el camping y los transportes (y, con ellos, la experiencia general, que es el promedio).
     private function armarValoracion(array $reserva, array $excursion, Carbon $fecha): array
     {
         $conLluvia = in_array($excursion['fecha_salida']->month, self::MESES_DE_LLUVIA, true);
@@ -1262,8 +1263,8 @@ class DatosDeVolumenSeeder extends Seeder
             });
         }
 
-        $conQuejas = $puntajes[CategoriaValoracion::Guia->value] <= 2 || $puntajes[CategoriaValoracion::Hotel->value] <= 2;
-        $experienciaGeneral = $this->elegirConPesos($conLluvia || $conQuejas ? self::PUNTAJES_REGULARES : self::PUNTAJES_HABITUALES);
+        // R-23: la experiencia general es el promedio redondeado de las categorías, como cuando valora el cliente.
+        $experienciaGeneral = Valoracion::calcularExperienciaGeneral(array_values($puntajes));
 
         return [
             'id_reserva' => $reserva['id_reserva'],

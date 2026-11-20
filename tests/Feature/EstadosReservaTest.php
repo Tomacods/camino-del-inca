@@ -128,7 +128,7 @@ class EstadosReservaTest extends TestCase
             $this->assertSame($posicion === 3 ? [$idReserva] : [], $finalizadas->pluck('id_reserva')->all());
         }
 
-        $valoracion = Valoracion::valorarServicios($reserva, $this->puntajesValidos($reserva), 5, 'Muy buena experiencia.');
+        $valoracion = Valoracion::valorarServicios($reserva, $this->puntajesValidos($reserva), 'Muy buena experiencia.');
         $reserva->refresh();
 
         $this->assertSame(EstadoReserva::Finalizada, $reserva->estado);
@@ -247,7 +247,7 @@ class EstadosReservaTest extends TestCase
         $reserva = $this->generarReserva();
 
         $this->assertThrows(
-            fn () => Valoracion::valorarServicios($reserva, $this->puntajesValidos($reserva), 5, null),
+            fn () => Valoracion::valorarServicios($reserva, $this->puntajesValidos($reserva), null),
             DomainException::class,
             'Sólo se valoran las reservas finalizadas, y una sola vez.',
         );

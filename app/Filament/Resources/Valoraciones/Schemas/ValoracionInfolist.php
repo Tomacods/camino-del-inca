@@ -19,7 +19,7 @@ class ValoracionInfolist
                 ->columns(2)
                 ->schema([
                     TextEntry::make('fecha')->label('Fecha')->dateTime('d/m/Y H:i'),
-                    TextEntry::make('puntaje_experiencia_general')->label('Experiencia general')
+                    TextEntry::make('puntaje_experiencia_general')->label('Experiencia general (promedio)')
                         ->formatStateUsing(fn ($state) => self::estrellas($state)),
                     TextEntry::make('comentario')->label('Comentario del cliente')
                         ->placeholder('Sin comentario')

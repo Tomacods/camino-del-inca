@@ -22,8 +22,6 @@ new #[Title('Valorar servicios')] class extends Component
     // Un puntaje de 1 a 5 por categoría, indexado por el nombre del caso del enum (por ejemplo «CampingDeEtapa»).
     public array $puntajes = [];
 
-    public ?int $experienciaGeneral = null;
-
     public string $comentario = '';
 
     // CU-23: se llega desde Consultar Reserva (CU-18), que deja en la sesión el correo con el que se consultó.
@@ -40,7 +38,6 @@ new #[Title('Valorar servicios')] class extends Component
     protected function rules(): array
     {
         $reglas = [
-            'experienciaGeneral' => ['required', 'integer', 'between:'.Valoracion::PUNTAJE_MINIMO.','.Valoracion::PUNTAJE_MAXIMO],
             'comentario' => ['nullable', 'string', 'max:500'],
         ];
 
@@ -56,8 +53,6 @@ new #[Title('Valorar servicios')] class extends Component
         return [
             'puntajes.*.required' => 'Elegí de 1 a 5 estrellas.',
             'puntajes.*.between' => 'El puntaje va de 1 a 5 estrellas.',
-            'experienciaGeneral.required' => 'Elegí de 1 a 5 estrellas para la experiencia general.',
-            'experienciaGeneral.between' => 'El puntaje va de 1 a 5 estrellas.',
             'comentario.max' => 'El comentario puede tener hasta 500 caracteres.',
         ];
     }
@@ -73,7 +68,6 @@ new #[Title('Valorar servicios')] class extends Component
             Valoracion::valorarServicios(
                 $this->reserva,
                 array_map('intval', $this->puntajes),
-                $this->experienciaGeneral,
                 $this->comentario,
             );
         } catch (\DomainException $excepcion) {
@@ -100,6 +94,26 @@ new #[Title('Valorar servicios')] class extends Component
     {
         return $this->reserva ? Valoracion::getCategoriasAValorar($this->reserva) : [];
     }
+
+    // R-23: el promedio que se va a guardar como experiencia general, para mostrarlo mientras el cliente elige las
+    // estrellas. Hasta que estén todas las categorías, con un puntaje válido, no hay promedio (null).
+    #[Computed]
+    public function experienciaGeneral(): ?int
+    {
+        $puntajes = [];
+
+        foreach ($this->categorias as $categoria) {
+            $puntaje = (int) ($this->puntajes[$categoria->name] ?? 0);
+
+            if ($puntaje < Valoracion::PUNTAJE_MINIMO || $puntaje > Valoracion::PUNTAJE_MAXIMO) {
+                return null;
+            }
+
+            $puntajes[] = $puntaje;
+        }
+
+        return $puntajes === [] ? null : Valoracion::calcularExperienciaGeneral($puntajes);
+    }
 };
 
 ?>
@@ -119,7 +133,8 @@ new #[Title('Valorar servicios')] class extends Component
         <div class="mt-8 grid gap-5">
             @if ($valorada)
                 <x-aviso titulo="¡Gracias por tu valoración!">
-                    Ya quedó registrada. Tu puntaje de la experiencia general pasa a formar parte del promedio del paquete.
+                    Ya quedó registrada. Tu experiencia general (promedio de los servicios) pasa a formar parte del
+                    promedio del paquete.
                 </x-aviso>
 
                 <div>
@@ -155,12 +170,24 @@ new #[Title('Valorar servicios')] class extends Component
                         </div>
                     </x-tarjeta>
 
-                    <x-tarjeta titulo="Experiencia general">
-                        <div class="divide-y divide-divisor">
-                            <x-estrellas modelo="experienciaGeneral" etiqueta="El recorrido completo" :valor="$experienciaGeneral" />
-                        </div>
+                    <x-tarjeta titulo="Experiencia general (promedio)">
+                        {{-- No se elige: es el promedio de los servicios, redondeado, y se actualiza con cada estrella. --}}
+                        <p class="text-[15px] text-texto-secundario">Se calcula sola: es el promedio de los puntajes de los servicios.</p>
 
-                        <label for="comentario" class="mt-6 block text-[15px] font-medium text-texto">Comentario (opcional)</label>
+                        <p class="mt-3 text-[17px] text-texto" aria-live="polite">
+                            @if ($this->experienciaGeneral === null)
+                                Se calcula cuando valores todos los servicios.
+                            @else
+                                <span role="img" aria-label="{{ $this->experienciaGeneral }} de 5 estrellas" class="text-xl leading-none tracking-wider">
+                                    <span class="text-ambar">{{ str_repeat('★', $this->experienciaGeneral) }}</span><span class="text-divisor">{{ str_repeat('★', 5 - $this->experienciaGeneral) }}</span>
+                                </span>
+                                <span class="ml-2 font-semibold tabular-nums">{{ $this->experienciaGeneral }}</span> de 5
+                            @endif
+                        </p>
+                    </x-tarjeta>
+
+                    <x-tarjeta titulo="Tu comentario">
+                        <label for="comentario" class="block text-[15px] font-medium text-texto">Comentario (opcional)</label>
                         <textarea id="comentario" wire:model="comentario" rows="4" maxlength="500"
                                   @error('comentario') aria-invalid="true" aria-describedby="comentario-error" @enderror
                                   class="mt-2 block w-full rounded-xl border border-borde-campo bg-tarjeta px-4 py-3 text-[17px] text-texto

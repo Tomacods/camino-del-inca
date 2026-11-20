@@ -111,12 +111,21 @@ class Valoracion extends Model
         ));
     }
 
-    // R-23: registra la valoración con un puntaje de 1 a 5 por categoría (indexado por el nombre del caso del enum, por
-    // ejemplo «CampingDeEtapa»), el de la experiencia general y el comentario opcional. Con la reserva bloqueada, para que
-    // dos envíos casi juntos no la valoren dos veces; la base, además, no admite dos valoraciones de la misma reserva.
-    public static function valorarServicios(Reserva $reserva, array $puntajes, int $experienciaGeneral, ?string $comentario): self
+    // R-23: la experiencia general no la elige el cliente: es el promedio de los puntajes de las categorías que valoró
+    // (el equipo de camping cuenta sólo si se valoró). La columna es SMALLINT, así que se redondea al entero más cercano,
+    // con x,5 hacia arriba: 4,4 da 4 y 4,5 da 5.
+    public static function calcularExperienciaGeneral(array $puntajes): int
     {
-        return DB::transaction(function () use ($reserva, $puntajes, $experienciaGeneral, $comentario) {
+        return (int) round(array_sum($puntajes) / count($puntajes));
+    }
+
+    // R-23: registra la valoración con un puntaje de 1 a 5 por categoría (indexado por el nombre del caso del enum, por
+    // ejemplo «CampingDeEtapa») y el comentario opcional; la experiencia general se calcula con esos puntajes. Con la
+    // reserva bloqueada, para que dos envíos casi juntos no la valoren dos veces; la base, además, no admite dos
+    // valoraciones de la misma reserva.
+    public static function valorarServicios(Reserva $reserva, array $puntajes, ?string $comentario): self
+    {
+        return DB::transaction(function () use ($reserva, $puntajes, $comentario) {
             $reserva = Reserva::lockForUpdate()->findOrFail($reserva->id_reserva);
 
             if (! self::admiteValoracion($reserva)) {
@@ -124,17 +133,18 @@ class Valoracion extends Model
             }
 
             $categorias = self::getCategoriasAValorar($reserva);
+            $puntajesValorados = array_map(fn (CategoriaValoracion $categoria) => $puntajes[$categoria->name] ?? null, $categorias);
 
-            foreach ([...array_map(fn (CategoriaValoracion $c) => $puntajes[$c->name] ?? null, $categorias), $experienciaGeneral] as $puntaje) {
+            foreach ($puntajesValorados as $puntaje) {
                 if (! is_int($puntaje) || $puntaje < self::PUNTAJE_MINIMO || $puntaje > self::PUNTAJE_MAXIMO) {
-                    throw new DomainException('Cada categoría y la experiencia general llevan de 1 a 5 estrellas.');
+                    throw new DomainException('Cada categoría lleva de 1 a 5 estrellas.');
                 }
             }
 
             $valoracion = self::create([
                 'id_reserva' => $reserva->id_reserva,
                 'fecha' => now(),
-                'puntaje_experiencia_general' => $experienciaGeneral,
+                'puntaje_experiencia_general' => self::calcularExperienciaGeneral($puntajesValorados),
                 'comentario' => filled($comentario) ? trim($comentario) : null,
             ]);
 
