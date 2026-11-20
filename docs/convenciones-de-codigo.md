@@ -30,7 +30,7 @@ La arquitectura es Modelo–Vista–Controlador, sin capa de servicios:
 - **Controladores y componentes Livewire** — reciben lo que hace el usuario, validan el formato de los datos y
   coordinan a los modelos. No tienen reglas de negocio. Los correos los piden desde acá, pero no los arman: llaman a
   `Reserva::notificarCliente()` (CU-13), que junta los datos, arma el mensaje y lo deja en la cola, como en el DS-13.
-  Así los ocho casos de uso que notifican, incluidas las tareas programadas, comparten el mismo mecanismo. A Mercado
+  Así los nueve casos de uso que notifican, incluidas las tareas programadas, comparten el mismo mecanismo. A Mercado
   Pago no lo llaman: le habla el modelo `Pago`, con el SDK, como en el DS-15 y en el Documento de Arquitectura.
 - **Vistas** — sólo muestran. No consultan la base ni calculan.
 - **Panel (`app/Filament`)** — pantallas del administrador y del guía.
@@ -97,7 +97,7 @@ Las nueve enumeraciones del [esquema](esquema-base-de-datos.md#enumeraciones) so
 valores exactos del esquema: `Rol`, `EstadoPaquete`, `TipoServicio`, `EstadoReserva`, `EstadoSaldo`, `EstadoPermiso`,
 `TipoPago`, `MotivoDevolucion` y `CategoriaValoracion`.
 
-Hay un décimo enum que no es una columna: `TipoNotificacion`, con los ocho tipos de Notificar Cliente (CU-13) de la
+Hay un décimo enum que no es una columna: `TipoNotificacion`, con los nueve tipos de Notificar Cliente (CU-13) de la
 regla de negocio del Doc 3. Lo pasa el caso de uso que invoca la notificación y no se guarda en la base.
 
 - Los valores **siempre se escriben con el enum**, nunca como texto suelto: `EstadoReserva::SinPermiso`, no
