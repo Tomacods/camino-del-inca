@@ -1,4 +1,4 @@
-{{-- Correo de Notificar Cliente (CU-13). Una sola vista para los ocho tipos: lo común (los datos de la reserva y el botón
+{{-- Correo de Notificar Cliente (CU-13). Una sola vista para los nueve tipos: lo común (los datos de la reserva y el botón
      a Mi reserva) va para todos, y en el medio, el bloque del tipo. Todo llega calculado desde Reserva::notificar(): la
      vista sólo lo muestra. HTML simple, con los estilos en cada etiqueta, porque los programas de correo no leen hojas
      de estilo. --}}
@@ -127,6 +127,15 @@
                 @if ($datos['devolucion'] !== null)
                     <p style="margin:0 0 24px">Te reintegramos todo lo abonado: un {{ mb_strtolower($datos['devolucion']['motivo']->value) }} de <strong>{{ $dolares($datos['devolucion']['monto']) }}</strong>, registrado el {{ $datos['devolucion']['fecha']->format('d/m/Y') }}.</p>
                 @endif
+                @break
+
+            @case(TipoNotificacion::Reprogramacion)
+                <p style="margin:0 0 16px">Reprogramaste tu reserva <strong>{{ $reserva['numero_reserva'] }}</strong>: la nueva fecha de salida es el <strong>{{ $excursion['fecha_salida']->format('d/m/Y') }}</strong>.</p>
+                <p style="margin:0 0 16px">
+                    La reserva volvió a <strong>«{{ $reserva['estado']->value }}»</strong> hasta que validemos de nuevo
+                    {{ count($datos['excursionistas']) === 1 ? 'el permiso de ingreso al Camino Inca del integrante' : 'los permisos de ingreso al Camino Inca de todos los integrantes' }}.
+                </p>
+                <p style="margin:0 0 24px">La nueva fecha límite de confirmación es el <strong>{{ $reserva['fecha_limite_confirmacion']->format('d/m/Y') }} a las {{ $reserva['fecha_limite_confirmacion']->format('H:i') }}</strong>.</p>
                 @break
         @endswitch
 

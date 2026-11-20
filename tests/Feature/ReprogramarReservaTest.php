@@ -7,7 +7,9 @@ use App\Enums\EstadoPermiso;
 use App\Enums\EstadoReserva;
 use App\Enums\EstadoSaldo;
 use App\Enums\Rol;
+use App\Enums\TipoNotificacion;
 use App\Enums\TipoPago;
+use App\Mail\NotificacionCliente;
 use App\Models\Excursion;
 use App\Models\Guia;
 use App\Models\Pago;
@@ -18,6 +20,8 @@ use App\Models\Usuario;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -521,6 +525,107 @@ class ReprogramarReservaTest extends TestCase
         Livewire::test('consultar-reserva')
             ->assertSeeHtml('href="/mi-reserva/000125-9/reintegro"')
             ->assertSeeHtml('href="/mi-reserva/000125-9/reprogramar"');
+    }
+
+    /* ------------------------ Correo de la reprogramación (CU-13) ------------------------ */
+
+    public function test_al_confirmar_se_envia_el_correo_de_reprogramacion_al_titular(): void
+    {
+        Mail::fake();
+        $this->darAcceso();
+
+        $this->abrirPantalla()
+            ->call('elegir', '2027-03-01')
+            ->call('confirmar')
+            ->assertSee('¡Reserva reprogramada!');
+
+        Mail::assertQueuedCount(1);
+        $correo = $this->correoDeReprogramacion();
+        $correo->assertHasSubject('Tu reserva 000125-9 fue reprogramada');
+
+        // La nueva salida, que vuelve a «Pendiente» hasta validar los permisos de todos y la nueva fecha límite: un mes
+        // antes de la nueva salida, a las 23:59.
+        $correo->assertSeeInOrderInHtml([
+            'la nueva fecha de salida es el', '01/03/2027',
+            '«'.EstadoReserva::Pendiente->value.'»', 'los permisos de ingreso al Camino Inca de todos los integrantes',
+            'La nueva fecha límite de confirmación es el', '01/02/2027 a las 23:59',
+        ]);
+    }
+
+    public function test_con_un_solo_integrante_el_correo_habla_de_su_permiso(): void
+    {
+        Mail::fake();
+        $this->reserva->excursionistas()->first()->delete();
+        $this->darAcceso();
+
+        $this->abrirPantalla()
+            ->call('elegir', '2027-03-01')
+            ->call('confirmar');
+
+        $correo = $this->correoDeReprogramacion();
+        $correo->assertSeeInHtml('el permiso de ingreso al Camino Inca del integrante');
+        $correo->assertDontSeeInHtml('todos los integrantes');
+    }
+
+    public function test_si_el_plazo_vence_antes_de_confirmar_no_se_envia_ningun_correo(): void
+    {
+        Mail::fake();
+        $this->travelTo(Carbon::parse('2027-01-01 23:50:00'));
+        $this->crearExcursion('2027-04-05', 12);
+        $this->darAcceso();
+
+        $pantalla = $this->abrirPantalla()->call('elegir', '2027-04-05');
+
+        $this->travelTo(Carbon::parse('2027-01-02 00:00:00'));
+        $pantalla->call('confirmar')->assertSee(self::AVISO_PLAZO_VENCIDO);
+
+        Mail::assertNothingQueued();
+        $this->assertNoCambio(EstadoReserva::SinPermiso);
+    }
+
+    public function test_si_otra_reserva_ocupa_el_ultimo_lugar_antes_de_confirmar_no_se_envia_ningun_correo(): void
+    {
+        Mail::fake();
+        $this->destino->update(['cupo' => 2]);
+        $this->darAcceso();
+
+        $pantalla = $this->abrirPantalla()->call('elegir', '2027-03-01');
+
+        $this->crearOtraReserva($this->destino, '000122-3', 'valentina.diaz@mail.com');
+        $pantalla->call('confirmar')->assertDontSee('¡Reserva reprogramada!');
+
+        Mail::assertNothingQueued();
+        $this->assertNoCambio(EstadoReserva::SinPermiso);
+    }
+
+    // A8 de CU-13: si el correo no se puede poner en la cola, se anota y la reprogramación queda hecha.
+    public function test_si_el_correo_no_se_puede_enviar_la_reprogramacion_no_se_deshace(): void
+    {
+        config(['queue.default' => 'no-configurada']);
+        Log::spy();
+        $this->darAcceso();
+
+        $this->abrirPantalla()
+            ->call('elegir', '2027-03-01')
+            ->call('confirmar')
+            ->assertSee('¡Reserva reprogramada!');
+
+        Log::shouldHaveReceived('error')->once()->withArgs(fn ($mensaje) => str_contains($mensaje, TipoNotificacion::Reprogramacion->value)
+            && str_contains($mensaje, '000125-9'));
+
+        $reserva = $this->reserva->fresh();
+        $this->assertSame(EstadoReserva::Pendiente, $reserva->estado);
+        $this->assertSame($this->destino->id_excursion, $reserva->id_excursion);
+    }
+
+    private function correoDeReprogramacion(): NotificacionCliente
+    {
+        $correos = Mail::queued(NotificacionCliente::class, fn (NotificacionCliente $correo) => $correo->tipo === TipoNotificacion::Reprogramacion
+            && $correo->hasTo('federico.rios@mail.com'));
+
+        $this->assertCount(1, $correos);
+
+        return $correos->first();
     }
 
     private function abrirPantalla()

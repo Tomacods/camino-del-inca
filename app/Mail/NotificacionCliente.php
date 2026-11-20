@@ -53,6 +53,7 @@ class NotificacionCliente extends Mailable implements ShouldQueue
                 TipoNotificacion::CancelacionFaltaPago => 'Tu reserva '.$numeroReserva.' fue cancelada por falta de pago',
                 TipoNotificacion::EtapaFinal => 'Tu excursión terminó: contanos cómo te fue',
                 TipoNotificacion::CancelacionFaltaPermisos => 'Tu reserva '.$numeroReserva.' fue cancelada por falta de permisos',
+                TipoNotificacion::Reprogramacion => 'Tu reserva '.$numeroReserva.' fue reprogramada',
             },
         );
     }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TipoNotificacion;
 use App\Models\Reserva;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
@@ -83,6 +84,9 @@ new #[Title('Reprogramar reserva')] class extends Component
         try {
             $cambio = $this->reserva->elegirDestino(Carbon::parse($this->fechaDestino));
             $this->reserva->reprogramar($cambio['destino']);
+            // Después de guardar y fuera de la transacción de reprogramar(): si el correo falla, notificarCliente() lo
+            // anota y la reprogramación queda igual (A8 de CU-13).
+            Reserva::notificarCliente(TipoNotificacion::Reprogramacion, $this->reserva->numero_reserva);
             $this->paso = 4;
         } catch (\DomainException $e) {
             $this->mostrarError($e);
