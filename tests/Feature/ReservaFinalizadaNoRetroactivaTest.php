@@ -76,6 +76,16 @@ class ReservaFinalizadaNoRetroactivaTest extends TestCase
         $this->assertSame(0.0, $reserva->calcularSaldoPendiente());
     }
 
+    // Si CU-22 no llegó a cancelarla, una reserva puede finalizar con el saldo «Adeudado» (finalizarReserva() no lo
+    // controla). Ahí el monto sigue saliendo del paquete, para que se vea la deuda: con sólo la seña, el saldo es 1350.
+    public function test_una_reserva_finalizada_con_saldo_adeudado_sigue_mostrando_la_deuda(): void
+    {
+        $reserva = $this->crearReserva('2026-09-07', EstadoReserva::Finalizada, EstadoSaldo::Adeudado, [1350]);
+
+        $this->assertSame(2700.0, $reserva->calcularMontoTotal());
+        $this->assertSame(1350.0, $reserva->calcularSaldoPendiente());
+    }
+
     // Una reserva activa sigue calculando con los precios del paquete: con la seña sola, el monto total es el del
     // paquete y no lo pagado. Y el paquete no se puede modificar mientras la tenga (R-02).
     public function test_una_reserva_activa_sigue_calculando_con_los_precios_del_paquete(): void
